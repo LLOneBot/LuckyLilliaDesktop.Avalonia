@@ -65,7 +65,7 @@
     <TrayIcon.Icons>
         <TrayIcons>
             <TrayIcon Icon="avares://LuckyLilliaDesktop/Assets/Icons/icon.ico"
-                      ToolTipText="LuckyLillia Desktop" 
+                      ToolTipText="LLBot" 
                       Clicked="TrayIcon_Clicked">
                 <TrayIcon.Menu>
                     <NativeMenu>

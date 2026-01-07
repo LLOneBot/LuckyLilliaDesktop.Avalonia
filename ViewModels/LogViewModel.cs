@@ -104,6 +104,9 @@ public class LogViewModel : ViewModelBase
                 await clipboard.SetTextAsync(text);
                 _logger.LogInformation("已复制 {Count} 条日志", SelectedLogEntries.Count);
             }
+            
+            SelectedLogEntries.Clear();
+            ClearSelectionRequested?.Invoke();
         });
 
         ClearSelectionCommand = ReactiveCommand.Create(() =>

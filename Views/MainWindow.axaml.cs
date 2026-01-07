@@ -38,7 +38,9 @@ public partial class MainWindow : Window
         {
             var config = await _configManager.LoadConfigAsync();
             
-            if (config.WindowLeft.HasValue && config.WindowTop.HasValue)
+            // 只有位置有效时才恢复（避免负值过大的情况）
+            if (config.WindowLeft.HasValue && config.WindowTop.HasValue 
+                && config.WindowLeft.Value > -1000 && config.WindowTop.Value > -1000)
             {
                 Position = new PixelPoint((int)config.WindowLeft.Value, (int)config.WindowTop.Value);
             }
@@ -64,6 +66,12 @@ public partial class MainWindow : Window
     private void ScheduleSaveWindowPosition()
     {
         if (_configManager == null || !_windowPositionLoaded) return;
+        
+        // 窗口最小化时不保存位置
+        if (WindowState == WindowState.Minimized) return;
+        
+        // 检查位置是否有效（负值过大说明窗口在屏幕外）
+        if (Position.X < -1000 || Position.Y < -1000) return;
         
         _savePositionCts?.Cancel();
         _savePositionCts = new CancellationTokenSource();

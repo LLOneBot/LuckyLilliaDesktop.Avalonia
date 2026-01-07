@@ -81,7 +81,7 @@ public class MainWindowViewModel : ViewModelBase
         // 监听 QQ 信息变化更新标题
         homeViewModel.WhenAnyValue(x => x.QQUin, x => x.QQNickname)
             .Where(tuple => !string.IsNullOrEmpty(tuple.Item1))
-            .Select(tuple => $"Lucky Lillia Desktop - {tuple.Item2}({tuple.Item1})")
+            .Select(tuple => $"LLBot - {tuple.Item2}({tuple.Item1})")
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(newTitle => Title = newTitle);
 
