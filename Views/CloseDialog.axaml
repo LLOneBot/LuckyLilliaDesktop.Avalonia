@@ -1,0 +1,73 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="200"
+        x:Class="LuckyLilliaDesktop.Views.CloseDialog"
+        Title=""
+        Width="300"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+    <Border Padding="24"
+            CornerRadius="12"
+            Background="{DynamicResource CardBackground}"
+            BorderBrush="{DynamicResource BorderColor}"
+            BorderThickness="1">
+        <Grid>
+            <!-- 右上角关闭按钮 -->
+            <Button Click="OnCancel"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="0,-12,-12,0"
+                    Width="28" Height="28"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="0">
+                <PathIcon Data="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                          Width="16" Height="16"
+                          Foreground="{DynamicResource TextSecondary}"/>
+            </Button>
+            
+            <StackPanel Spacing="20">
+                <!-- 标题 -->
+                <TextBlock Text="关闭窗口"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}"
+                           HorizontalAlignment="Center"/>
+
+                <!-- 记住选择复选框 -->
+                <CheckBox x:Name="RememberCheckBox"
+                          Content="记住我的选择"
+                          Foreground="{DynamicResource TextPrimary}"
+                          HorizontalAlignment="Center"/>
+
+                <!-- 按钮区域 -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="12"
+                            HorizontalAlignment="Center">
+                    <Button Content="收进托盘"
+                            Click="OnMinimizeToTray"
+                            Width="100"
+                            Padding="0,10"
+                            Background="{DynamicResource PrimaryBrush}"
+                            Foreground="White"
+                            HorizontalContentAlignment="Center"/>
+                    <Button Content="直接退出"
+                            Click="OnExit"
+                            Width="100"
+                            Padding="0,10"
+                            Background="{DynamicResource DangerColor}"
+                            Foreground="White"
+                            HorizontalContentAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

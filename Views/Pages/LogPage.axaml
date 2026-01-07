@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:LuckyLilliaDesktop.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="LuckyLilliaDesktop.Views.Pages.LogPage"
+             x:DataType="vm:LogViewModel">
+
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="28,28,28,0">
+            <DockPanel>
+                <PathIcon DockPanel.Dock="Left"
+                          Data="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1v5h5M16 13H8M16 17H8M10 9H8"
+                          Width="36" Height="36"
+                          Foreground="{DynamicResource PrimaryBrush}"
+                          Margin="0,0,12,0"/>
+                <TextBlock Text="日志查看器"
+                           FontSize="32"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimary}"
+                           VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+                    <Button Content="取消选中"
+                            Command="{Binding ClearSelectionCommand}"
+                            IsVisible="{Binding HasSelection}"
+                            Padding="12,6"/>
+                    <Button Content="复制选中"
+                            Command="{Binding CopySelectedCommand}"
+                            IsVisible="{Binding HasSelection}"
+                            Background="{DynamicResource PrimaryBrush}"
+                            Foreground="White"
+                            Padding="12,6"/>
+                    <ToggleButton x:Name="AutoScrollToggle"
+                                  IsChecked="{Binding AutoScroll}"
+                                  ToolTip.Tip="自动滚动到底部">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Data="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
+                                      Width="16" Height="16"/>
+                            <TextBlock Text="自动滚动" FontSize="12"/>
+                        </StackPanel>
+                    </ToggleButton>
+                    <Button Content="清空日志"
+                            Command="{Binding ClearLogsCommand}"
+                            Background="#EF4444"
+                            Foreground="White"
+                            Padding="12,6"/>
+                </StackPanel>
+            </DockPanel>
+            <Border Height="2" Background="{DynamicResource PrimaryBrush}" CornerRadius="1" Margin="0,12,0,0"/>
+        </StackPanel>
+
+        <Border Background="{DynamicResource CardBackground}"
+                Margin="28,16,28,28"
+                CornerRadius="12"
+                BorderThickness="1"
+                BorderBrush="{DynamicResource BorderColor}"
+                Padding="8">
+            <ListBox x:Name="LogListBox"
+                     ItemsSource="{Binding LogEntries}"
+                     SelectionMode="Multiple"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock x:Name="LogText"
+                                   Text="{Binding FormattedText}"
+                                   FontFamily="Cascadia Code,Consolas,Courier New"
+                                   FontSize="13"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   TextWrapping="Wrap"
+                                   Padding="4,2"
+                                   Classes.error="{Binding IsError}"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0,1"/>
+                        <Setter Property="CornerRadius" Value="4"/>
+                    </Style>
+                    <Style Selector="TextBlock.error">
+                        <Setter Property="Foreground" Value="{DynamicResource DangerColor}"/>
+                    </Style>
+                </ListBox.Styles>
+            </ListBox>
+        </Border>
+    </DockPanel>
+</UserControl>

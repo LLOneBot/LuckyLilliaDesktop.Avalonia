@@ -1,0 +1,70 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LuckyLilliaDesktop.Views.ChoiceDialog"
+        Title=""
+        Width="380"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+    <Border Padding="24"
+            CornerRadius="12"
+            Background="{DynamicResource CardBackground}"
+            BorderBrush="{DynamicResource BorderColor}"
+            BorderThickness="1">
+        <Grid>
+            <Button Click="OnCancel"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="0,-12,-12,0"
+                    Width="28" Height="28"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="0">
+                <PathIcon Data="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                          Width="16" Height="16"
+                          Foreground="{DynamicResource TextSecondary}"/>
+            </Button>
+            
+            <StackPanel Spacing="20">
+                <TextBlock x:Name="TitleText"
+                           Text="标题"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}"
+                           HorizontalAlignment="Center"/>
+                
+                <TextBlock x:Name="MessageText"
+                           Text="消息"
+                           FontSize="14"
+                           Foreground="{DynamicResource TextSecondary}"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"/>
+
+                <StackPanel Orientation="Horizontal"
+                            Spacing="12"
+                            HorizontalAlignment="Center">
+                    <Button x:Name="Option1Button"
+                            Content="选项1"
+                            Width="140"
+                            Padding="0,10"
+                            Background="{DynamicResource PrimaryBrush}"
+                            Foreground="White"
+                            HorizontalContentAlignment="Center"
+                            Click="OnOption1Click"/>
+                    <Button x:Name="Option2Button"
+                            Content="选项2"
+                            Width="140"
+                            Padding="0,10"
+                            HorizontalContentAlignment="Center"
+                            Click="OnOption2Click"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

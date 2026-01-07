@@ -1,0 +1,289 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LuckyLilliaDesktop.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="900"
+             x:Class="LuckyLilliaDesktop.Views.Pages.LLBotConfigPage"
+             x:DataType="vm:LLBotConfigViewModel">
+
+    <Panel>
+        <!-- 未登录提示 -->
+        <StackPanel IsVisible="{Binding !HasUin}"
+                    Spacing="16"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center">
+            <PathIcon Data="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"
+                      Width="64" Height="64"
+                      Foreground="#F59E0B"/>
+            <TextBlock Text="请先启动并登录 QQ"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="#F59E0B"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="获取到 QQ 账号后才能编辑 Bot 配置"
+                       FontSize="16"
+                       Foreground="{DynamicResource TextSecondary}"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- 配置内容 -->
+        <ScrollViewer IsVisible="{Binding HasUin}">
+            <StackPanel Spacing="16" Margin="28">
+                <!-- 标题 -->
+                <DockPanel>
+                    <PathIcon DockPanel.Dock="Left"
+                              Data="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"
+                              Width="36" Height="36"
+                              Foreground="{DynamicResource PrimaryBrush}"
+                              Margin="0,0,12,0"/>
+                    <TextBlock Text="LLBot 配置"
+                               FontSize="32"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               VerticalAlignment="Center"/>
+                </DockPanel>
+                <Border Height="2" Background="{DynamicResource PrimaryBrush}" CornerRadius="1"/>
+
+                <!-- WebUI 配置 -->
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="12" Padding="16">
+                    <StackPanel Spacing="12">
+                        <DockPanel>
+                            <PathIcon DockPanel.Dock="Left"
+                                      Data="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z"
+                                      Width="20" Height="20"
+                                      Foreground="{DynamicResource PrimaryBrush}"
+                                      Margin="0,0,10,0"/>
+                            <TextBlock Text="WebUI" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                        </DockPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <CheckBox Content="启用" IsChecked="{Binding WebuiEnable}" Foreground="{DynamicResource TextPrimary}"/>
+                            <NumericUpDown Value="{Binding WebuiPort}" Minimum="1" Maximum="65535" Width="120" ShowButtonSpinner="False"/>
+                            <Button Content="打开 WebUI" Command="{Binding OpenWebuiCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- OneBot 11 配置 -->
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="12" Padding="16">
+                    <StackPanel Spacing="12">
+                        <DockPanel>
+                            <PathIcon DockPanel.Dock="Left"
+                                      Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
+                                      Width="20" Height="20"
+                                      Foreground="{DynamicResource PrimaryBrush}"
+                                      Margin="0,0,10,0"/>
+                            <TextBlock Text="OneBot 11" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                        </DockPanel>
+                        <CheckBox Content="启用 OneBot 11" IsChecked="{Binding Ob11Enable}" Foreground="{DynamicResource TextPrimary}"/>
+
+                        <!-- Tab 切换连接 -->
+                        <TabControl ItemsSource="{Binding Ob11Connections}"
+                                    SelectedIndex="{Binding SelectedConnectionIndex}"
+                                    Padding="0">
+                            <TabControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:OB11ConnectionViewModel">
+                                    <TextBlock Text="{Binding TypeName}"/>
+                                </DataTemplate>
+                            </TabControl.ItemTemplate>
+                            <TabControl.ContentTemplate>
+                                <DataTemplate x:DataType="vm:OB11ConnectionViewModel">
+                                    <Border Background="Transparent" 
+                                            Padding="12,16" 
+                                            Margin="0">
+                                        <StackPanel Spacing="12">
+                                            <DockPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                    <CheckBox Content="启用" IsChecked="{Binding Enable}" Foreground="{DynamicResource TextPrimary}"/>
+                                                    <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" Width="100" ShowButtonSpinner="False"
+                                                                   IsVisible="{Binding HasPort}"/>
+                                                    <TextBox Text="{Binding Url}" Width="300" Watermark="URL"
+                                                             IsVisible="{Binding HasUrl}"/>
+                                                </StackPanel>
+                                                <Button DockPanel.Dock="Right" Content="删除"
+                                                        Command="{Binding $parent[TabControl].((vm:LLBotConfigViewModel)DataContext).RemoveConnectionCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Foreground="{DynamicResource DangerColor}"
+                                                        HorizontalAlignment="Right"/>
+                                            </DockPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                                <NumericUpDown Value="{Binding HeartInterval}" Minimum="1000" Width="120" ShowButtonSpinner="False"
+                                                               IsVisible="{Binding HasHeart}"/>
+                                                <CheckBox Content="启用心跳" IsChecked="{Binding EnableHeart}" Foreground="{DynamicResource TextPrimary}"
+                                                          IsVisible="{Binding HasEnableHeart}"/>
+                                                <TextBox Text="{Binding Token}" Width="180" Watermark="Token"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                                <ComboBox SelectedItem="{Binding MessageFormat}" Width="120">
+                                                    <ComboBoxItem Content="array"/>
+                                                    <ComboBoxItem Content="string"/>
+                                                </ComboBox>
+                                                <CheckBox Content="上报自身" IsChecked="{Binding ReportSelfMessage}" Foreground="{DynamicResource TextPrimary}"/>
+                                                <CheckBox Content="上报离线" IsChecked="{Binding ReportOfflineMessage}" Foreground="{DynamicResource TextPrimary}"/>
+                                                <CheckBox Content="调试" IsChecked="{Binding Debug}" Foreground="{DynamicResource TextPrimary}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </TabControl.ContentTemplate>
+                        </TabControl>
+
+                        <!-- 添加连接按钮 -->
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="添加连接:" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"/>
+                            <Button Content="WebSocket" Command="{Binding AddConnectionCommand}" CommandParameter="ws"/>
+                            <Button Content="反向WS" Command="{Binding AddConnectionCommand}" CommandParameter="ws-reverse"/>
+                            <Button Content="HTTP" Command="{Binding AddConnectionCommand}" CommandParameter="http"/>
+                            <Button Content="HTTP POST" Command="{Binding AddConnectionCommand}" CommandParameter="http-post"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Satori 配置 -->
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="12" Padding="16">
+                    <StackPanel Spacing="12">
+                        <DockPanel>
+                            <PathIcon DockPanel.Dock="Left"
+                                      Data="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"
+                                      Width="20" Height="20"
+                                      Foreground="{DynamicResource PrimaryBrush}"
+                                      Margin="0,0,10,0"/>
+                            <TextBlock Text="Satori" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                        </DockPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <CheckBox Content="启用" IsChecked="{Binding SatoriEnable}" Foreground="{DynamicResource TextPrimary}"/>
+                            <NumericUpDown Value="{Binding SatoriPort}" Minimum="1" Maximum="65535" Width="120" ShowButtonSpinner="False"/>
+                            <TextBox Text="{Binding SatoriToken}" Width="250" Watermark="Token"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Milky 配置 -->
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="12" Padding="16">
+                    <StackPanel Spacing="12">
+                        <DockPanel>
+                            <PathIcon DockPanel.Dock="Left"
+                                      Data="M7 2v2h1v1.17C5.69 6.07 4 8.35 4 11v9c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-9c0-2.65-1.69-4.93-4-5.83V4h1V2H7zm2 3h6v1.1c-.32-.07-.66-.1-1-.1H10c-.34 0-.68.03-1 .1V5zm5 7c0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3 3 1.34 3 3z"
+                                      Width="20" Height="20"
+                                      Foreground="{DynamicResource PrimaryBrush}"
+                                      Margin="0,0,10,0"/>
+                            <TextBlock Text="Milky" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                        </DockPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <CheckBox Content="启用" IsChecked="{Binding MilkyEnable}" Foreground="{DynamicResource TextPrimary}"/>
+                            <CheckBox Content="上报自身消息" IsChecked="{Binding MilkyReportSelf}" Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <NumericUpDown Value="{Binding MilkyHttpPort}" Minimum="1" Maximum="65535" Width="120" ShowButtonSpinner="False"/>
+                            <TextBox Text="{Binding MilkyHttpPrefix}" Width="150" Watermark="前缀"/>
+                            <TextBox Text="{Binding MilkyHttpToken}" Width="200" Watermark="AccessToken"/>
+                        </StackPanel>
+
+                        <!-- Webhook -->
+                        <TextBlock Text="Webhook" Foreground="{DynamicResource TextSecondary}" FontWeight="Medium"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBox Text="{Binding MilkyWebhookToken}" Width="200" Watermark="Webhook AccessToken"/>
+                            <Button Content="+ 添加 URL" Command="{Binding AddWebhookUrlCommand}"/>
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding MilkyWebhookUrls}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4">
+                                        <TextBox Text="{Binding}" Width="350" Watermark="http://example.com/webhook"/>
+                                        <Button Content="删除"
+                                                Command="{Binding $parent[ItemsControl].((vm:LLBotConfigViewModel)DataContext).RemoveWebhookUrlCommand}"
+                                                CommandParameter="{Binding}"
+                                                Foreground="{DynamicResource DangerColor}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- 其他配置 -->
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="12" Padding="16">
+                    <StackPanel Spacing="12">
+                        <DockPanel>
+                            <PathIcon DockPanel.Dock="Left"
+                                      Data="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"
+                                      Width="20" Height="20"
+                                      Foreground="{DynamicResource PrimaryBrush}"
+                                      Margin="0,0,10,0"/>
+                            <TextBlock Text="其他配置" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                        </DockPanel>
+                        <WrapPanel>
+                            <CheckBox Content="本地文件转URL" IsChecked="{Binding EnableLocalFile2Url}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,16,8"/>
+                            <CheckBox Content="启用日志" IsChecked="{Binding LogEnable}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,16,8"/>
+                            <CheckBox Content="自动删除文件" IsChecked="{Binding AutoDeleteFile}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,16,8"/>
+                            <CheckBox Content="仅本地访问" IsChecked="{Binding OnlyLocalhost}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,16,8"/>
+                        </WrapPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="删除时间(秒)" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                <NumericUpDown Value="{Binding AutoDeleteFileSecond}" Minimum="1" Width="120" ShowButtonSpinner="False"/>
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="消息缓存(秒)" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                <NumericUpDown Value="{Binding MsgCacheExpire}" Minimum="1" Width="120" ShowButtonSpinner="False"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="音乐签名URL" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                            <TextBox Text="{Binding MusicSignUrl}" Watermark="https://llob.linyuchen.net/sign/music"/>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="FFmpeg 路径" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                            <TextBox Text="{Binding FfmpegPath}" Watermark="留空使用系统默认"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- 底部留白 -->
+                <Border Height="80"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 悬浮按钮 -->
+        <StackPanel Orientation="Horizontal"
+                    Spacing="12"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Margin="0,0,28,28"
+                    IsVisible="{Binding HasUin}">
+            <Button Command="{Binding RefreshCommand}"
+                    Width="48" Height="48"
+                    CornerRadius="24"
+                    Background="{DynamicResource CardBackgroundSecondary}"
+                    ToolTip.Tip="刷新">
+                <PathIcon Data="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+                          Width="20" Height="20"
+                          Foreground="{DynamicResource TextPrimary}"/>
+            </Button>
+            <Button Command="{Binding SaveConfigCommand}"
+                    Width="48" Height="48"
+                    CornerRadius="24"
+                    Background="{DynamicResource PrimaryBrush}"
+                    ToolTip.Tip="保存配置">
+                <PathIcon Data="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"
+                          Width="20" Height="20"
+                          Foreground="White"/>
+            </Button>
+        </StackPanel>
+    </Panel>
+</UserControl>

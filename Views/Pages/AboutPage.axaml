@@ -1,0 +1,315 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LuckyLilliaDesktop.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="700"
+             x:Class="LuckyLilliaDesktop.Views.Pages.AboutPage"
+             x:DataType="vm:AboutViewModel">
+
+    <Panel>
+        <ScrollViewer>
+            <StackPanel Spacing="16" Margin="28">
+                <!-- 标题 -->
+                <DockPanel>
+                    <PathIcon DockPanel.Dock="Left"
+                              Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+                              Width="36" Height="36"
+                              Foreground="{DynamicResource PrimaryBrush}"
+                              Margin="0,0,12,0"/>
+                    <TextBlock Text="关于"
+                               FontSize="32"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               VerticalAlignment="Center"/>
+                </DockPanel>
+                <Border Height="2" Background="{DynamicResource PrimaryBrush}" CornerRadius="1"/>
+
+                <!-- 应用信息卡片 -->
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="12" Padding="20">
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <Border Width="56" Height="56"
+                                CornerRadius="12">
+                            <Image Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
+                                   Width="56" Height="56"/>
+                        </Border>
+                        <StackPanel Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding AppName}"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                            <TextBlock Text="LLBot - 幸运莉莉娅桌面端"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+            <!-- 版本信息标题 -->
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <PathIcon Data="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm-1-4h2v2h-2v-2zm0-10h2v8h-2V6z"
+                          Width="24" Height="24"
+                          Foreground="{DynamicResource PrimaryBrush}"/>
+                <TextBlock Text="版本信息"
+                           FontSize="22"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}"/>
+            </StackPanel>
+
+            <!-- 管理器版本卡片 -->
+            <Border Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="12" Padding="24">
+                <StackPanel Spacing="16">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <PathIcon Data="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"
+                                  Width="24" Height="24"
+                                  Foreground="{DynamicResource PrimaryBrush}"/>
+                        <TextBlock Text="{Binding AppName}"
+                                   FontSize="20"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+                    </StackPanel>
+                    <Border Height="1" Background="{DynamicResource BorderColor}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8" Height="36">
+                        <TextBlock Text="{Binding AppVersion, StringFormat=当前版本: {0}}"
+                                   FontSize="15"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   FontWeight="Medium"
+                                   VerticalAlignment="Center"/>
+                        <!-- 更新状态 -->
+                        <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
+                                  Width="20" Height="20"
+                                  Foreground="{DynamicResource SuccessColor}"
+                                  IsVisible="{Binding AppIsLatest}"/>
+                        <TextBlock Text="已是最新版本"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource SuccessColor}"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding AppIsLatest}"/>
+                        <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+                                  Width="20" Height="20"
+                                  Foreground="#F59E0B"
+                                  IsVisible="{Binding AppHasUpdate}"/>
+                        <TextBlock Text="{Binding AppLatestVersion, StringFormat=有新版本: {0}}"
+                                   FontSize="12"
+                                   Foreground="#F59E0B"
+                                   FontWeight="Bold"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding AppHasUpdate}"/>
+                        <Button Content="查看详情"
+                                Command="{Binding OpenAppReleaseCommand}"
+                                FontSize="12"
+                                Padding="8,4"
+                                IsVisible="{Binding AppHasUpdate}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- PMHQ 和 LLBot 版本卡片并排 -->
+            <UniformGrid Columns="2">
+                <!-- PMHQ 版本卡片 -->
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="12" Padding="24" Margin="0,0,10,0">
+                    <StackPanel Spacing="16">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <PathIcon Data="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"
+                                      Width="24" Height="24"
+                                      Foreground="{DynamicResource PrimaryBrush}"/>
+                            <TextBlock Text="PMHQ"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                        <Border Height="1" Background="{DynamicResource BorderColor}"/>
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{Binding PmhqVersion, StringFormat=当前版本: {0}}"
+                                       FontSize="15"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       FontWeight="Medium"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8" Height="24">
+                                <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
+                                          Width="20" Height="20"
+                                          Foreground="{DynamicResource SuccessColor}"
+                                          IsVisible="{Binding PmhqIsLatest}"/>
+                                <TextBlock Text="已是最新版本"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource SuccessColor}"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding PmhqIsLatest}"/>
+                                <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+                                          Width="20" Height="20"
+                                          Foreground="#F59E0B"
+                                          IsVisible="{Binding PmhqHasUpdate}"/>
+                                <TextBlock Text="{Binding PmhqLatestVersion, StringFormat=有新版本: {0}}"
+                                           FontSize="12"
+                                           Foreground="#F59E0B"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding PmhqHasUpdate}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- LLBot 版本卡片 -->
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="12" Padding="24" Margin="10,0,0,0">
+                    <StackPanel Spacing="16">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <PathIcon Data="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"
+                                      Width="24" Height="24"
+                                      Foreground="{DynamicResource PrimaryBrush}"/>
+                            <TextBlock Text="LLBot"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                        <Border Height="1" Background="{DynamicResource BorderColor}"/>
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{Binding LLBotVersion, StringFormat=当前版本: {0}}"
+                                       FontSize="15"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       FontWeight="Medium"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8" Height="24">
+                                <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
+                                          Width="20" Height="20"
+                                          Foreground="{DynamicResource SuccessColor}"
+                                          IsVisible="{Binding LLBotIsLatest}"/>
+                                <TextBlock Text="已是最新版本"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource SuccessColor}"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding LLBotIsLatest}"/>
+                                <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+                                          Width="20" Height="20"
+                                          Foreground="#F59E0B"
+                                          IsVisible="{Binding LLBotHasUpdate}"/>
+                                <TextBlock Text="{Binding LLBotLatestVersion, StringFormat=有新版本: {0}}"
+                                           FontSize="12"
+                                           Foreground="#F59E0B"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding LLBotHasUpdate}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- 检查更新按钮 -->
+                <StackPanel Orientation="Horizontal" Spacing="20" HorizontalAlignment="Center" IsVisible="False">
+                    <Button Command="{Binding CheckUpdateCommand}"
+                            Padding="24,12"
+                            Background="{DynamicResource PrimaryBrush}"
+                            Foreground="White"
+                            CornerRadius="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Data="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"
+                                      Width="20" Height="20"
+                                      Foreground="White"/>
+                            <TextBlock Text="{Binding CheckUpdateButtonText}" FontWeight="Medium"/>
+                        </StackPanel>
+                    </Button>
+                    <ProgressBar Width="100" Height="4"
+                                 IsIndeterminate="True"
+                                 IsVisible="{Binding IsCheckingUpdate}"
+                                 Foreground="{DynamicResource PrimaryBrush}"/>
+                </StackPanel>
+
+            <!-- 相关链接 -->
+            <Border Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="12" Padding="24">
+                <StackPanel Spacing="16">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <PathIcon Data="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"
+                                  Width="20" Height="20"
+                                  Foreground="{DynamicResource PrimaryBrush}"/>
+                        <TextBlock Text="相关链接"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+                    </StackPanel>
+                    <StackPanel Spacing="12">
+                        <Button Command="{Binding OpenQQGroupCommand}"
+                                Background="Transparent"
+                                Padding="0">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
+                                          Width="16" Height="16"
+                                          Foreground="{DynamicResource PrimaryBrush}"/>
+                                <TextBlock Text="QQ群：545402644"
+                                           Foreground="{DynamicResource PrimaryBrush}"
+                                           FontSize="14"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding OpenAppGitHubCommand}"
+                                Background="Transparent"
+                                Padding="0">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
+                                          Width="16" Height="16"
+                                          Foreground="{DynamicResource PrimaryBrush}"/>
+                                <TextBlock Text="Lucky Lillia Desktop GitHub"
+                                           Foreground="{DynamicResource PrimaryBrush}"
+                                           FontSize="14"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding OpenPmhqGitHubCommand}"
+                                Background="Transparent"
+                                Padding="0">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
+                                          Width="16" Height="16"
+                                          Foreground="{DynamicResource PrimaryBrush}"/>
+                                <TextBlock Text="PMHQ GitHub"
+                                           Foreground="{DynamicResource PrimaryBrush}"
+                                           FontSize="14"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding OpenLLBotGitHubCommand}"
+                                Background="Transparent"
+                                Padding="0">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
+                                          Width="16" Height="16"
+                                          Foreground="{DynamicResource PrimaryBrush}"/>
+                                <TextBlock Text="LLBot GitHub"
+                                           Foreground="{DynamicResource PrimaryBrush}"
+                                           FontSize="14"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+
+    <!-- 悬浮检查更新按钮 -->
+    <Button Command="{Binding CheckUpdateCommand}"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,20"
+            Padding="24,12"
+            Background="{DynamicResource PrimaryBrush}"
+            Foreground="White"
+            CornerRadius="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Data="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"
+                      Width="20" Height="20"
+                      Foreground="White"/>
+            <TextBlock Text="{Binding CheckUpdateButtonText}" FontWeight="Medium"/>
+        </StackPanel>
+    </Button>
+    </Panel>
+</UserControl>

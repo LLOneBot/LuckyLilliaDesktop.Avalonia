@@ -1,0 +1,178 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LuckyLilliaDesktop.ViewModels"
+        xmlns:views="using:LuckyLilliaDesktop.Views.Pages"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+        x:Class="LuckyLilliaDesktop.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="{Binding Title}"
+        Icon="avares://LuckyLilliaDesktop/Assets/Icons/icon.ico"
+        Width="900" Height="600"
+        WindowStartupLocation="Manual"
+        Position="50,50"
+        Background="{DynamicResource MainBackground}">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Panel>
+        <!-- 主内容 -->
+        <Grid ColumnDefinitions="90,*">
+            <!-- 左侧导航栏 -->
+            <Border Grid.Column="0"
+                    Background="{DynamicResource SidebarBackground}"
+                    CornerRadius="0">
+                <Grid RowDefinitions="Auto,*,Auto">
+                    <!-- 头像区域 -->
+                    <StackPanel Grid.Row="0" Margin="0,40,0,20" HorizontalAlignment="Center">
+                        <!-- 头像 -->
+                        <Border Width="48" Height="48"
+                                Background="{DynamicResource PrimaryBrush}"
+                                CornerRadius="24">
+                            <Panel>
+                                <!-- 默认图标 -->
+                                <PathIcon x:Name="DefaultAvatarIcon"
+                                          Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"
+                                          Foreground="White"
+                                          IsVisible="{Binding !HomeVM.HasQQInfo}"/>
+                                <!-- QQ 头像 -->
+                                <Image x:Name="QQAvatarImage"
+                                       Width="48" Height="48"
+                                       Stretch="UniformToFill"
+                                       Source="{Binding HomeVM.AvatarBitmap}"
+                                       IsVisible="{Binding HomeVM.HasQQInfo}">
+                                    <Image.Clip>
+                                        <EllipseGeometry Center="24,24" RadiusX="24" RadiusY="24"/>
+                                    </Image.Clip>
+                                </Image>
+                            </Panel>
+                        </Border>
+                        <!-- 未登录提示 -->
+                        <TextBlock Text="未登录"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,8,0,0"
+                                   IsVisible="{Binding !HomeVM.HasQQInfo}"/>
+                        <!-- 昵称和 UIN -->
+                        <TextBlock Text="{Binding HomeVM.QQNickname}"
+                                   FontSize="10"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="80"
+                                   Margin="0,8,0,0"
+                                   IsVisible="{Binding HomeVM.HasQQInfo}"/>
+                        <TextBlock Text="{Binding HomeVM.QQUin}"
+                                   FontSize="9"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,2,0,0"
+                                   IsVisible="{Binding HomeVM.HasQQInfo}"/>
+                    </StackPanel>
+
+                    <!-- 导航按钮列表 -->
+                    <ListBox Grid.Row="1"
+                             SelectedIndex="{Binding SelectedIndex}"
+                             Background="Transparent"
+                             Padding="8">
+                        <!-- 控制面板 -->
+                        <ListBoxItem>
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <PathIcon Data="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"
+                                          Width="24" Height="24"/>
+                                <TextBlock Text="控制面板" FontSize="11" TextAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+
+                        <!-- 日志查看 -->
+                        <ListBoxItem>
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <PathIcon Data="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"
+                                          Width="24" Height="24"/>
+                                <TextBlock Text="日志查看" FontSize="11" TextAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+
+                        <!-- 系统配置 -->
+                        <ListBoxItem>
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <PathIcon Data="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"
+                                          Width="24" Height="24"/>
+                                <TextBlock Text="系统配置" FontSize="11" TextAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+
+                        <!-- Bot配置 -->
+                        <ListBoxItem>
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <PathIcon Data="M20,9V7c0-1.1-0.9-2-2-2h-3c0-1.66-1.34-3-3-3S9,3.34,9,5H6C4.9,5,4,5.9,4,7v2c-1.66,0-3,1.34-3,3c0,1.66,1.34,3,3,3 v4c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2v-4c1.66,0,3-1.34,3-3C23,10.34,21.66,9,20,9z M12,6.5c0.83,0,1.5,0.67,1.5,1.5 s-0.67,1.5-1.5,1.5S10.5,8.83,10.5,8S11.17,6.5,12,6.5z M7.5,17c-0.83,0-1.5-0.67-1.5-1.5S6.67,14,7.5,14s1.5,0.67,1.5,1.5 S8.33,17,7.5,17z M12,13.5c-0.83,0-1.5-0.67-1.5-1.5s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S12.83,13.5,12,13.5z M16.5,17 c-0.83,0-1.5-0.67-1.5-1.5s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S17.33,17,16.5,17z"
+                                          Width="24" Height="24"/>
+                                <TextBlock Text="Bot配置" FontSize="11" TextAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+
+                        <!-- 关于 -->
+                        <ListBoxItem>
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+                                          Width="24" Height="24"/>
+                                <TextBlock Text="关于应用" FontSize="11" TextAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                    </ListBox>
+
+                    <!-- 主题切换按钮（底部） -->
+                    <StackPanel Grid.Row="2" Margin="0,0,0,16">
+                        <Border Height="1" 
+                                Background="{DynamicResource BorderColor}" 
+                                Margin="12,0,12,12"/>
+                        <Button Command="{Binding ToggleThemeCommand}"
+                                HorizontalAlignment="Center"
+                                Width="32" Height="32"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                ToolTip.Tip="切换主题">
+                            <Panel>
+                                <!-- 月亮图标 (深色模式) -->
+                                <PathIcon Data="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"
+                                          Width="18" Height="18"
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          IsVisible="{Binding IsDarkTheme}"/>
+                                <!-- 太阳图标 (浅色模式) -->
+                                <PathIcon Data="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"
+                                          Width="18" Height="18"
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          IsVisible="{Binding !IsDarkTheme}"/>
+                            </Panel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 右侧内容区域 -->
+            <Border Grid.Column="1"
+                    Background="{DynamicResource MainBackground}"
+                    CornerRadius="0,12,12,0"
+                    Margin="2,2,8,8">
+                <!-- 页面切换容器 -->
+                <Panel x:CompileBindings="False">
+                    <views:HomePage DataContext="{Binding HomeVM}"
+                                   IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=0}"/>
+                    <views:LogPage DataContext="{Binding LogVM}"
+                                  IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=1}"/>
+                    <views:ConfigPage DataContext="{Binding ConfigVM}"
+                                     IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=2}"/>
+                    <views:LLBotConfigPage DataContext="{Binding LLBotConfigVM}"
+                                          IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=3}"/>
+                    <views:AboutPage DataContext="{Binding AboutVM}"
+                                    IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=4}"/>
+                </Panel>
+            </Border>
+        </Grid>
+    </Panel>
+</Window>
