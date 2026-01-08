@@ -146,6 +146,11 @@
                                            FontSize="16"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="{Binding QQVersion}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding QQVersion, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                             </StackPanel>
                             <!-- 状态行 -->
                             <StackPanel Orientation="Horizontal" Spacing="6">

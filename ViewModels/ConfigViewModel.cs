@@ -1,5 +1,4 @@
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using LuckyLilliaDesktop.Models;
@@ -8,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reactive;
 using System.Threading.Tasks;
 
@@ -133,28 +133,28 @@ public class ConfigViewModel : ViewModelBase
         // 浏览文件命令
         BrowseQQCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var path = await BrowseFileAsync("选择 QQ 可执行文件", new[] { "exe" });
+            var path = await BrowseFileAsync("选择 QQ 可执行文件", new[] { "exe" }, QQPath);
             if (!string.IsNullOrEmpty(path))
                 QQPath = path;
         });
 
         BrowsePmhqCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var path = await BrowseFileAsync("选择 PMHQ 可执行文件", new[] { "exe" });
+            var path = await BrowseFileAsync("选择 PMHQ 可执行文件", new[] { "exe" }, PmhqPath);
             if (!string.IsNullOrEmpty(path))
                 PmhqPath = path;
         });
 
         BrowseLLBotCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var path = await BrowseFileAsync("选择 LLBot 脚本文件", new[] { "js" });
+            var path = await BrowseFileAsync("选择 LLBot 脚本文件", new[] { "js" }, LLBotPath);
             if (!string.IsNullOrEmpty(path))
                 LLBotPath = path;
         });
 
         BrowseNodeCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var path = await BrowseFileAsync("选择 Node.js 可执行文件", new[] { "exe" });
+            var path = await BrowseFileAsync("选择 Node.js 可执行文件", new[] { "exe" }, NodePath);
             if (!string.IsNullOrEmpty(path))
                 NodePath = path;
         });
@@ -199,7 +199,7 @@ public class ConfigViewModel : ViewModelBase
         _ = LoadConfigAsync();
     }
 
-    private async Task<string?> BrowseFileAsync(string title, string[] extensions)
+    private async Task<string?> BrowseFileAsync(string title, string[] extensions, string? currentPath = null)
     {
         try
         {
@@ -218,16 +218,73 @@ public class ConfigViewModel : ViewModelBase
                     }
                 };
 
-                var result = await mainWindow.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+                // 处理初始目录
+                string? suggestedStartLocation = null;
+                if (!string.IsNullOrEmpty(currentPath))
+                {
+                    // 如果是相对路径，转换为绝对路径
+                    var fullPath = Path.IsPathRooted(currentPath) 
+                        ? currentPath 
+                        : Path.GetFullPath(currentPath);
+                    
+                    // 如果文件存在，使用文件所在目录；否则使用当前工作目录
+                    if (File.Exists(fullPath))
+                    {
+                        suggestedStartLocation = Path.GetDirectoryName(fullPath);
+                    }
+                    else if (Directory.Exists(Path.GetDirectoryName(fullPath)))
+                    {
+                        suggestedStartLocation = Path.GetDirectoryName(fullPath);
+                    }
+                }
+
+                // 如果没有合适的初始目录，使用当前工作目录
+                suggestedStartLocation ??= Environment.CurrentDirectory;
+
+                var options = new FilePickerOpenOptions
                 {
                     Title = title,
                     AllowMultiple = false,
                     FileTypeFilter = filters
-                });
+                };
+
+                // 设置初始目录
+                if (Directory.Exists(suggestedStartLocation))
+                {
+                    try
+                    {
+                        options.SuggestedStartLocation = await mainWindow.StorageProvider.TryGetFolderFromPathAsync(suggestedStartLocation);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "设置初始目录失败: {Path}", suggestedStartLocation);
+                    }
+                }
+
+                var result = await mainWindow.StorageProvider.OpenFilePickerAsync(options);
 
                 if (result.Count > 0)
                 {
-                    return result[0].Path.LocalPath;
+                    var selectedPath = result[0].Path.LocalPath;
+                    
+                    // 尝试转换为相对路径（如果在当前工作目录下）
+                    try
+                    {
+                        var currentDir = Environment.CurrentDirectory;
+                        var relativePath = Path.GetRelativePath(currentDir, selectedPath);
+                        
+                        // 如果相对路径更短且不包含 ".."，使用相对路径
+                        if (relativePath.Length < selectedPath.Length && !relativePath.StartsWith(".."))
+                        {
+                            return relativePath;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "转换相对路径失败，使用绝对路径");
+                    }
+                    
+                    return selectedPath;
                 }
             }
         }

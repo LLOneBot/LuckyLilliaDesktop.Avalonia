@@ -14,16 +14,26 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        // 设置控制台编码为 UTF-8
-        Console.OutputEncoding = Encoding.UTF8;
-        Console.InputEncoding = Encoding.UTF8;
-        
-        // 注册进程退出事件（包括正常退出、Ctrl+C、异常等）
-        AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
-        Console.CancelKeyPress += OnCancelKeyPress;
-        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-        
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        try
+        {
+            // 仅在有控制台时设置编码
+            try
+            {
+                Console.OutputEncoding = Encoding.UTF8;
+                Console.InputEncoding = Encoding.UTF8;
+            }
+            catch { }
+            
+            AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
+            AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+            
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        catch (Exception ex)
+        {
+            System.IO.File.WriteAllText("crash.log", $"{DateTime.Now}: {ex}");
+            throw;
+        }
     }
 
     public static AppBuilder BuildAvaloniaApp()
@@ -38,11 +48,6 @@ class Program
             });
 
     private static void OnProcessExit(object? sender, EventArgs e)
-    {
-        CleanupProcesses();
-    }
-
-    private static void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
     {
         CleanupProcesses();
     }

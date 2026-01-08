@@ -15,6 +15,7 @@ public interface IPmhqClient
     void ClearPort();
     bool HasPort { get; }
     Task<SelfInfo?> FetchSelfInfoAsync(CancellationToken ct = default);
+    Task<DeviceInfo?> FetchDeviceInfoAsync(CancellationToken ct = default);
     Task<int?> FetchQQPidAsync(CancellationToken ct = default);
     void CancelAll();
 }
@@ -153,6 +154,34 @@ public class PmhqClient : IPmhqClient, IDisposable
         }
 
         return new SelfInfo { Uin = uin, Nickname = nickname };
+    }
+
+    public async Task<DeviceInfo?> FetchDeviceInfoAsync(CancellationToken ct = default)
+    {
+        var data = await CallAsync("getDeviceInfo", ct: ct);
+        if (data == null)
+            return null;
+
+        var dataElem = data.Value;
+        if (!dataElem.TryGetProperty("result", out var result))
+            return null;
+
+        if (result.ValueKind != JsonValueKind.Object)
+            return null;
+
+        var buildVer = "";
+        if (result.TryGetProperty("buildVer", out var buildVerElem))
+        {
+            buildVer = buildVerElem.GetString() ?? "";
+        }
+
+        var model = "";
+        if (result.TryGetProperty("devType", out var modelElem))
+        {
+            model = modelElem.GetString() ?? "";
+        }
+
+        return new DeviceInfo { BuildVer = buildVer, Model = model };
     }
 
     public async Task<int?> FetchQQPidAsync(CancellationToken ct = default)

@@ -133,6 +133,14 @@ public class HomeViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _qqMemory, value);
     }
 
+    // QQ 版本
+    private string _qqVersion = string.Empty;
+    public string QQVersion
+    {
+        get => _qqVersion;
+        set => this.RaiseAndSetIfChanged(ref _qqVersion, value);
+    }
+
     // QQ 信息
     private string _qqUin = string.Empty;
     public string QQUin
@@ -337,7 +345,15 @@ public class HomeViewModel : ViewModelBase
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(mem => AvailableMemory = mem);
 
-// 订阅 UIN 信息流        _resourceMonitor.UinStream            .ObserveOn(RxApp.MainThreadScheduler)            .Subscribe(OnUinReceived);
+        // 订阅 UIN 信息流
+        _resourceMonitor.UinStream
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(OnUinReceived);
+
+        // 订阅 QQ 版本流
+        _resourceMonitor.QQVersionStream
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(version => QQVersion = version);
 
         // 订阅进程状态变化
         _processManager.ProcessStatusChanged += OnProcessStatusChanged;
@@ -668,11 +684,66 @@ public class HomeViewModel : ViewModelBase
 
             // 检查并下载缺失的文件
             var pmhqExists = !string.IsNullOrEmpty(config.PmhqPath) && File.Exists(config.PmhqPath);
-            var nodeExists = !string.IsNullOrEmpty(config.NodePath) && File.Exists(config.NodePath);
+            
+            // 检查 Node.js：优先使用 PATH 中的 Node.js（版本 >= 22）
+            var nodeExists = false;
+            var systemNode = Utils.NodeHelper.FindNodeInPath();
+            if (!string.IsNullOrEmpty(systemNode))
+            {
+                if (await Utils.NodeHelper.CheckNodeVersionValidAsync(systemNode, 22, _logger))
+                {
+                    _logger.LogInformation("在系统PATH中找到Node.js (版本>=22): {Path}", systemNode);
+                    config.NodePath = systemNode;
+                    nodeExists = true;
+                }
+                else
+                {
+                    _logger.LogWarning("系统PATH中的Node.js版本低于22: {Path}", systemNode);
+                }
+            }
+            
+            // 如果 PATH 中没有合适的 Node.js，检查本地 bin/llbot/node.exe
+            if (!nodeExists)
+            {
+                var localNodePath = Utils.Constants.DefaultPaths.NodeExe;
+                if (File.Exists(localNodePath))
+                {
+                    if (await Utils.NodeHelper.CheckNodeVersionValidAsync(localNodePath, 22, _logger))
+                    {
+                        _logger.LogInformation("在本地目录找到Node.js: {Path}", localNodePath);
+                        config.NodePath = localNodePath;
+                        nodeExists = true;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("本地Node.js版本低于22: {Path}", localNodePath);
+                    }
+                }
+            }
+            
             var llbotExists = !string.IsNullOrEmpty(config.LLBotPath) && File.Exists(config.LLBotPath);
 
+            // 检查 FFmpeg 和 FFprobe
+            var ffmpegExists = Utils.FFmpegHelper.CheckFFmpegExists();
+            var ffprobeExists = Utils.FFmpegHelper.CheckFFprobeExists();
+            
+            if (ffmpegExists)
+            {
+                var systemFFmpeg = Utils.FFmpegHelper.FindFFmpegInPath();
+                if (!string.IsNullOrEmpty(systemFFmpeg))
+                {
+                    _logger.LogInformation("在系统PATH中找到FFmpeg: {Path}", systemFFmpeg);
+                }
+                else
+                {
+                    _logger.LogInformation("在本地目录找到FFmpeg: {Path}", Utils.Constants.DefaultPaths.FFmpegExe);
+                }
+            }
+            _logger.LogInformation("FFmpeg可用: {Available}", ffmpegExists);
+            _logger.LogInformation("FFprobe可用: {Available}", ffprobeExists);
+
             // 如果任何文件不存在，尝试下载
-            if (!pmhqExists || !nodeExists || !llbotExists)
+            if (!pmhqExists || !nodeExists || !llbotExists || !ffmpegExists || !ffprobeExists)
             {
                 _logger.LogInformation("检测到缺失文件，开始下载...");
 
@@ -733,6 +804,20 @@ public class HomeViewModel : ViewModelBase
                         config.LLBotPath = Utils.Constants.DefaultPaths.LLBotScript;
                     }
 
+                    // 下载 FFmpeg
+                    if (!ffmpegExists || !ffprobeExists)
+                    {
+                        DownloadingItem = "FFmpeg";
+                        _logger.LogInformation("下载 FFmpeg...");
+                        var success = await _downloadService.DownloadFFmpegAsync(progress, _downloadCts.Token);
+                        if (!success)
+                        {
+                            ErrorMessage = "FFmpeg 下载失败";
+                            BotStatus = ProcessStatus.Stopped;
+                            return;
+                        }
+                    }
+
                     // 保存更新后的配置
                     await _configManager.SaveConfigAsync(config);
                     _logger.LogInformation("下载完成，配置已更新");
@@ -763,6 +848,21 @@ public class HomeViewModel : ViewModelBase
             if (!File.Exists(config.LLBotPath))
             {
                 ErrorMessage = $"LLBot 脚本不存在: {config.LLBotPath}";
+                BotStatus = ProcessStatus.Stopped;
+                return;
+            }
+
+            // 验证 FFmpeg 文件
+            if (!Utils.FFmpegHelper.CheckFFmpegExists())
+            {
+                ErrorMessage = "FFmpeg 不可用";
+                BotStatus = ProcessStatus.Stopped;
+                return;
+            }
+
+            if (!Utils.FFmpegHelper.CheckFFprobeExists())
+            {
+                ErrorMessage = "FFprobe 不可用";
                 BotStatus = ProcessStatus.Stopped;
                 return;
             }
@@ -842,6 +942,7 @@ public class HomeViewModel : ViewModelBase
 
             QQUin = string.Empty;
             QQNickname = string.Empty;
+            QQVersion = string.Empty;
             AvatarBitmap = null;
 
             _logger.LogInformation("所有服务已停止");
@@ -861,7 +962,6 @@ public class HomeViewModel : ViewModelBase
         
         _ = Task.Run(async () =>
         {
-            // 先等待端口可用（PMHQ API 能响应）
             _logger.LogInformation("等待 PMHQ API 可用...");
             while (!ct.IsCancellationRequested)
             {
@@ -877,14 +977,50 @@ public class HomeViewModel : ViewModelBase
                             QQNickname = selfInfo.Nickname;
                         });
                     }
-                    break; // 端口可用，退出等待循环
+                    break;
                 }
                 
-                try { await Task.Delay(1000, ct); } // 等待时 1 秒轮询一次
+                try { await Task.Delay(1000, ct); }
                 catch (OperationCanceledException) { return; }
             }
             
-            // 端口可用后，正常轮询获取信息
+            // 获取 QQ 版本（只获取一次）
+            string? cachedVersion = null;
+            _logger.LogInformation("开始获取 QQ 版本...");
+            while (!ct.IsCancellationRequested && string.IsNullOrEmpty(cachedVersion))
+            {
+                try
+                {
+                    _logger.LogDebug("正在调用 FetchDeviceInfoAsync...");
+                    var deviceInfo = await _pmhqClient.FetchDeviceInfoAsync(ct);
+                    _logger.LogDebug("FetchDeviceInfoAsync 返回: {DeviceInfo}", deviceInfo != null ? $"BuildVer={deviceInfo.BuildVer}" : "null");
+                    
+                    if (deviceInfo != null && !string.IsNullOrEmpty(deviceInfo.BuildVer))
+                    {
+                        cachedVersion = deviceInfo.BuildVer;
+                        _logger.LogInformation("成功获取 QQ 版本: {Version}", cachedVersion);
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            QQVersion = cachedVersion;
+                            _logger.LogInformation("QQVersion 属性已设置为: {Version}", QQVersion);
+                        });
+                        break;
+                    }
+                    else
+                    {
+                        _logger.LogDebug("未获取到 QQ 版本，1秒后重试");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "获取 QQ 版本时出错");
+                }
+                
+                try { await Task.Delay(1000, ct); }
+                catch (OperationCanceledException) { return; }
+            }
+            
+            // 继续轮询 SelfInfo
             while (!ct.IsCancellationRequested)
             {
                 try { await Task.Delay(3000, ct); }

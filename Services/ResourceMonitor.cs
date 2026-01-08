@@ -13,6 +13,7 @@ public interface IResourceMonitor
 {
     IObservable<ProcessResourceInfo> ResourceStream { get; }
     IObservable<SelfInfo> UinStream { get; }
+    IObservable<string> QQVersionStream { get; }
     IObservable<double> AvailableMemoryStream { get; }
     Task StartMonitoringAsync(CancellationToken ct = default);
     void StopMonitoring();
@@ -26,14 +27,17 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
     private readonly IPmhqClient _pmhqClient;
     private readonly Subject<ProcessResourceInfo> _resourceSubject = new();
     private readonly Subject<SelfInfo> _uinSubject = new();
+    private readonly Subject<string> _qqVersionSubject = new();
     private readonly Subject<double> _availableMemorySubject = new();
     private CancellationTokenSource? _monitorCts;
     private Task? _monitorTask;
     private string? _lastUin;
+    private string? _cachedQQVersion;
     private int? _qqPid;
 
     public IObservable<ProcessResourceInfo> ResourceStream => _resourceSubject;
     public IObservable<SelfInfo> UinStream => _uinSubject;
+    public IObservable<string> QQVersionStream => _qqVersionSubject;
     public IObservable<double> AvailableMemoryStream => _availableMemorySubject;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -86,6 +90,7 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
     public void ResetState()
     {
         _lastUin = null;
+        _cachedQQVersion = null;
         _qqPid = null;
     }
 
@@ -128,6 +133,7 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
                 // 尝试获取 UIN 和 QQ PID
                 await TryFetchSelfInfoAsync();
                 await TryFetchQQPidAsync();
+                await TryFetchQQVersionAsync();
 
                 // 监控 QQ 进程
                 await MonitorQQProcessAsync();
@@ -170,10 +176,6 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         if (!_pmhqClient.HasPort || _qqPid.HasValue)
             return;
 
-        var pmhqStatus = _processManager.GetProcessStatus("PMHQ");
-        if (pmhqStatus != ProcessStatus.Running)
-            return;
-
         try
         {
             var pid = await _pmhqClient.FetchQQPidAsync();
@@ -181,6 +183,24 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
             {
                 _qqPid = pid.Value;
                 _logger.LogInformation("获取到 QQ PID: {Pid}", pid.Value);
+            }
+        }
+        catch { }
+    }
+
+    private async Task TryFetchQQVersionAsync()
+    {
+        if (!_pmhqClient.HasPort || !string.IsNullOrEmpty(_cachedQQVersion) || !_qqPid.HasValue)
+            return;
+
+        try
+        {
+            var deviceInfo = await _pmhqClient.FetchDeviceInfoAsync();
+            if (deviceInfo != null && !string.IsNullOrEmpty(deviceInfo.BuildVer))
+            {
+                _cachedQQVersion = deviceInfo.BuildVer;
+                _logger.LogInformation("获取到 QQ 版本: {Version}", _cachedQQVersion);
+                _qqVersionSubject.OnNext(_cachedQQVersion);
             }
         }
         catch { }
@@ -221,6 +241,7 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         _monitorCts?.Dispose();
         _resourceSubject.Dispose();
         _uinSubject.Dispose();
+        _qqVersionSubject.Dispose();
         _availableMemorySubject.Dispose();
     }
 }

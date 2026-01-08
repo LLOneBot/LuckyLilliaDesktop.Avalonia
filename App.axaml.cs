@@ -63,30 +63,38 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        try
         {
-            var mainVM = Services.GetRequiredService<MainWindowViewModel>();
-            desktop.MainWindow = new MainWindow
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                DataContext = mainVM
-            };
-            
-            desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            desktop.ShutdownRequested += OnShutdownRequested;
-
-            // 获取托盘菜单项引用
-            var trayIcons = TrayIcon.GetIcons(this);
-            if (trayIcons?.Count > 0)
-            {
-                var menu = trayIcons[0].Menu;
-                if (menu?.Items.Count > 0)
+                var mainVM = Services.GetRequiredService<MainWindowViewModel>();
+                desktop.MainWindow = new MainWindow
                 {
-                    _trayShowMenuItem = menu.Items[0] as NativeMenuItem;
+                    DataContext = mainVM
+                };
+                
+                desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                desktop.ShutdownRequested += OnShutdownRequested;
+
+                // 获取托盘菜单项引用
+                var trayIcons = TrayIcon.GetIcons(this);
+                if (trayIcons?.Count > 0)
+                {
+                    var menu = trayIcons[0].Menu;
+                    if (menu?.Items.Count > 0)
+                    {
+                        _trayShowMenuItem = menu.Items[0] as NativeMenuItem;
+                    }
                 }
             }
-        }
 
-        base.OnFrameworkInitializationCompleted();
+            base.OnFrameworkInitializationCompleted();
+        }
+        catch (Exception ex)
+        {
+            System.IO.File.WriteAllText("startup_error.log", $"{DateTime.Now}: {ex}");
+            throw;
+        }
     }
 
     public void UpdateTrayMenuText(string? nickname, string? uin)
