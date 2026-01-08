@@ -102,6 +102,21 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         {
             while (await timer.WaitForNextTickAsync(ct))
             {
+                // 监控管理器自身
+                try
+                {
+                    var currentProcess = Process.GetCurrentProcess();
+                    var managerCpu = 0.0;
+                    // 使用私有内存大小，更接近资源管理器显示的值
+                    var managerMemory = currentProcess.PrivateMemorySize64 / 1024.0 / 1024.0;
+                    var managerResources = new ProcessResourceInfo("Manager", managerCpu, managerMemory);
+                    _resourceSubject.OnNext(managerResources);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "监控管理器进程失败");
+                }
+
                 // 监控 PMHQ
                 var pmhqStatus = _processManager.GetProcessStatus("PMHQ");
                 if (pmhqStatus == ProcessStatus.Running)
@@ -117,6 +132,9 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
                     var llbotResources = _processManager.GetProcessResources("LLBot");
                     _resourceSubject.OnNext(llbotResources);
                 }
+
+                // 监控 Node.js 进程
+                await MonitorNodeProcessAsync();
 
                 // 获取系统可用内存
                 try
@@ -206,6 +224,45 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         catch { }
     }
 
+    private async Task MonitorNodeProcessAsync()
+    {
+        try
+        {
+            // 查找 Node.js 进程（通过进程名和命令行参数）
+            var processes = Process.GetProcessesByName("node");
+            foreach (var process in processes)
+            {
+                try
+                {
+                    // 检查是否是运行 LLBot 的 Node.js 进程
+                    var commandLine = process.StartInfo.Arguments;
+                    if (commandLine.Contains("llbot.js") || process.ProcessName.Contains("node"))
+                    {
+                        var nodeCpu = 0.0;
+                        var nodeMemory = process.PrivateMemorySize64 / 1024.0 / 1024.0;
+                        var nodeResources = new ProcessResourceInfo("Node", nodeCpu, nodeMemory);
+                        _resourceSubject.OnNext(nodeResources);
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "检查 Node.js 进程失败: {ProcessId}", process.Id);
+                }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "监控 Node.js 进程失败");
+        }
+
+        await Task.CompletedTask;
+    }
+
     private async Task MonitorQQProcessAsync()
     {
         if (!_qqPid.HasValue)
@@ -216,16 +273,19 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
             var qqProcess = Process.GetProcessById(_qqPid.Value);
             if (qqProcess != null && !qqProcess.HasExited)
             {
-                var cpuPercent = 0.0; // CPU 计算复杂，暂时跳过
-                var memoryMB = qqProcess.WorkingSet64 / 1024.0 / 1024.0;
+                var cpuPercent = 0.0;
+                var memoryMB = qqProcess.PrivateMemorySize64 / 1024.0 / 1024.0;
                 var qqResources = new ProcessResourceInfo("QQ", cpuPercent, memoryMB);
                 _resourceSubject.OnNext(qqResources);
             }
         }
         catch (ArgumentException)
         {
-            // 进程不存在
+            // 进程不存在，发送停止状态
             _qqPid = null;
+            var qqStoppedResources = new ProcessResourceInfo("QQ", 0.0, 0.0);
+            _resourceSubject.OnNext(qqStoppedResources);
+            _logger.LogDebug("QQ 进程已退出");
         }
         catch (Exception ex)
         {

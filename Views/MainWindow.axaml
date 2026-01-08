@@ -12,6 +12,7 @@
         Width="900" Height="600"
         WindowStartupLocation="Manual"
         Position="50,50"
+        UseLayoutRounding="True"
         Background="{DynamicResource MainBackground}">
 
     <Design.DataContext>

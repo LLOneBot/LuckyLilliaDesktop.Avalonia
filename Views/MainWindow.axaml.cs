@@ -11,8 +11,6 @@ namespace LuckyLilliaDesktop.Views;
 public partial class MainWindow : Window
 {
     private IConfigManager? _configManager;
-    private IProcessManager? _processManager;
-    private bool _forceClose;
     private bool _windowPositionLoaded;
 
     public MainWindow()
@@ -84,14 +82,41 @@ public partial class MainWindow : Window
                 await Task.Delay(2000, token);
                 if (token.IsCancellationRequested) return;
                 
-                await _configManager.SetSettingAsync("window_left", (double)Position.X);
-                await _configManager.SetSettingAsync("window_top", (double)Position.Y);
-                await _configManager.SetSettingAsync("window_width", Width);
-                await _configManager.SetSettingAsync("window_height", Height);
+                await _configManager.SetSettingAsync("window_left", Position.X);
+                await _configManager.SetSettingAsync("window_top", Position.Y);
+                await _configManager.SetSettingAsync("window_width", (int)Width);
+                await _configManager.SetSettingAsync("window_height", (int)Height);
             }
             catch (OperationCanceledException) { }
             catch { }
         }, token);
+    }
+
+    private async Task SaveWindowPositionImmediatelyAsync()
+    {
+        if (_configManager == null || !_windowPositionLoaded) return;
+        
+        _savePositionCts?.Cancel();
+        
+        if (WindowState == WindowState.Minimized) return;
+        if (Position.X < -1000 || Position.Y < -1000) return;
+        
+        try
+        {
+            await _configManager.SetSettingAsync("window_left", Position.X);
+            await _configManager.SetSettingAsync("window_top", Position.Y);
+            await _configManager.SetSettingAsync("window_width", (int)Width);
+            await _configManager.SetSettingAsync("window_height", (int)Height);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// 公开的保存窗口状态方法，供 App 调用
+    /// </summary>
+    public async Task SaveWindowStateAsync()
+    {
+        await SaveWindowPositionImmediatelyAsync();
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -102,7 +127,6 @@ public partial class MainWindow : Window
         {
             var app = Application.Current as App;
             _configManager = app?.Services?.GetService(typeof(IConfigManager)) as IConfigManager;
-            _processManager = app?.Services?.GetService(typeof(IProcessManager)) as IProcessManager;
             
             vm.HomeVM.ConfirmDialog = ShowConfirmDialogAsync;
             vm.HomeVM.ChoiceDialog = ShowChoiceDialogAsync;
@@ -123,34 +147,37 @@ public partial class MainWindow : Window
         return result ?? -1;
     }
 
+    private bool _isClosingHandled;
+    
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (_forceClose)
-        {
-            // 强制关闭，执行清理
-            await CleanupAndCloseAsync();
-            return;
-        }
-
-        // 检查是否有保存的关闭行为
+        if (_isClosingHandled) return;
+        
         var closeToTray = _configManager?.GetSetting<bool?>("close_to_tray", null);
 
         if (closeToTray == true)
         {
-            // 最小化到托盘
             e.Cancel = true;
             MinimizeToTray();
         }
         else if (closeToTray == false)
         {
-            // 直接退出
-            await CleanupAndCloseAsync();
+            _isClosingHandled = true;
+            e.Cancel = true;
+            await ExitAsync();
         }
         else
         {
-            // 首次关闭，显示对话框
             e.Cancel = true;
             await ShowCloseDialogAsync();
+        }
+    }
+
+    private async Task ExitAsync()
+    {
+        if (Application.Current is App app)
+        {
+            await app.ExitApplicationAsync();
         }
     }
 
@@ -159,13 +186,8 @@ public partial class MainWindow : Window
         var dialog = new CloseDialog();
         var result = await dialog.ShowDialog<CloseDialogResult?>(this);
 
-        if (result == null)
-        {
-            // 用户取消
-            return;
-        }
+        if (result == null) return;
 
-        // 保存用户选择
         if (result.RememberChoice && _configManager != null)
         {
             await _configManager.SetSettingAsync("close_to_tray", result.MinimizeToTray);
@@ -177,8 +199,8 @@ public partial class MainWindow : Window
         }
         else
         {
-            _forceClose = true;
-            Close();
+            _isClosingHandled = true;
+            await ExitAsync();
         }
     }
 
@@ -193,22 +215,6 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
-    }
-
-    private async Task CleanupAndCloseAsync()
-    {
-        try
-        {
-            // 停止所有进程
-            if (_processManager != null)
-            {
-                await _processManager.StopAllAsync();
-            }
-        }
-        catch
-        {
-            // 忽略清理错误
-        }
     }
 }
 

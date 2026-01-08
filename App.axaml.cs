@@ -8,6 +8,7 @@ using LuckyLilliaDesktop.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using System;
+using System.Threading.Tasks;
 
 namespace LuckyLilliaDesktop;
 
@@ -122,7 +123,6 @@ public partial class App : Application
 
     private async void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
     {
-        // 停止所有进程
         var processManager = Services.GetService<IProcessManager>();
         if (processManager != null)
         {
@@ -140,12 +140,32 @@ public partial class App : Application
         ShowMainWindow();
     }
 
-    private void Exit_Click(object? sender, EventArgs e)
+    private async void Exit_Click(object? sender, EventArgs e)
     {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        await ExitApplicationAsync();
+    }
+
+    /// <summary>
+    /// 统一的应用退出方法
+    /// </summary>
+    public async Task ExitApplicationAsync()
+    {
+        if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop) return;
+        
+        // 保存窗口位置
+        if (desktop.MainWindow is MainWindow mainWindow)
         {
-            desktop.Shutdown();
+            await mainWindow.SaveWindowStateAsync();
         }
+        
+        // 停止所有进程
+        var processManager = Services.GetService<IProcessManager>();
+        if (processManager != null)
+        {
+            await processManager.StopAllAsync();
+        }
+        
+        desktop.Shutdown();
     }
 
     private void ShowMainWindow()

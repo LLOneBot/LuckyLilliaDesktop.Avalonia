@@ -303,11 +303,11 @@ public class ProcessManager : IProcessManager, IDisposable
         }
     }
 
-    public Task StopPmhqAsync()
+    public async Task StopPmhqAsync()
     {
         // 如果进程已停止，直接返回
         if (_pmhqStatus == ProcessStatus.Stopped)
-            return Task.CompletedTask;
+            return;
 
         _pmhqStatus = ProcessStatus.Stopping;
         ProcessStatusChanged?.Invoke(this, _pmhqStatus);
@@ -321,35 +321,38 @@ public class ProcessManager : IProcessManager, IDisposable
             var process = _pmhqProcess;
             _pmhqProcess = null;
             
-            // 在后台杀进程，不阻塞
-            _ = Task.Run(() =>
+            try
             {
-                try
+                if (!process.HasExited)
                 {
-                    if (!process.HasExited)
+                    KillProcessTree(process.Id);
+                    // 等待进程退出
+                    await Task.Run(() =>
                     {
-                        KillProcessTree(process.Id);
-                    }
+                        try
+                        {
+                            process.WaitForExit(2000);
+                        }
+                        catch { }
+                    });
                 }
-                catch { }
-                finally
-                {
-                    process.Dispose();
-                }
-            });
+            }
+            catch { }
+            finally
+            {
+                process.Dispose();
+            }
         }
 
         _pmhqStatus = ProcessStatus.Stopped;
         ProcessStatusChanged?.Invoke(this, _pmhqStatus);
         _logger.LogInformation("PMHQ 已停止");
-        
-        return Task.CompletedTask;
     }
 
-    public Task StopLLBotAsync()
+    public async Task StopLLBotAsync()
     {
         if (_llbotProcess == null || _llbotStatus == ProcessStatus.Stopped)
-            return Task.CompletedTask;
+            return;
 
         _llbotStatus = ProcessStatus.Stopping;
         ProcessStatusChanged?.Invoke(this, _llbotStatus);
@@ -359,83 +362,84 @@ public class ProcessManager : IProcessManager, IDisposable
         var process = _llbotProcess;
         _llbotProcess = null;
         
-        // 在后台杀进程，不阻塞
-        _ = Task.Run(() =>
+        try
         {
-            try
+            if (!process.HasExited)
             {
-                if (!process.HasExited)
+                KillProcessTree(process.Id);
+                // 等待进程退出
+                await Task.Run(() =>
                 {
-                    KillProcessTree(process.Id);
-                }
+                    try
+                    {
+                        process.WaitForExit(2000);
+                    }
+                    catch { }
+                });
             }
-            catch { }
-            finally
-            {
-                process.Dispose();
-            }
-        });
+        }
+        catch { }
+        finally
+        {
+            process.Dispose();
+        }
 
         _llbotStatus = ProcessStatus.Stopped;
         ProcessStatusChanged?.Invoke(this, _llbotStatus);
         _logger.LogInformation("LLBot 已停止");
-        
-        return Task.CompletedTask;
     }
 
-    public Task StopAllAsync()
+    public async Task StopAllAsync()
     {
         _monitorCts?.Cancel();
 
-        // 先停止 LLBot 和 PMHQ（同步，不等待）
-        _ = StopLLBotAsync();
-        _ = StopPmhqAsync();
+        // 停止 LLBot 和 PMHQ
+        await StopLLBotAsync();
+        await StopPmhqAsync();
 
-        // 尝试终止 QQ 进程（fire-and-forget，不阻塞）
+        // 尝试终止 QQ 进程
         if (PmhqPort.HasValue)
         {
             var port = PmhqPort.Value;
-            _ = Task.Run(async () =>
+            try
             {
-                try
+                using var cts = new CancellationTokenSource(1000);
+                using var client = new HttpClient { Timeout = TimeSpan.FromMilliseconds(1000) };
+                var payload = new { type = "call", data = new { func = "getProcessInfo", args = Array.Empty<object>() } };
+                var response = await client.PostAsJsonAsync($"http://127.0.0.1:{port}", payload, cts.Token);
+                if (response.IsSuccessStatusCode)
                 {
-                    using var cts = new CancellationTokenSource(200);
-                    using var client = new HttpClient { Timeout = TimeSpan.FromMilliseconds(200) };
-                    var payload = new { type = "call", data = new { func = "getProcessInfo", args = Array.Empty<object>() } };
-                    var response = await client.PostAsJsonAsync($"http://127.0.0.1:{port}", payload, cts.Token);
-                    if (response.IsSuccessStatusCode)
+                    var json = await response.Content.ReadFromJsonAsync<JsonElement>(cts.Token);
+                    if (json.TryGetProperty("data", out var dataElem))
                     {
-                        var json = await response.Content.ReadFromJsonAsync<JsonElement>(cts.Token);
-                        if (json.TryGetProperty("data", out var dataElem))
+                        var dataStr = dataElem.ValueKind == JsonValueKind.String 
+                            ? dataElem.GetString() 
+                            : dataElem.GetRawText();
+                        if (!string.IsNullOrEmpty(dataStr))
                         {
-                            var dataStr = dataElem.ValueKind == JsonValueKind.String 
-                                ? dataElem.GetString() 
-                                : dataElem.GetRawText();
-                            if (!string.IsNullOrEmpty(dataStr))
+                            var data = JsonSerializer.Deserialize<JsonElement>(dataStr);
+                            if (data.TryGetProperty("result", out var result) && 
+                                result.TryGetProperty("pid", out var pidElem))
                             {
-                                var data = JsonSerializer.Deserialize<JsonElement>(dataStr);
-                                if (data.TryGetProperty("result", out var result) && 
-                                    result.TryGetProperty("pid", out var pidElem))
+                                var qqPid = pidElem.GetInt32();
+                                if (qqPid > 0)
                                 {
-                                    var qqPid = pidElem.GetInt32();
-                                    if (qqPid > 0)
-                                    {
-                                        _logger.LogInformation("正在终止 QQ 进程, PID: {Pid}", qqPid);
-                                        // 使用 taskkill 更快地杀进程树
-                                        KillProcessTree(qqPid);
-                                        _logger.LogInformation("QQ 进程已终止");
-                                    }
+                                    _logger.LogInformation("正在终止 QQ 进程, PID: {Pid}", qqPid);
+                                    KillProcessTree(qqPid);
+                                    _logger.LogInformation("QQ 进程已终止");
                                 }
                             }
                         }
                     }
                 }
-                catch { }
-            });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "终止 QQ 进程时出错");
+            }
         }
 
         PmhqPort = null;
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -496,7 +500,7 @@ public class ProcessManager : IProcessManager, IDisposable
         try
         {
             var cpuPercent = GetCpuUsage(process);
-            var memoryMB = process.WorkingSet64 / 1024.0 / 1024.0;
+            var memoryMB = process.PrivateMemorySize64 / 1024.0 / 1024.0;
             return new ProcessResourceInfo(processName, cpuPercent, memoryMB);
         }
         catch

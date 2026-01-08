@@ -939,6 +939,7 @@ public class HomeViewModel : ViewModelBase
 
             IsServicesRunning = false;
             BotStatus = ProcessStatus.Stopped;
+            QQStatus = ProcessStatus.Stopped;
 
             QQUin = string.Empty;
             QQNickname = string.Empty;
@@ -1077,6 +1078,10 @@ private void OnUinReceived(SelfInfo selfInfo)
     private double _pmhqMemory;
     private double _llbotCpu;
     private double _llbotMemory;
+    private double _managerCpu;
+    private double _managerMemory;
+    private double _nodeCpu;
+    private double _nodeMemory;
 
     private void OnResourceUpdate(ProcessResourceInfo resource)
     {
@@ -1085,27 +1090,44 @@ private void OnUinReceived(SelfInfo selfInfo)
             case "pmhq":
                 _pmhqCpu = resource.CpuPercent;
                 _pmhqMemory = resource.MemoryMB;
-                // Bot = PMHQ + LLBot 合计
-                BotCpu = _pmhqCpu + _llbotCpu;
-                BotMemory = _pmhqMemory + _llbotMemory;
+                UpdateBotResources();
                 break;
             case "llbot":
                 _llbotCpu = resource.CpuPercent;
                 _llbotMemory = resource.MemoryMB;
-                // Bot = PMHQ + LLBot 合计
-                BotCpu = _pmhqCpu + _llbotCpu;
-                BotMemory = _pmhqMemory + _llbotMemory;
+                UpdateBotResources();
+                break;
+            case "manager":
+            case "luckylilliadesktop":
+                _managerCpu = resource.CpuPercent;
+                _managerMemory = resource.MemoryMB;
+                UpdateBotResources();
+                break;
+            case "node":
+                _nodeCpu = resource.CpuPercent;
+                _nodeMemory = resource.MemoryMB;
+                UpdateBotResources();
                 break;
             case "qq":
                 QQCpu = resource.CpuPercent;
                 QQMemory = resource.MemoryMB;
-                // 如果 QQ 在运行，更新状态
                 if (resource.CpuPercent > 0 || resource.MemoryMB > 0)
                 {
                     QQStatus = ProcessStatus.Running;
                 }
+                else
+                {
+                    QQStatus = ProcessStatus.Stopped;
+                }
                 break;
         }
+    }
+
+    private void UpdateBotResources()
+    {
+        // Bot 占用 = 管理器 + PMHQ + Node.js + LLBot
+        BotCpu = _managerCpu + _pmhqCpu + _nodeCpu + _llbotCpu;
+        BotMemory = _managerMemory + _pmhqMemory + _nodeMemory + _llbotMemory;
     }
 
     private void OnProcessStatusChanged(object? sender, ProcessStatus status)

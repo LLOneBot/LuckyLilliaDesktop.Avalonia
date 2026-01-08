@@ -64,6 +64,10 @@ public class DownloadService : IDownloadService
         {
             Timeout = TimeSpan.FromSeconds(Constants.Timeouts.Download)
         };
+        
+        // 设置 User-Agent 提高下载速度
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", 
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
     }
 
     public bool CheckFileExists(string path)
@@ -146,9 +150,9 @@ public class DownloadService : IDownloadService
                 var downloadedBytes = 0L;
 
                 await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
 
-                var buffer = new byte[8192];
+                var buffer = new byte[65536]; // 64KB chunk 提高下载速度
                 int bytesRead;
 
                 while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
@@ -220,9 +224,9 @@ public class DownloadService : IDownloadService
                 var downloadedBytes = 0L;
 
                 await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
 
-                var buffer = new byte[8192];
+                var buffer = new byte[65536]; // 64KB chunk 提高下载速度
                 int bytesRead;
 
                 while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
@@ -391,9 +395,9 @@ public class DownloadService : IDownloadService
                 var downloadedBytes = 0L;
 
                 await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
 
-                var buffer = new byte[8192];
+                var buffer = new byte[65536]; // 64KB chunk 提高下载速度
                 int bytesRead;
 
                 while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
