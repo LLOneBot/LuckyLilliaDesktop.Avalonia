@@ -22,6 +22,17 @@ public class DownloadProgress
 }
 
 /// <summary>
+/// 应用更新结果
+/// </summary>
+public class AppUpdateResult
+{
+    public bool Success { get; set; }
+    public string? NewExePath { get; set; }
+    public string? UpdateScriptPath { get; set; }
+    public string? Error { get; set; }
+}
+
+/// <summary>
 /// 下载服务接口
 /// </summary>
 public interface IDownloadService
@@ -31,6 +42,7 @@ public interface IDownloadService
     Task<bool> DownloadNodeAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
     Task<bool> DownloadFFmpegAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
     Task<bool> DownloadQQAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
+    Task<AppUpdateResult> DownloadAppUpdateAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
     bool CheckFileExists(string path);
     string? FindInPath(string executable);
 }
@@ -177,6 +189,171 @@ public class DownloadService : IDownloadService
             _logger.LogError(ex, "下载安装 QQ 失败");
             return false;
         }
+    }
+
+    public async Task<AppUpdateResult> DownloadAppUpdateAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
+    {
+        try
+        {
+            progress?.Report(new DownloadProgress { Status = "正在获取下载地址..." });
+
+            var tarballUrl = await _npmClient.GetTarballUrlAsync(Constants.NpmPackages.App, ct);
+            if (string.IsNullOrEmpty(tarballUrl))
+            {
+                return new AppUpdateResult { Success = false, Error = "无法获取下载地址" };
+            }
+
+            _logger.LogInformation("开始下载应用更新: {Url}", tarballUrl);
+            progress?.Report(new DownloadProgress { Status = "正在下载更新..." });
+
+            var tempDir = Path.Combine(Path.GetTempPath(), $"app_update_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempDir);
+
+            var tempFile = Path.Combine(tempDir, "update.tgz");
+
+            // 下载文件
+            using (var response = await _httpClient.GetAsync(tarballUrl, HttpCompletionOption.ResponseHeadersRead, ct))
+            {
+                response.EnsureSuccessStatusCode();
+
+                var totalBytes = response.Content.Headers.ContentLength ?? 0;
+                var downloadedBytes = 0L;
+
+                await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+
+                var buffer = new byte[8192];
+                int bytesRead;
+
+                while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                    downloadedBytes += bytesRead;
+
+                    progress?.Report(new DownloadProgress
+                    {
+                        Downloaded = downloadedBytes,
+                        Total = totalBytes,
+                        Status = $"正在下载更新... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB"
+                    });
+                }
+            }
+
+            progress?.Report(new DownloadProgress { Status = "正在解压..." });
+
+            // 解压
+            await ExtractTarGzAsync(tempFile, tempDir, null, ct);
+
+            // 删除临时 tgz 文件
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+
+            // 查找 exe 文件
+            string? newExePath = null;
+            foreach (var file in Directory.GetFiles(tempDir, "*.exe"))
+            {
+                newExePath = file;
+                break;
+            }
+
+            if (string.IsNullOrEmpty(newExePath))
+            {
+                Directory.Delete(tempDir, true);
+                return new AppUpdateResult { Success = false, Error = "更新包中未找到可执行文件" };
+            }
+
+            // 生成更新脚本
+            var currentExe = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+            if (string.IsNullOrEmpty(currentExe))
+            {
+                Directory.Delete(tempDir, true);
+                return new AppUpdateResult { Success = false, Error = "无法获取当前程序路径" };
+            }
+
+            var currentPid = Environment.ProcessId;
+            var scriptPath = CreateUpdateScript(newExePath, currentExe, currentPid, tempDir);
+
+            _logger.LogInformation("应用更新下载完成，更新脚本: {Script}", scriptPath);
+
+            return new AppUpdateResult
+            {
+                Success = true,
+                NewExePath = newExePath,
+                UpdateScriptPath = scriptPath
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("应用更新下载已取消");
+            return new AppUpdateResult { Success = false, Error = "下载已取消" };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "下载应用更新失败");
+            return new AppUpdateResult { Success = false, Error = ex.Message };
+        }
+    }
+
+    private string CreateUpdateScript(string newExePath, string currentExePath, int currentPid, string tempDir)
+    {
+        var currentDir = Path.GetDirectoryName(currentExePath)!;
+        var currentExeName = Path.GetFileName(currentExePath);
+        var scriptPath = Path.Combine(tempDir, "_update.bat");
+
+        var scriptContent = $"""
+            @echo off
+            chcp 65001 >nul
+
+            cd /d "{currentDir}"
+            echo 正在更新应用程序，请稍候...
+            echo.
+
+            :: 等待原程序退出
+            set count=0
+            :wait_loop
+            tasklist /FI "PID eq {currentPid}" 2>NUL | find /I "{currentPid}" >NUL
+            if errorlevel 1 goto do_update
+            set /a count=%count%+1
+            if %count% geq 20 (
+                echo 等待超时，尝试强制终止进程...
+                taskkill /F /PID {currentPid} 2>NUL
+                timeout /t 1 /nobreak >nul
+                goto do_update
+            )
+            echo 等待程序退出... %count%/20
+            timeout /t 1 /nobreak >nul
+            goto wait_loop
+
+            :do_update
+            echo 程序已退出，开始更新...
+
+            echo 正在备份旧版本...
+            if exist "{currentExePath}.bak" del /f /q "{currentExePath}.bak"
+            if exist "{currentExePath}" move /y "{currentExePath}" "{currentExePath}.bak"
+
+            echo 正在安装新版本...
+            copy /y "{newExePath}" "{currentExePath}"
+
+            if errorlevel 1 (
+                echo 更新失败，正在恢复旧版本...
+                if exist "{currentExePath}.bak" move /y "{currentExePath}.bak" "{currentExePath}"
+                pause
+                exit /b 1
+            )
+
+            echo.
+            echo 更新完成！正在启动新版本...
+            timeout /t 2 /nobreak >nul
+
+            cd /d "{currentDir}"
+            start "" "{currentExeName}"
+
+            :: 清理临时文件
+            start /b "" cmd /c "timeout /t 5 /nobreak >nul & rmdir /s /q "{tempDir}" 2>nul"
+            exit
+            """;
+
+        File.WriteAllText(scriptPath, scriptContent, System.Text.Encoding.UTF8);
+        return scriptPath;
     }
 
     private async Task<bool> DownloadAndExtractAsync(

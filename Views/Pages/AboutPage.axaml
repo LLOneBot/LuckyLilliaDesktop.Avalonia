@@ -101,11 +101,6 @@
                                    FontWeight="Bold"
                                    VerticalAlignment="Center"
                                    IsVisible="{Binding AppHasUpdate}"/>
-                        <Button Content="查看详情"
-                                Command="{Binding OpenAppReleaseCommand}"
-                                FontSize="12"
-                                Padding="8,4"
-                                IsVisible="{Binding AppHasUpdate}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -205,9 +200,9 @@
                 </Border>
             </UniformGrid>
 
-            <!-- 检查更新按钮 -->
+            <!-- 检查更新按钮（隐藏，使用底部悬浮按钮） -->
                 <StackPanel Orientation="Horizontal" Spacing="20" HorizontalAlignment="Center" IsVisible="False">
-                    <Button Command="{Binding CheckUpdateCommand}"
+                    <Button Command="{Binding CheckOrUpdateCommand}"
                             Padding="24,12"
                             Background="{DynamicResource PrimaryBrush}"
                             Foreground="White"
@@ -296,20 +291,70 @@
     </ScrollViewer>
 
     <!-- 悬浮检查更新按钮 -->
-    <Button Command="{Binding CheckUpdateCommand}"
+    <Button Command="{Binding CheckOrUpdateCommand}"
             HorizontalAlignment="Center"
             VerticalAlignment="Bottom"
             Margin="0,0,0,20"
             Padding="24,12"
             Background="{DynamicResource PrimaryBrush}"
             Foreground="White"
-            CornerRadius="8">
+            CornerRadius="8"
+            IsVisible="{Binding !IsDownloadingUpdate}">
         <StackPanel Orientation="Horizontal" Spacing="8">
             <PathIcon Data="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"
                       Width="20" Height="20"
-                      Foreground="White"/>
+                      Foreground="White"
+                      IsVisible="{Binding !HasAnyUpdate}"/>
+            <PathIcon Data="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
+                      Width="20" Height="20"
+                      Foreground="White"
+                      IsVisible="{Binding HasAnyUpdate}"/>
             <TextBlock Text="{Binding CheckUpdateButtonText}" FontWeight="Medium"/>
         </StackPanel>
     </Button>
+
+    <!-- 下载进度遮罩层 -->
+    <Border Background="#D0000000"
+            IsVisible="{Binding IsDownloadingUpdate}"
+            CornerRadius="12">
+        <Border Background="{DynamicResource CardBackground}"
+                BorderBrush="{DynamicResource BorderColor}"
+                BorderThickness="1"
+                CornerRadius="16"
+                Padding="32"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                MinWidth="400">
+            <StackPanel Spacing="20">
+                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                    <PathIcon Data="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
+                              Width="28" Height="28"
+                              Foreground="{DynamicResource PrimaryBrush}"/>
+                    <TextBlock Text="正在更新"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <ProgressBar Value="{Binding DownloadProgress}"
+                                 Maximum="100"
+                                 Height="8"
+                                 Foreground="{DynamicResource PrimaryBrush}"
+                                 Background="{DynamicResource BorderColor}"
+                                 CornerRadius="4"/>
+                    <DockPanel>
+                        <TextBlock Text="{Binding DownloadStatus}"
+                                   FontSize="13"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                        <TextBlock Text="{Binding DownloadProgress, StringFormat={}{0:F0}%}"
+                                   FontSize="13"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   HorizontalAlignment="Right"/>
+                    </DockPanel>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Border>
     </Panel>
 </UserControl>

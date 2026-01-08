@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,6 +22,8 @@ public class HomeViewModel : ViewModelBase
     private readonly IPmhqClient _pmhqClient;
     private readonly ILogCollector _logCollector;
     private readonly IDownloadService _downloadService;
+    private readonly IUpdateChecker _updateChecker;
+    private readonly IUpdateStateService _updateStateService;
     private readonly ILogger<HomeViewModel> _logger;
     private CancellationTokenSource? _downloadCts;
     private CancellationTokenSource? _infoPollingCts;
@@ -217,6 +220,13 @@ public class HomeViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _hasUpdate, value);
     }
 
+    private string _updateBannerText = "发现新版本！";
+    public string UpdateBannerText
+    {
+        get => _updateBannerText;
+        set => this.RaiseAndSetIfChanged(ref _updateBannerText, value);
+    }
+
     // 启动按钮状态
     private bool _isServicesRunning;
     public bool IsServicesRunning
@@ -259,6 +269,7 @@ public class HomeViewModel : ViewModelBase
 
     // 导航回调
     public Action? NavigateToLogs { get; set; }
+    public Action? NavigateToAbout { get; set; }
 
     // 下载状态
     private bool _isDownloading;
@@ -302,6 +313,8 @@ public class HomeViewModel : ViewModelBase
         IPmhqClient pmhqClient,
         ILogCollector logCollector,
         IDownloadService downloadService,
+        IUpdateChecker updateChecker,
+        IUpdateStateService updateStateService,
         ILogger<HomeViewModel> logger)
     {
         _processManager = processManager;
@@ -310,6 +323,8 @@ public class HomeViewModel : ViewModelBase
         _pmhqClient = pmhqClient;
         _logCollector = logCollector;
         _downloadService = downloadService;
+        _updateChecker = updateChecker;
+        _updateStateService = updateStateService;
         _logger = logger;
 
         // 订阅资源监控流
@@ -342,11 +357,11 @@ public class HomeViewModel : ViewModelBase
             NavigateToLogs?.Invoke();
         });
 
-        // 更新命令
+        // 更新命令 - 导航到关于页面
         UpdateCommand = ReactiveCommand.Create(() =>
         {
-            _logger.LogInformation("用户点击更新按钮");
-            // TODO: 实现更新逻辑
+            _logger.LogInformation("用户点击更新按钮，导航到关于页面");
+            NavigateToAbout?.Invoke();
         });
 
         // 取消下载命令
@@ -362,6 +377,140 @@ public class HomeViewModel : ViewModelBase
 
         // 加载最近日志
         LoadRecentLogs();
+
+        // 检查更新
+        _ = CheckForUpdatesAsync();
+    }
+
+    /// <summary>
+    /// 检查组件更新
+    /// </summary>
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            _logger.LogInformation("开始检查组件更新...");
+
+            var config = await _configManager.LoadConfigAsync();
+            var appVersion = GetAppVersion();
+            var pmhqVersion = DetectPmhqVersion(config.PmhqPath);
+            var llbotVersion = DetectLLBotVersion(config.LLBotPath);
+
+            var updateNames = new System.Collections.Generic.List<string>();
+            var state = new UpdateState { IsChecked = true };
+
+            // 检查应用更新
+            var appUpdate = await _updateChecker.CheckAppUpdateAsync(appVersion);
+            if (appUpdate.HasUpdate)
+            {
+                updateNames.Add("管理器");
+                state.AppHasUpdate = true;
+                state.AppLatestVersion = appUpdate.LatestVersion;
+                state.AppReleaseUrl = appUpdate.ReleaseUrl;
+                _logger.LogInformation("发现管理器新版本: {Version}", appUpdate.LatestVersion);
+            }
+
+            // 检查 PMHQ 更新
+            if (!string.IsNullOrEmpty(pmhqVersion))
+            {
+                var pmhqUpdate = await _updateChecker.CheckPmhqUpdateAsync(pmhqVersion);
+                if (pmhqUpdate.HasUpdate)
+                {
+                    updateNames.Add("PMHQ");
+                    state.PmhqHasUpdate = true;
+                    state.PmhqLatestVersion = pmhqUpdate.LatestVersion;
+                    _logger.LogInformation("发现 PMHQ 新版本: {Version}", pmhqUpdate.LatestVersion);
+                }
+            }
+
+            // 检查 LLBot 更新
+            if (!string.IsNullOrEmpty(llbotVersion))
+            {
+                var llbotUpdate = await _updateChecker.CheckLLBotUpdateAsync(llbotVersion);
+                if (llbotUpdate.HasUpdate)
+                {
+                    updateNames.Add("LLBot");
+                    state.LLBotHasUpdate = true;
+                    state.LLBotLatestVersion = llbotUpdate.LatestVersion;
+                    _logger.LogInformation("发现 LLBot 新版本: {Version}", llbotUpdate.LatestVersion);
+                }
+            }
+
+            // 发布更新状态
+            _updateStateService.UpdateState(state);
+
+            // 更新 UI
+            if (updateNames.Count > 0)
+            {
+                HasUpdate = true;
+                UpdateBannerText = $"发现新版本: {string.Join(", ", updateNames)}";
+                _logger.LogInformation("发现更新: {Updates}", string.Join(", ", updateNames));
+            }
+            else
+            {
+                HasUpdate = false;
+                _logger.LogInformation("所有组件已是最新版本");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "检查更新失败");
+        }
+    }
+
+    private string GetAppVersion()
+    {
+        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        var version = assembly.GetName().Version;
+        return version != null
+            ? $"{version.Major}.{version.Minor}.{version.Build}"
+            : "1.0.0";
+    }
+
+    private string? DetectPmhqVersion(string? pmhqPath)
+    {
+        if (string.IsNullOrEmpty(pmhqPath)) return null;
+        try
+        {
+            var pmhqDir = Path.GetDirectoryName(pmhqPath);
+            if (string.IsNullOrEmpty(pmhqDir)) return null;
+
+            var packageJsonPath = Path.Combine(pmhqDir, "package.json");
+            if (File.Exists(packageJsonPath))
+            {
+                var json = File.ReadAllText(packageJsonPath);
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("version", out var versionElement))
+                {
+                    return versionElement.GetString();
+                }
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private string? DetectLLBotVersion(string? llbotPath)
+    {
+        if (string.IsNullOrEmpty(llbotPath)) return null;
+        try
+        {
+            var llbotDir = Path.GetDirectoryName(llbotPath);
+            if (string.IsNullOrEmpty(llbotDir)) return null;
+
+            var packageJsonPath = Path.Combine(llbotDir, "package.json");
+            if (File.Exists(packageJsonPath))
+            {
+                var json = File.ReadAllText(packageJsonPath);
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("version", out var versionElement))
+                {
+                    return versionElement.GetString();
+                }
+            }
+        }
+        catch { }
+        return null;
     }
 
     private void UpdateTitle()

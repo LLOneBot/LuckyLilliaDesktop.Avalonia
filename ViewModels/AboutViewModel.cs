@@ -2,9 +2,11 @@ using LuckyLilliaDesktop.Services;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Reactive;
+using System.Reactive.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -15,6 +17,12 @@ public class AboutViewModel : ViewModelBase
 {
     private readonly ILogger<AboutViewModel> _logger;
     private readonly IConfigManager _configManager;
+    private readonly IUpdateChecker _updateChecker;
+    private readonly IDownloadService _downloadService;
+    private readonly IProcessManager _processManager;
+    private readonly IUpdateStateService _updateStateService;
+
+    private string? _pendingAppUpdateScript;
 
     // GitHub 仓库地址
     private const string AppGitHubUrl = "https://github.com/linyyyang/LuckyLilliaDesktop";
@@ -23,7 +31,7 @@ public class AboutViewModel : ViewModelBase
     private const string QQGroupUrl = "https://qm.qq.com/q/4XrMj9iReU";
 
     // 应用信息
-    public string AppName => "Lucky Lillia Desktop";
+    public static string AppName => "Lucky Lillia Desktop";
     public string AppVersion { get; }
 
     // PMHQ 版本
@@ -130,18 +138,57 @@ public class AboutViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _checkUpdateButtonText, value);
     }
 
+    private bool _hasAnyUpdate;
+    public bool HasAnyUpdate
+    {
+        get => _hasAnyUpdate;
+        set => this.RaiseAndSetIfChanged(ref _hasAnyUpdate, value);
+    }
+
+    // 下载更新状态
+    private bool _isDownloadingUpdate;
+    public bool IsDownloadingUpdate
+    {
+        get => _isDownloadingUpdate;
+        set => this.RaiseAndSetIfChanged(ref _isDownloadingUpdate, value);
+    }
+
+    private string _downloadStatus = string.Empty;
+    public string DownloadStatus
+    {
+        get => _downloadStatus;
+        set => this.RaiseAndSetIfChanged(ref _downloadStatus, value);
+    }
+
+    private double _downloadProgress;
+    public double DownloadProgress
+    {
+        get => _downloadProgress;
+        set => this.RaiseAndSetIfChanged(ref _downloadProgress, value);
+    }
+
     // 命令
-    public ReactiveCommand<Unit, Unit> CheckUpdateCommand { get; }
+    public ReactiveCommand<Unit, Unit> CheckOrUpdateCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenAppReleaseCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenQQGroupCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenAppGitHubCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenPmhqGitHubCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenLLBotGitHubCommand { get; }
 
-    public AboutViewModel(ILogger<AboutViewModel> logger, IConfigManager configManager)
+    public AboutViewModel(
+        ILogger<AboutViewModel> logger, 
+        IConfigManager configManager,
+        IUpdateChecker updateChecker,
+        IDownloadService downloadService,
+        IProcessManager processManager,
+        IUpdateStateService updateStateService)
     {
         _logger = logger;
         _configManager = configManager;
+        _updateChecker = updateChecker;
+        _downloadService = downloadService;
+        _processManager = processManager;
+        _updateStateService = updateStateService;
 
         // 获取应用版本
         var assembly = Assembly.GetExecutingAssembly();
@@ -150,8 +197,8 @@ public class AboutViewModel : ViewModelBase
             ? $"{version.Major}.{version.Minor}.{version.Build}"
             : "1.0.0";
 
-        // 检查更新命令
-        CheckUpdateCommand = ReactiveCommand.CreateFromTask(CheckUpdatesAsync);
+        // 检查更新/立即更新命令
+        CheckOrUpdateCommand = ReactiveCommand.CreateFromTask(CheckOrUpdateAsync);
 
         // 打开链接命令
         OpenAppReleaseCommand = ReactiveCommand.Create(() => OpenUrl(AppReleaseUrl));
@@ -160,8 +207,34 @@ public class AboutViewModel : ViewModelBase
         OpenPmhqGitHubCommand = ReactiveCommand.Create(() => OpenUrl(PmhqGitHubUrl));
         OpenLLBotGitHubCommand = ReactiveCommand.Create(() => OpenUrl(LLBotGitHubUrl));
 
+        // 订阅共享更新状态
+        _updateStateService.StateChanged
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(OnUpdateStateChanged);
+
         // 初始化版本检测
         _ = LoadVersionsAsync();
+    }
+
+    private void OnUpdateStateChanged(UpdateState state)
+    {
+        if (!state.IsChecked) return;
+
+        AppHasUpdate = state.AppHasUpdate;
+        AppLatestVersion = state.AppLatestVersion;
+        AppReleaseUrl = state.AppReleaseUrl;
+        AppIsLatest = !state.AppHasUpdate;
+
+        PmhqHasUpdate = state.PmhqHasUpdate;
+        PmhqLatestVersion = state.PmhqLatestVersion;
+        PmhqIsLatest = !state.PmhqHasUpdate;
+
+        LLBotHasUpdate = state.LLBotHasUpdate;
+        LLBotLatestVersion = state.LLBotLatestVersion;
+        LLBotIsLatest = !state.LLBotHasUpdate;
+
+        HasAnyUpdate = state.HasAnyUpdate;
+        CheckUpdateButtonText = HasAnyUpdate ? "立即更新" : "检查更新";
     }
 
     /// <summary>
@@ -263,13 +336,22 @@ public class AboutViewModel : ViewModelBase
         return null;
     }
 
-    /// <summary>
-    /// 检查更新
-    /// </summary>
+    private async Task CheckOrUpdateAsync()
+    {
+        if (IsCheckingUpdate || IsDownloadingUpdate) return;
+
+        if (HasAnyUpdate)
+        {
+            await DownloadAllUpdatesAsync();
+        }
+        else
+        {
+            await CheckUpdatesAsync();
+        }
+    }
+
     private async Task CheckUpdatesAsync()
     {
-        if (IsCheckingUpdate) return;
-
         IsCheckingUpdate = true;
         CheckUpdateButtonText = "检查中...";
 
@@ -280,21 +362,70 @@ public class AboutViewModel : ViewModelBase
         PmhqHasUpdate = false;
         LLBotIsLatest = false;
         LLBotHasUpdate = false;
+        HasAnyUpdate = false;
 
         try
         {
             _logger.LogInformation("开始检查更新...");
 
-            // TODO: 实现实际的更新检查逻辑
-            // 这里暂时模拟检查结果
-            await Task.Delay(1000);
+            // 检查应用更新
+            var appUpdate = await _updateChecker.CheckAppUpdateAsync(AppVersion);
+            if (appUpdate.HasUpdate)
+            {
+                AppHasUpdate = true;
+                AppLatestVersion = appUpdate.LatestVersion;
+                AppReleaseUrl = appUpdate.ReleaseUrl;
+                _logger.LogInformation("发现应用新版本: {Version}", appUpdate.LatestVersion);
+            }
+            else
+            {
+                AppIsLatest = true;
+            }
 
-            // 暂时显示为最新版本
-            AppIsLatest = true;
-            PmhqIsLatest = true;
-            LLBotIsLatest = true;
+            // 检查 PMHQ 更新
+            if (PmhqVersion != "未配置" && PmhqVersion != "未知" && PmhqVersion != "检测中...")
+            {
+                var pmhqUpdate = await _updateChecker.CheckPmhqUpdateAsync(PmhqVersion);
+                if (pmhqUpdate.HasUpdate)
+                {
+                    PmhqHasUpdate = true;
+                    PmhqLatestVersion = pmhqUpdate.LatestVersion;
+                    _logger.LogInformation("发现 PMHQ 新版本: {Version}", pmhqUpdate.LatestVersion);
+                }
+                else
+                {
+                    PmhqIsLatest = true;
+                }
+            }
+            else
+            {
+                PmhqIsLatest = true;
+            }
 
-            CheckUpdateButtonText = "检查更新";
+            // 检查 LLBot 更新
+            if (LLBotVersion != "未配置" && LLBotVersion != "未知" && LLBotVersion != "检测中...")
+            {
+                var llbotUpdate = await _updateChecker.CheckLLBotUpdateAsync(LLBotVersion);
+                if (llbotUpdate.HasUpdate)
+                {
+                    LLBotHasUpdate = true;
+                    LLBotLatestVersion = llbotUpdate.LatestVersion;
+                    _logger.LogInformation("发现 LLBot 新版本: {Version}", llbotUpdate.LatestVersion);
+                }
+                else
+                {
+                    LLBotIsLatest = true;
+                }
+            }
+            else
+            {
+                LLBotIsLatest = true;
+            }
+
+            // 更新按钮状态
+            HasAnyUpdate = AppHasUpdate || PmhqHasUpdate || LLBotHasUpdate;
+            CheckUpdateButtonText = HasAnyUpdate ? "立即更新" : "检查更新";
+
             _logger.LogInformation("更新检查完成");
         }
         catch (Exception ex)
@@ -305,6 +436,135 @@ public class AboutViewModel : ViewModelBase
         finally
         {
             IsCheckingUpdate = false;
+        }
+    }
+
+    private async Task DownloadAllUpdatesAsync()
+    {
+        if (IsDownloadingUpdate) return;
+
+        IsDownloadingUpdate = true;
+        DownloadProgress = 0;
+
+        // 收集需要更新的组件，按顺序：LLBot → PMHQ → 管理器
+        var updates = new List<string>();
+        if (LLBotHasUpdate) updates.Add("LLBot");
+        if (PmhqHasUpdate) updates.Add("PMHQ");
+        if (AppHasUpdate) updates.Add("管理器");
+
+        var hadRunningProcesses = _processManager.IsAnyProcessRunning;
+
+        try
+        {
+            // 如果有进程在运行，先停止
+            if (hadRunningProcesses)
+            {
+                DownloadStatus = "正在停止所有进程...";
+                _logger.LogInformation("更新前停止所有进程...");
+                await _processManager.StopAllAsync();
+                await Task.Delay(1000);
+            }
+
+            var progress = new Progress<DownloadProgress>(p =>
+            {
+                DownloadProgress = p.Percentage;
+                DownloadStatus = p.Status;
+            });
+
+            // 依次更新各组件
+            foreach (var component in updates)
+            {
+                DownloadStatus = $"正在更新: {component}";
+                DownloadProgress = 0;
+
+                bool success;
+                switch (component)
+                {
+                    case "LLBot":
+                        success = await _downloadService.DownloadLLBotAsync(progress);
+                        if (success)
+                        {
+                            LLBotHasUpdate = false;
+                            LLBotIsLatest = true;
+                        }
+                        break;
+
+                    case "PMHQ":
+                        success = await _downloadService.DownloadPmhqAsync(progress);
+                        if (success)
+                        {
+                            PmhqHasUpdate = false;
+                            PmhqIsLatest = true;
+                        }
+                        break;
+
+                    case "管理器":
+                        var result = await _downloadService.DownloadAppUpdateAsync(progress);
+                        if (result.Success)
+                        {
+                            _pendingAppUpdateScript = result.UpdateScriptPath;
+                            AppHasUpdate = false;
+                            AppIsLatest = true;
+                        }
+                        break;
+                }
+            }
+
+            DownloadStatus = "更新完成！";
+            DownloadProgress = 100;
+
+            // 重新加载版本信息
+            await LoadVersionsAsync();
+
+            // 重置按钮状态
+            HasAnyUpdate = false;
+            CheckUpdateButtonText = "检查更新";
+
+            // 如果有管理器更新，提示重启
+            if (!string.IsNullOrEmpty(_pendingAppUpdateScript))
+            {
+                await Task.Delay(500);
+                LaunchAppUpdate();
+            }
+            else if (hadRunningProcesses)
+            {
+                // 如果之前有进程在运行，自动重启服务
+                _logger.LogInformation("更新完成，自动重启服务...");
+                // 这里可以触发重启服务的逻辑
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "下载更新失败");
+            DownloadStatus = $"更新失败: {ex.Message}";
+        }
+        finally
+        {
+            IsDownloadingUpdate = false;
+        }
+    }
+
+    private void LaunchAppUpdate()
+    {
+        if (string.IsNullOrEmpty(_pendingAppUpdateScript)) return;
+
+        _logger.LogInformation("启动应用更新脚本");
+
+        var scriptDir = Path.GetDirectoryName(_pendingAppUpdateScript);
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "cmd",
+            Arguments = $"/c start \"更新\" /D \"{scriptDir}\" \"{_pendingAppUpdateScript}\"",
+            UseShellExecute = true,
+            CreateNoWindow = true
+        });
+
+        _pendingAppUpdateScript = null;
+
+        // 退出应用
+        if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.Shutdown();
         }
     }
 

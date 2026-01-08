@@ -16,16 +16,21 @@
                         CornerRadius="8"
                         Padding="16,8"
                         IsVisible="{Binding HasUpdate}">
-                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <PathIcon Data="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.53-9.11-.02-12.58s9.14-3.47 12.65 0L21 3v7.12z"
                                   Width="20" Height="20"
-                                  Foreground="White"/>
-                        <TextBlock Text="发现新版本！" Foreground="White" FontSize="14"/>
+                                  Foreground="White"
+                                  VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding UpdateBannerText}" 
+                                   Foreground="White" 
+                                   FontSize="14"
+                                   VerticalAlignment="Center"/>
                         <Button Content="更新"
                                 Command="{Binding UpdateCommand}"
                                 Background="Transparent"
                                 Foreground="White"
-                                Padding="8,4"/>
+                                Padding="8,4"
+                                VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>
 

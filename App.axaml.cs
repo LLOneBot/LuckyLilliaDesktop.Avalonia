@@ -42,6 +42,7 @@ public partial class App : Application
         services.AddSingleton<IPmhqClient, PmhqClient>();
         services.AddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<IUpdateChecker, UpdateChecker>();
+        services.AddSingleton<IUpdateStateService, UpdateStateService>();
 
         // ViewModels（瞬态）
         services.AddTransient<MainWindowViewModel>();

@@ -14,6 +14,11 @@ public interface IProcessManager
     /// </summary>
     int? PmhqPort { get; }
 
+    /// <summary>
+    /// 是否有任何进程在运行
+    /// </summary>
+    bool IsAnyProcessRunning { get; }
+
     Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, bool autoLogin, bool headless);
     Task<bool> StartLLBotAsync(string nodePath, string scriptPath);
     Task StopPmhqAsync();

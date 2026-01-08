@@ -91,6 +91,9 @@ public class MainWindowViewModel : ViewModelBase
         // 设置导航到日志页面的回调
         homeViewModel.NavigateToLogs = () => SelectedIndex = 1;
 
+        // 设置导航到关于页面的回调（用于更新）
+        homeViewModel.NavigateToAbout = () => SelectedIndex = 4;
+
         _logger.LogInformation("MainWindowViewModel 已初始化");
     }
 

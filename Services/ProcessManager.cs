@@ -36,6 +36,12 @@ public class ProcessManager : IProcessManager, IDisposable
     /// </summary>
     public int? PmhqPort { get; private set; }
 
+    /// <summary>
+    /// 是否有任何进程在运行
+    /// </summary>
+    public bool IsAnyProcessRunning => 
+        _pmhqStatus == ProcessStatus.Running || _llbotStatus == ProcessStatus.Running;
+
     public event EventHandler<ProcessStatus>? ProcessStatusChanged;
 
     public ProcessManager(ILogger<ProcessManager> logger, ILogCollector logCollector)
