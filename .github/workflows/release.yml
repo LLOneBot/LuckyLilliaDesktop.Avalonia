@@ -1,0 +1,81 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '版本号 (例如: v2.0.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build and Publish
+        run: |
+          dotnet publish -c Release -r win-x64
+          dir bin\Release\net8.0-windows\win-x64\publish
+          (Get-Item bin\Release\net8.0-windows\win-x64\publish\LuckyLilliaDesktop.exe).Length / 1MB
+
+      - name: Rename exe
+        run: Rename-Item -Path bin\Release\net8.0-windows\win-x64\publish\LuckyLilliaDesktop.exe -NewName lucky-lillia-desktop.exe
+
+      - name: Compress to zip
+        run: Compress-Archive -Path bin\Release\net8.0-windows\win-x64\publish\lucky-lillia-desktop.exe -DestinationPath lucky-lillia-desktop-win-x64.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: Lucky-Lillia-Desktop ${{ inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          draft: true
+          files: lucky-lillia-desktop-win-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        if: github.event_name == 'push'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Prepare and publish npm package
+        if: github.event_name == 'push'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          mkdir package
+          copy bin\Release\net8.0-windows\win-x64\publish\lucky-lillia-desktop.exe package\
+          @"
+          {
+            "name": "lucky-lillia-desktop-win-x64",
+            "version": "$version",
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/LLOneBot/LuckyLilliaDesktop.Avalonia"
+            }
+          }
+          "@ | Out-File -FilePath package\package.json -Encoding utf8
+          tar -czf lucky-lillia-desktop-win-x64.tgz package
+          npm publish lucky-lillia-desktop-win-x64.tgz --access public
