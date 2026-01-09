@@ -366,10 +366,12 @@ public class HomeViewModel : ViewModelBase
         // 订阅进程状态变化
         _processManager.ProcessStatusChanged += OnProcessStatusChanged;
 
-        // 订阅日志流（最近10条）
+        // 订阅日志流（最近10条），批量处理避免 UI 卡顿
         _logCollector.LogStream
+            .Buffer(TimeSpan.FromMilliseconds(100))
+            .Where(batch => batch.Count > 0)
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(OnLogReceived);
+            .Subscribe(OnLogBatchReceived);
 
         // 全局启动/停止命令
         var canExecute = this.WhenAnyValue(x => x.IsButtonEnabled);
@@ -1155,11 +1157,13 @@ private void OnUinReceived(SelfInfo selfInfo)
         }
     }
 
-    private void OnLogReceived(LogEntry logEntry)
+    private void OnLogBatchReceived(System.Collections.Generic.IList<LogEntry> batch)
     {
-        RecentLogs.Add(new LogEntryViewModel(logEntry));
+        foreach (var logEntry in batch)
+        {
+            RecentLogs.Add(new LogEntryViewModel(logEntry));
+        }
 
-        // 只保留最近 10 条
         while (RecentLogs.Count > 10)
         {
             RecentLogs.RemoveAt(0);

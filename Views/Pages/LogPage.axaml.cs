@@ -32,8 +32,8 @@ public partial class LogPage : UserControl
             vm.ClearSelectionRequested += OnClearSelectionRequested;
         }
         
-        // 页面加载时自动滚动到底部
-        OnScrollToBottomRequested();
+        // 页面加载时自动滚动到底部（延迟执行确保列表已渲染）
+        Avalonia.Threading.Dispatcher.UIThread.Post(OnScrollToBottomRequested, Avalonia.Threading.DispatcherPriority.Loaded);
     }
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)

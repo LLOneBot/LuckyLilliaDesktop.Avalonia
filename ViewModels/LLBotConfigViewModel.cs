@@ -321,7 +321,9 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             Ob11Connections.Clear();
             foreach (var conn in _config.OB11.Connect)
             {
-                Ob11Connections.Add(new OB11ConnectionViewModel(conn));
+                var vm = new OB11ConnectionViewModel(conn);
+                vm.PropertyModified += MarkAsModified;
+                Ob11Connections.Add(vm);
             }
 
             // Satori
@@ -455,7 +457,9 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             HeartInterval = 60000,
             MessageFormat = "array"
         };
-        Ob11Connections.Add(new OB11ConnectionViewModel(conn));
+        var vm = new OB11ConnectionViewModel(conn);
+        vm.PropertyModified += MarkAsModified;
+        Ob11Connections.Add(vm);
         SelectedConnectionIndex = Ob11Connections.Count - 1;
         HasUnsavedChanges = true;
     }
@@ -463,6 +467,7 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     private void RemoveConnection(OB11ConnectionViewModel conn)
     {
         _logger.LogInformation("移除 OB11 连接: {Type}", conn.Type);
+        conn.PropertyModified -= MarkAsModified;
         Ob11Connections.Remove(conn);
         HasUnsavedChanges = true;
     }
@@ -487,6 +492,13 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
 
 public class OB11ConnectionViewModel : ViewModelBase
 {
+    public event Action? PropertyModified;
+
+    private void NotifyModified()
+    {
+        PropertyModified?.Invoke();
+    }
+
     private string _type;
     private bool _enable;
     private int _port;
@@ -517,55 +529,55 @@ public class OB11ConnectionViewModel : ViewModelBase
     public bool Enable
     {
         get => _enable;
-        set => this.RaiseAndSetIfChanged(ref _enable, value);
+        set { this.RaiseAndSetIfChanged(ref _enable, value); NotifyModified(); }
     }
 
     public int Port
     {
         get => _port;
-        set => this.RaiseAndSetIfChanged(ref _port, value);
+        set { this.RaiseAndSetIfChanged(ref _port, value); NotifyModified(); }
     }
 
     public string Url
     {
         get => _url;
-        set => this.RaiseAndSetIfChanged(ref _url, value);
+        set { this.RaiseAndSetIfChanged(ref _url, value); NotifyModified(); }
     }
 
     public int HeartInterval
     {
         get => _heartInterval;
-        set => this.RaiseAndSetIfChanged(ref _heartInterval, value);
+        set { this.RaiseAndSetIfChanged(ref _heartInterval, value); NotifyModified(); }
     }
 
     public bool EnableHeart
     {
         get => _enableHeart;
-        set => this.RaiseAndSetIfChanged(ref _enableHeart, value);
+        set { this.RaiseAndSetIfChanged(ref _enableHeart, value); NotifyModified(); }
     }
 
     public string Token
     {
         get => _token;
-        set => this.RaiseAndSetIfChanged(ref _token, value);
+        set { this.RaiseAndSetIfChanged(ref _token, value); NotifyModified(); }
     }
 
     public bool ReportSelfMessage
     {
         get => _reportSelfMessage;
-        set => this.RaiseAndSetIfChanged(ref _reportSelfMessage, value);
+        set { this.RaiseAndSetIfChanged(ref _reportSelfMessage, value); NotifyModified(); }
     }
 
     public bool ReportOfflineMessage
     {
         get => _reportOfflineMessage;
-        set => this.RaiseAndSetIfChanged(ref _reportOfflineMessage, value);
+        set { this.RaiseAndSetIfChanged(ref _reportOfflineMessage, value); NotifyModified(); }
     }
 
     public string MessageFormat
     {
         get => _messageFormat;
-        set => this.RaiseAndSetIfChanged(ref _messageFormat, value);
+        set { this.RaiseAndSetIfChanged(ref _messageFormat, value); NotifyModified(); }
     }
 
     public int MessageFormatIndex
@@ -577,7 +589,7 @@ public class OB11ConnectionViewModel : ViewModelBase
     public bool Debug
     {
         get => _debug;
-        set => this.RaiseAndSetIfChanged(ref _debug, value);
+        set { this.RaiseAndSetIfChanged(ref _debug, value); NotifyModified(); }
     }
 
     // 辅助属性 - 是否显示端口

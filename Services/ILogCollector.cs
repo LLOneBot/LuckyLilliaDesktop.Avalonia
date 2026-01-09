@@ -85,6 +85,9 @@ public class LogCollector : ILogCollector, IDisposable
                 if (line == null)
                     break;
 
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
                 var entry = new LogEntry(DateTime.Now, processName, level, line);
 
                 // 添加到队列

@@ -1,4 +1,3 @@
-using Avalonia.Media;
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
 using Microsoft.Extensions.Logging;
@@ -72,8 +71,10 @@ public class LogViewModel : ViewModelBase
         _logger = logger;
 
         _logCollector.LogStream
+            .Buffer(TimeSpan.FromMilliseconds(100))
+            .Where(batch => batch.Count > 0)
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(OnLogReceived);
+            .Subscribe(OnLogBatchReceived);
 
         SelectedLogEntries.CollectionChanged += (_, _) => 
         {
@@ -127,9 +128,12 @@ public class LogViewModel : ViewModelBase
         }
     }
 
-    private void OnLogReceived(LogEntry logEntry)
+    private void OnLogBatchReceived(System.Collections.Generic.IList<LogEntry> batch)
     {
-        LogEntries.Add(new LogEntryViewModel(logEntry));
+        foreach (var logEntry in batch)
+        {
+            LogEntries.Add(new LogEntryViewModel(logEntry));
+        }
 
         const int maxLogs = 500;
         while (LogEntries.Count > maxLogs)
@@ -137,7 +141,6 @@ public class LogViewModel : ViewModelBase
             LogEntries.RemoveAt(0);
         }
 
-        // 只有开启自动滚动且没有选中项时才滚动
         if (AutoScroll && !HasSelection)
         {
             ScrollToBottomRequested?.Invoke();
