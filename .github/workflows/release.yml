@@ -42,11 +42,19 @@ jobs:
       - name: Compress to zip
         run: Compress-Archive -Path bin\Release\net8.0-windows\win-x64\publish\lucky-lillia-desktop.exe -DestinationPath lucky-lillia-desktop-win-x64.zip
 
+      - name: Upload artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lucky-lillia-desktop-win-x64
+          path: lucky-lillia-desktop-win-x64.zip
+
       - name: Create GitHub Release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          name: Lucky-Lillia-Desktop ${{ inputs.tag || github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          name: Lucky-Lillia-Desktop ${{ github.ref_name }}
           generate_release_notes: true
           draft: true
           files: lucky-lillia-desktop-win-x64.zip
