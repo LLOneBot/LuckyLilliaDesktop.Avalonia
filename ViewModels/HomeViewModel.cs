@@ -444,9 +444,9 @@ public class HomeViewModel : ViewModelBase
                     StartInfo = new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = "cmd.exe",
-                        Arguments = $"/c {config.StartupCommand}",
-                        UseShellExecute = false,
-                        CreateNoWindow = true
+                        Arguments = $"/c start cmd /c \"{config.StartupCommand} & pause\"",
+                        UseShellExecute = true,
+                        CreateNoWindow = false
                     }
                 };
                 process.Start();

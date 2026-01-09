@@ -20,10 +20,6 @@ public class AppConfig
     [JsonPropertyName("node_path")]
     public string NodePath { get; set; } = "bin/llbot/node.exe";
 
-    // PMHQ 配置
-    [JsonPropertyName("pmhq_port")]
-    public int PmhqPort { get; set; } = 11451;
-
     // 启动选项
     [JsonPropertyName("auto_login_qq")]
     public string AutoLoginQQ { get; set; } = string.Empty;
