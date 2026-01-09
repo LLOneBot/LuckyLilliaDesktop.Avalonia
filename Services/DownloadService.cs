@@ -98,6 +98,7 @@ public class DownloadService : IDownloadService
 
     public async Task<bool> DownloadPmhqAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
     {
+        _logger.LogInformation("开始下载 PMHQ...");
         return await DownloadAndExtractAsync(
             Constants.NpmPackages.Pmhq,
             Constants.DefaultPaths.PmhqDir,
@@ -107,6 +108,7 @@ public class DownloadService : IDownloadService
 
     public async Task<bool> DownloadLLBotAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
     {
+        _logger.LogInformation("开始下载 LLBot...");
         return await DownloadAndExtractAsync(
             Constants.NpmPackages.LLBot,
             Constants.DefaultPaths.LLBotDir,
@@ -116,6 +118,7 @@ public class DownloadService : IDownloadService
 
     public async Task<bool> DownloadNodeAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
     {
+        _logger.LogInformation("开始下载 Node.js...");
         return await DownloadAndExtractAsync(
             Constants.NpmPackages.Node,
             Constants.DefaultPaths.LLBotDir,
@@ -126,6 +129,7 @@ public class DownloadService : IDownloadService
 
     public async Task<bool> DownloadFFmpegAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
     {
+        _logger.LogInformation("开始下载 FFmpeg...");
         return await DownloadAndExtractAsync(
             Constants.NpmPackages.FFmpeg,
             Constants.DefaultPaths.LLBotDir,
@@ -138,9 +142,12 @@ public class DownloadService : IDownloadService
     {
         try
         {
+            _logger.LogInformation("开始下载 QQ 安装包...");
             progress?.Report(new DownloadProgress { Status = "正在下载 QQ 安装包..." });
 
             var tempFile = Path.Combine(Path.GetTempPath(), "QQ_Setup.exe");
+            _logger.LogInformation("下载地址: {Url}", Constants.QQDownloadUrl);
+            _logger.LogInformation("临时文件: {Path}", tempFile);
 
             using (var response = await _httpClient.GetAsync(Constants.QQDownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct))
             {
@@ -170,6 +177,7 @@ public class DownloadService : IDownloadService
             }
 
             progress?.Report(new DownloadProgress { Status = "正在安装 QQ..." });
+            _logger.LogInformation("QQ 下载完成，开始安装...");
 
             var process = new System.Diagnostics.Process
             {
@@ -369,6 +377,7 @@ public class DownloadService : IDownloadService
     {
         try
         {
+            _logger.LogInformation("开始下载包: {Package}", packageName);
             progress?.Report(new DownloadProgress { Status = "正在获取下载地址..." });
 
             var tarballUrl = await _npmClient.GetTarballUrlAsync(packageName, ct);
@@ -378,7 +387,7 @@ public class DownloadService : IDownloadService
                 return false;
             }
 
-            _logger.LogInformation("开始下载: {Url}", tarballUrl);
+            _logger.LogInformation("下载地址: {Url}", tarballUrl);
             progress?.Report(new DownloadProgress { Status = "正在下载..." });
 
             // 确保目录存在
@@ -415,6 +424,7 @@ public class DownloadService : IDownloadService
             }
 
             progress?.Report(new DownloadProgress { Status = "正在解压..." });
+            _logger.LogInformation("下载完成，开始解压到: {Dir}", extractDir);
 
             // 解压 tarball (tgz = tar.gz)
             await ExtractTarGzAsync(tempFile, extractDir, skipFiles, ct);

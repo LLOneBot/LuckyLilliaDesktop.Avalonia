@@ -14,6 +14,7 @@ public partial class MainWindow : Window
     private IConfigManager? _configManager;
     private ILogger<LoginDialog>? _loginDialogLogger;
     private bool _windowPositionLoaded;
+    private bool _minimizeToTrayOnStartChecked;
 
     public MainWindow()
     {
@@ -32,7 +33,9 @@ public partial class MainWindow : Window
 
     private async Task CheckMinimizeToTrayOnStartAsync()
     {
-        if (_configManager == null) return;
+        // 只在首次启动时检查，避免从托盘恢复时再次最小化
+        if (_minimizeToTrayOnStartChecked || _configManager == null) return;
+        _minimizeToTrayOnStartChecked = true;
         
         try
         {

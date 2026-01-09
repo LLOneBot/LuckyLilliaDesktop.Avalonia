@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Views;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System;
@@ -18,7 +19,34 @@ public class ConfigViewModel : ViewModelBase
     private readonly IConfigManager _configManager;
     private readonly ILogger<ConfigViewModel> _logger;
 
-    // 路径配置
+    private AppConfig _savedConfig = new();
+    private bool _savedStartupEnabled;
+
+    private bool _hasUnsavedChanges;
+    public bool HasUnsavedChanges
+    {
+        get => _hasUnsavedChanges;
+        private set => this.RaiseAndSetIfChanged(ref _hasUnsavedChanges, value);
+    }
+
+    private void CheckUnsavedChanges()
+    {
+        HasUnsavedChanges =
+            QQPath != _savedConfig.QQPath ||
+            PmhqPath != _savedConfig.PmhqPath ||
+            LLBotPath != _savedConfig.LLBotPath ||
+            NodePath != _savedConfig.NodePath ||
+            AutoLoginQQ != _savedConfig.AutoLoginQQ ||
+            AutoStartBot != _savedConfig.AutoStartBot ||
+            Headless != _savedConfig.Headless ||
+            MinimizeToTrayOnStart != _savedConfig.MinimizeToTrayOnStart ||
+            StartupEnabled != _savedStartupEnabled ||
+            StartupCommandEnabled != _savedConfig.StartupCommandEnabled ||
+            StartupCommand != _savedConfig.StartupCommand ||
+            LogSaveEnabled != _savedConfig.LogSaveEnabled ||
+            LogRetentionHours != _savedConfig.LogRetentionSeconds / 3600;
+    }
+
     private string _qqPath = string.Empty;
     private string _pmhqPath = string.Empty;
     private string _llbotPath = string.Empty;
@@ -27,28 +55,27 @@ public class ConfigViewModel : ViewModelBase
     public string QQPath
     {
         get => _qqPath;
-        set => this.RaiseAndSetIfChanged(ref _qqPath, value);
+        set { this.RaiseAndSetIfChanged(ref _qqPath, value); CheckUnsavedChanges(); }
     }
 
     public string PmhqPath
     {
         get => _pmhqPath;
-        set => this.RaiseAndSetIfChanged(ref _pmhqPath, value);
+        set { this.RaiseAndSetIfChanged(ref _pmhqPath, value); CheckUnsavedChanges(); }
     }
 
     public string LLBotPath
     {
         get => _llbotPath;
-        set => this.RaiseAndSetIfChanged(ref _llbotPath, value);
+        set { this.RaiseAndSetIfChanged(ref _llbotPath, value); CheckUnsavedChanges(); }
     }
 
     public string NodePath
     {
         get => _nodePath;
-        set => this.RaiseAndSetIfChanged(ref _nodePath, value);
+        set { this.RaiseAndSetIfChanged(ref _nodePath, value); CheckUnsavedChanges(); }
     }
 
-    // 启动选项
     private string _autoLoginQQ = string.Empty;
     private bool _autoStartBot;
     private bool _headless;
@@ -60,25 +87,25 @@ public class ConfigViewModel : ViewModelBase
     public string AutoLoginQQ
     {
         get => _autoLoginQQ;
-        set => this.RaiseAndSetIfChanged(ref _autoLoginQQ, value);
+        set { this.RaiseAndSetIfChanged(ref _autoLoginQQ, value); CheckUnsavedChanges(); }
     }
 
     public bool AutoStartBot
     {
         get => _autoStartBot;
-        set => this.RaiseAndSetIfChanged(ref _autoStartBot, value);
+        set { this.RaiseAndSetIfChanged(ref _autoStartBot, value); CheckUnsavedChanges(); }
     }
 
     public bool Headless
     {
         get => _headless;
-        set => this.RaiseAndSetIfChanged(ref _headless, value);
+        set { this.RaiseAndSetIfChanged(ref _headless, value); CheckUnsavedChanges(); }
     }
 
     public bool MinimizeToTrayOnStart
     {
         get => _minimizeToTrayOnStart;
-        set => this.RaiseAndSetIfChanged(ref _minimizeToTrayOnStart, value);
+        set { this.RaiseAndSetIfChanged(ref _minimizeToTrayOnStart, value); CheckUnsavedChanges(); }
     }
 
     public bool StartupEnabled
@@ -86,45 +113,83 @@ public class ConfigViewModel : ViewModelBase
         get => _startupEnabled;
         set
         {
-            if (this.RaiseAndSetIfChanged(ref _startupEnabled, value) && value != Utils.StartupManager.IsStartupEnabled())
+            if (_startupEnabled == value) return;
+            
+            if (value && string.IsNullOrWhiteSpace(AutoLoginQQ))
             {
-                if (value)
-                    Utils.StartupManager.EnableStartup();
-                else
-                    Utils.StartupManager.DisableStartup();
+                ShowStartupConfirmDialog();
             }
+            else
+            {
+                this.RaiseAndSetIfChanged(ref _startupEnabled, value);
+                if (value) AutoStartBot = true;
+                CheckUnsavedChanges();
+            }
+        }
+    }
+
+    private async void ShowStartupConfirmDialog()
+    {
+        try
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                var mainWindow = desktop.MainWindow;
+                if (mainWindow == null) return;
+
+                var dialog = new ConfirmDialog("没有填入自动登录QQ号，确定依然要开机自启？");
+                var result = await dialog.ShowDialog<bool?>(mainWindow);
+
+                if (result == true)
+                {
+                    _startupEnabled = true;
+                    this.RaisePropertyChanged(nameof(StartupEnabled));
+                    AutoStartBot = true;
+                    CheckUnsavedChanges();
+                }
+                else
+                {
+                    // 取消时强制刷新 UI（先设 true 再设 false 触发变更通知）
+                    _startupEnabled = true;
+                    this.RaisePropertyChanged(nameof(StartupEnabled));
+                    _startupEnabled = false;
+                    this.RaisePropertyChanged(nameof(StartupEnabled));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "显示开机自启确认对话框失败");
         }
     }
 
     public bool StartupCommandEnabled
     {
         get => _startupCommandEnabled;
-        set => this.RaiseAndSetIfChanged(ref _startupCommandEnabled, value);
+        set { this.RaiseAndSetIfChanged(ref _startupCommandEnabled, value); CheckUnsavedChanges(); }
     }
 
     public string StartupCommand
     {
         get => _startupCommand;
-        set => this.RaiseAndSetIfChanged(ref _startupCommand, value);
+        set { this.RaiseAndSetIfChanged(ref _startupCommand, value); CheckUnsavedChanges(); }
     }
 
-    // 日志设置
     private bool _logSaveEnabled = true;
-    private int _logRetentionHours = 168; // 默认 7 天 (168 小时)
+    private int _logRetentionHours = 168;
 
     public bool LogSaveEnabled
     {
         get => _logSaveEnabled;
-        set => this.RaiseAndSetIfChanged(ref _logSaveEnabled, value);
+        set { this.RaiseAndSetIfChanged(ref _logSaveEnabled, value); CheckUnsavedChanges(); }
     }
 
     public int LogRetentionHours
     {
         get => _logRetentionHours;
-        set => this.RaiseAndSetIfChanged(ref _logRetentionHours, value);
+        set { this.RaiseAndSetIfChanged(ref _logRetentionHours, value); CheckUnsavedChanges(); }
     }
 
-    // 状态标志
     private bool _isSaving;
     public bool IsSaving
     {
@@ -132,7 +197,6 @@ public class ConfigViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _isSaving, value);
     }
 
-    // 命令
     public ReactiveCommand<Unit, Unit> BrowseQQCommand { get; }
     public ReactiveCommand<Unit, Unit> BrowsePmhqCommand { get; }
     public ReactiveCommand<Unit, Unit> BrowseLLBotCommand { get; }
@@ -146,44 +210,33 @@ public class ConfigViewModel : ViewModelBase
         _configManager = configManager;
         _logger = logger;
 
-        // 浏览文件命令
         BrowseQQCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var path = await BrowseFileAsync("选择 QQ 可执行文件", new[] { "exe" }, QQPath);
-            if (!string.IsNullOrEmpty(path))
-                QQPath = path;
+            var path = await BrowseFileAsync("选择 QQ 可执行文件", ["exe"], QQPath);
+            if (!string.IsNullOrEmpty(path)) QQPath = path;
         });
 
         BrowsePmhqCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var path = await BrowseFileAsync("选择 PMHQ 可执行文件", new[] { "exe" }, PmhqPath);
-            if (!string.IsNullOrEmpty(path))
-                PmhqPath = path;
+            var path = await BrowseFileAsync("选择 PMHQ 可执行文件", ["exe"], PmhqPath);
+            if (!string.IsNullOrEmpty(path)) PmhqPath = path;
         });
 
         BrowseLLBotCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var path = await BrowseFileAsync("选择 LLBot 脚本文件", new[] { "js" }, LLBotPath);
-            if (!string.IsNullOrEmpty(path))
-                LLBotPath = path;
+            var path = await BrowseFileAsync("选择 LLBot 脚本文件", ["js"], LLBotPath);
+            if (!string.IsNullOrEmpty(path)) LLBotPath = path;
         });
 
         BrowseNodeCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var path = await BrowseFileAsync("选择 Node.js 可执行文件", new[] { "exe" }, NodePath);
-            if (!string.IsNullOrEmpty(path))
-                NodePath = path;
+            var path = await BrowseFileAsync("选择 Node.js 可执行文件", ["exe"], NodePath);
+            if (!string.IsNullOrEmpty(path)) NodePath = path;
         });
 
-        // 测试命令
         TestCommandCommand = ReactiveCommand.Create(() =>
         {
-            if (string.IsNullOrWhiteSpace(StartupCommand))
-            {
-                _logger.LogWarning("请先输入要测试的命令");
-                return;
-            }
-
+            if (string.IsNullOrWhiteSpace(StartupCommand)) return;
             try
             {
                 var process = new System.Diagnostics.Process
@@ -197,7 +250,6 @@ public class ConfigViewModel : ViewModelBase
                     }
                 };
                 process.Start();
-                _logger.LogInformation("命令已在新窗口中启动");
             }
             catch (Exception ex)
             {
@@ -205,13 +257,9 @@ public class ConfigViewModel : ViewModelBase
             }
         });
 
-        // 保存配置命令
         SaveConfigCommand = ReactiveCommand.CreateFromTask(SaveConfigAsync);
-
-        // 加载配置命令
         LoadConfigCommand = ReactiveCommand.CreateFromTask(LoadConfigAsync);
 
-        // 初始化时加载配置
         _ = LoadConfigAsync();
     }
 
@@ -226,35 +274,23 @@ public class ConfigViewModel : ViewModelBase
 
                 var filters = new List<FilePickerFileType>
                 {
-                    new FilePickerFileType(title)
+                    new(title)
                     {
                         Patterns = extensions.Length > 0
                             ? Array.ConvertAll(extensions, ext => $"*.{ext}")
-                            : new[] { "*.*" }
+                            : ["*.*"]
                     }
                 };
 
-                // 处理初始目录
                 string? suggestedStartLocation = null;
                 if (!string.IsNullOrEmpty(currentPath))
                 {
-                    // 如果是相对路径，转换为绝对路径
-                    var fullPath = Path.IsPathRooted(currentPath) 
-                        ? currentPath 
-                        : Path.GetFullPath(currentPath);
-                    
-                    // 如果文件存在，使用文件所在目录；否则使用当前工作目录
+                    var fullPath = Path.IsPathRooted(currentPath) ? currentPath : Path.GetFullPath(currentPath);
                     if (File.Exists(fullPath))
-                    {
                         suggestedStartLocation = Path.GetDirectoryName(fullPath);
-                    }
                     else if (Directory.Exists(Path.GetDirectoryName(fullPath)))
-                    {
                         suggestedStartLocation = Path.GetDirectoryName(fullPath);
-                    }
                 }
-
-                // 如果没有合适的初始目录，使用当前工作目录
                 suggestedStartLocation ??= Environment.CurrentDirectory;
 
                 var options = new FilePickerOpenOptions
@@ -264,42 +300,27 @@ public class ConfigViewModel : ViewModelBase
                     FileTypeFilter = filters
                 };
 
-                // 设置初始目录
                 if (Directory.Exists(suggestedStartLocation))
                 {
                     try
                     {
                         options.SuggestedStartLocation = await mainWindow.StorageProvider.TryGetFolderFromPathAsync(suggestedStartLocation);
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "设置初始目录失败: {Path}", suggestedStartLocation);
-                    }
+                    catch { }
                 }
 
                 var result = await mainWindow.StorageProvider.OpenFilePickerAsync(options);
-
                 if (result.Count > 0)
                 {
                     var selectedPath = result[0].Path.LocalPath;
-                    
-                    // 尝试转换为相对路径（如果在当前工作目录下）
                     try
                     {
                         var currentDir = Environment.CurrentDirectory;
                         var relativePath = Path.GetRelativePath(currentDir, selectedPath);
-                        
-                        // 如果相对路径更短且不包含 ".."，使用相对路径
                         if (relativePath.Length < selectedPath.Length && !relativePath.StartsWith(".."))
-                        {
                             return relativePath;
-                        }
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "转换相对路径失败，使用绝对路径");
-                    }
-                    
+                    catch { }
                     return selectedPath;
                 }
             }
@@ -317,24 +338,18 @@ public class ConfigViewModel : ViewModelBase
         {
             var config = await _configManager.LoadConfigAsync();
 
-            // 路径配置
             QQPath = config.QQPath;
             PmhqPath = config.PmhqPath;
             LLBotPath = config.LLBotPath;
             NodePath = config.NodePath;
 
-            // 如果 QQ 路径为空，尝试自动检测
             if (string.IsNullOrEmpty(QQPath))
             {
                 var detectedPath = Utils.QQPathHelper.GetQQPathFromRegistry();
                 if (!string.IsNullOrEmpty(detectedPath))
-                {
                     QQPath = detectedPath;
-                    _logger.LogInformation("自动检测到 QQ 路径: {Path}", detectedPath);
-                }
             }
 
-            // 启动选项
             AutoLoginQQ = config.AutoLoginQQ;
             AutoStartBot = config.AutoStartBot;
             Headless = config.Headless;
@@ -344,11 +359,26 @@ public class ConfigViewModel : ViewModelBase
             StartupCommandEnabled = config.StartupCommandEnabled;
             StartupCommand = config.StartupCommand;
 
-            // 日志设置 (秒转小时)
             LogSaveEnabled = config.LogSaveEnabled;
             LogRetentionHours = config.LogRetentionSeconds / 3600;
 
-            _logger.LogInformation("配置已加载");
+            _savedConfig = new AppConfig
+            {
+                QQPath = QQPath,
+                PmhqPath = PmhqPath,
+                LLBotPath = LLBotPath,
+                NodePath = NodePath,
+                AutoLoginQQ = AutoLoginQQ,
+                AutoStartBot = AutoStartBot,
+                Headless = Headless,
+                MinimizeToTrayOnStart = MinimizeToTrayOnStart,
+                StartupCommandEnabled = StartupCommandEnabled,
+                StartupCommand = StartupCommand,
+                LogSaveEnabled = LogSaveEnabled,
+                LogRetentionSeconds = LogRetentionHours * 3600
+            };
+            _savedStartupEnabled = _startupEnabled;
+            HasUnsavedChanges = false;
         }
         catch (Exception ex)
         {
@@ -361,24 +391,20 @@ public class ConfigViewModel : ViewModelBase
         try
         {
             IsSaving = true;
+            _logger.LogInformation("开始保存配置...");
 
             var config = new AppConfig
             {
-                // 路径配置
                 QQPath = QQPath,
                 PmhqPath = PmhqPath,
                 LLBotPath = LLBotPath,
                 NodePath = NodePath,
-
-                // 启动选项
                 AutoLoginQQ = AutoLoginQQ,
                 AutoStartBot = AutoStartBot,
                 Headless = Headless,
                 MinimizeToTrayOnStart = MinimizeToTrayOnStart,
                 StartupCommandEnabled = StartupCommandEnabled,
                 StartupCommand = StartupCommand,
-
-                // 日志设置 (小时转秒)
                 LogSaveEnabled = LogSaveEnabled,
                 LogRetentionSeconds = LogRetentionHours * 3600
             };
@@ -387,6 +413,18 @@ public class ConfigViewModel : ViewModelBase
 
             if (success)
             {
+                // 保存时处理开机自启注册表
+                if (StartupEnabled != _savedStartupEnabled)
+                {
+                    if (StartupEnabled)
+                        Utils.StartupManager.EnableStartup();
+                    else
+                        Utils.StartupManager.DisableStartup();
+                }
+
+                _savedConfig = config;
+                _savedStartupEnabled = StartupEnabled;
+                HasUnsavedChanges = false;
                 _logger.LogInformation("配置已保存");
             }
             else

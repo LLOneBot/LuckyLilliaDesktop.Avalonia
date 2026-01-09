@@ -22,6 +22,20 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
 
     private string? _currentUin;
     private LLBotConfig _config = LLBotConfig.Default;
+    private bool _isLoading;
+
+    // 未保存更改标志
+    private bool _hasUnsavedChanges;
+    public bool HasUnsavedChanges
+    {
+        get => _hasUnsavedChanges;
+        private set => this.RaiseAndSetIfChanged(ref _hasUnsavedChanges, value);
+    }
+
+    private void MarkAsModified()
+    {
+        if (!_isLoading) HasUnsavedChanges = true;
+    }
 
     // 是否有 UIN（用于显示/隐藏配置界面）
     private bool _hasUin;
@@ -38,13 +52,13 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public bool WebuiEnable
     {
         get => _webuiEnable;
-        set => this.RaiseAndSetIfChanged(ref _webuiEnable, value);
+        set { this.RaiseAndSetIfChanged(ref _webuiEnable, value); MarkAsModified(); }
     }
 
     public int WebuiPort
     {
         get => _webuiPort;
-        set => this.RaiseAndSetIfChanged(ref _webuiPort, value);
+        set { this.RaiseAndSetIfChanged(ref _webuiPort, value); MarkAsModified(); }
     }
 
     // OB11 配置
@@ -52,7 +66,7 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public bool Ob11Enable
     {
         get => _ob11Enable;
-        set => this.RaiseAndSetIfChanged(ref _ob11Enable, value);
+        set { this.RaiseAndSetIfChanged(ref _ob11Enable, value); MarkAsModified(); }
     }
 
     private int _selectedConnectionIndex;
@@ -72,19 +86,19 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public bool SatoriEnable
     {
         get => _satoriEnable;
-        set => this.RaiseAndSetIfChanged(ref _satoriEnable, value);
+        set { this.RaiseAndSetIfChanged(ref _satoriEnable, value); MarkAsModified(); }
     }
 
     public int SatoriPort
     {
         get => _satoriPort;
-        set => this.RaiseAndSetIfChanged(ref _satoriPort, value);
+        set { this.RaiseAndSetIfChanged(ref _satoriPort, value); MarkAsModified(); }
     }
 
     public string SatoriToken
     {
         get => _satoriToken;
-        set => this.RaiseAndSetIfChanged(ref _satoriToken, value);
+        set { this.RaiseAndSetIfChanged(ref _satoriToken, value); MarkAsModified(); }
     }
 
     // Milky 配置
@@ -98,37 +112,37 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public bool MilkyEnable
     {
         get => _milkyEnable;
-        set => this.RaiseAndSetIfChanged(ref _milkyEnable, value);
+        set { this.RaiseAndSetIfChanged(ref _milkyEnable, value); MarkAsModified(); }
     }
 
     public bool MilkyReportSelf
     {
         get => _milkyReportSelf;
-        set => this.RaiseAndSetIfChanged(ref _milkyReportSelf, value);
+        set { this.RaiseAndSetIfChanged(ref _milkyReportSelf, value); MarkAsModified(); }
     }
 
     public int MilkyHttpPort
     {
         get => _milkyHttpPort;
-        set => this.RaiseAndSetIfChanged(ref _milkyHttpPort, value);
+        set { this.RaiseAndSetIfChanged(ref _milkyHttpPort, value); MarkAsModified(); }
     }
 
     public string MilkyHttpPrefix
     {
         get => _milkyHttpPrefix;
-        set => this.RaiseAndSetIfChanged(ref _milkyHttpPrefix, value);
+        set { this.RaiseAndSetIfChanged(ref _milkyHttpPrefix, value); MarkAsModified(); }
     }
 
     public string MilkyHttpToken
     {
         get => _milkyHttpToken;
-        set => this.RaiseAndSetIfChanged(ref _milkyHttpToken, value);
+        set { this.RaiseAndSetIfChanged(ref _milkyHttpToken, value); MarkAsModified(); }
     }
 
     public string MilkyWebhookToken
     {
         get => _milkyWebhookToken;
-        set => this.RaiseAndSetIfChanged(ref _milkyWebhookToken, value);
+        set { this.RaiseAndSetIfChanged(ref _milkyWebhookToken, value); MarkAsModified(); }
     }
 
     public ObservableCollection<string> MilkyWebhookUrls { get; } = new();
@@ -146,49 +160,49 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public bool EnableLocalFile2Url
     {
         get => _enableLocalFile2Url;
-        set => this.RaiseAndSetIfChanged(ref _enableLocalFile2Url, value);
+        set { this.RaiseAndSetIfChanged(ref _enableLocalFile2Url, value); MarkAsModified(); }
     }
 
     public bool LogEnable
     {
         get => _logEnable;
-        set => this.RaiseAndSetIfChanged(ref _logEnable, value);
+        set { this.RaiseAndSetIfChanged(ref _logEnable, value); MarkAsModified(); }
     }
 
     public bool AutoDeleteFile
     {
         get => _autoDeleteFile;
-        set => this.RaiseAndSetIfChanged(ref _autoDeleteFile, value);
+        set { this.RaiseAndSetIfChanged(ref _autoDeleteFile, value); MarkAsModified(); }
     }
 
     public int AutoDeleteFileSecond
     {
         get => _autoDeleteFileSecond;
-        set => this.RaiseAndSetIfChanged(ref _autoDeleteFileSecond, value);
+        set { this.RaiseAndSetIfChanged(ref _autoDeleteFileSecond, value); MarkAsModified(); }
     }
 
     public string MusicSignUrl
     {
         get => _musicSignUrl;
-        set => this.RaiseAndSetIfChanged(ref _musicSignUrl, value);
+        set { this.RaiseAndSetIfChanged(ref _musicSignUrl, value); MarkAsModified(); }
     }
 
     public int MsgCacheExpire
     {
         get => _msgCacheExpire;
-        set => this.RaiseAndSetIfChanged(ref _msgCacheExpire, value);
+        set { this.RaiseAndSetIfChanged(ref _msgCacheExpire, value); MarkAsModified(); }
     }
 
     public bool OnlyLocalhost
     {
         get => _onlyLocalhost;
-        set => this.RaiseAndSetIfChanged(ref _onlyLocalhost, value);
+        set { this.RaiseAndSetIfChanged(ref _onlyLocalhost, value); MarkAsModified(); }
     }
 
     public string FfmpegPath
     {
         get => _ffmpegPath;
-        set => this.RaiseAndSetIfChanged(ref _ffmpegPath, value);
+        set { this.RaiseAndSetIfChanged(ref _ffmpegPath, value); MarkAsModified(); }
     }
 
     // 命令
@@ -295,45 +309,54 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
 
     private void UpdateUIFromConfig()
     {
-        // WebUI
-        WebuiEnable = _config.WebUI.Enable;
-        WebuiPort = _config.WebUI.Port;
-
-        // OB11
-        Ob11Enable = _config.OB11.Enable;
-        Ob11Connections.Clear();
-        foreach (var conn in _config.OB11.Connect)
+        _isLoading = true;
+        try
         {
-            Ob11Connections.Add(new OB11ConnectionViewModel(conn));
+            // WebUI
+            WebuiEnable = _config.WebUI.Enable;
+            WebuiPort = _config.WebUI.Port;
+
+            // OB11
+            Ob11Enable = _config.OB11.Enable;
+            Ob11Connections.Clear();
+            foreach (var conn in _config.OB11.Connect)
+            {
+                Ob11Connections.Add(new OB11ConnectionViewModel(conn));
+            }
+
+            // Satori
+            SatoriEnable = _config.Satori.Enable;
+            SatoriPort = _config.Satori.Port;
+            SatoriToken = _config.Satori.Token;
+
+            // Milky
+            MilkyEnable = _config.Milky.Enable;
+            MilkyReportSelf = _config.Milky.ReportSelfMessage;
+            MilkyHttpPort = _config.Milky.Http.Port;
+            MilkyHttpPrefix = _config.Milky.Http.Prefix;
+            MilkyHttpToken = _config.Milky.Http.AccessToken;
+            MilkyWebhookToken = _config.Milky.Webhook.AccessToken;
+            MilkyWebhookUrls.Clear();
+            foreach (var url in _config.Milky.Webhook.Urls)
+            {
+                MilkyWebhookUrls.Add(url);
+            }
+
+            // 其他
+            EnableLocalFile2Url = _config.EnableLocalFile2Url;
+            LogEnable = _config.Log;
+            AutoDeleteFile = _config.AutoDeleteFile;
+            AutoDeleteFileSecond = _config.AutoDeleteFileSecond;
+            MusicSignUrl = _config.MusicSignUrl;
+            MsgCacheExpire = _config.MsgCacheExpire;
+            OnlyLocalhost = _config.OnlyLocalhost;
+            FfmpegPath = _config.Ffmpeg;
         }
-
-        // Satori
-        SatoriEnable = _config.Satori.Enable;
-        SatoriPort = _config.Satori.Port;
-        SatoriToken = _config.Satori.Token;
-
-        // Milky
-        MilkyEnable = _config.Milky.Enable;
-        MilkyReportSelf = _config.Milky.ReportSelfMessage;
-        MilkyHttpPort = _config.Milky.Http.Port;
-        MilkyHttpPrefix = _config.Milky.Http.Prefix;
-        MilkyHttpToken = _config.Milky.Http.AccessToken;
-        MilkyWebhookToken = _config.Milky.Webhook.AccessToken;
-        MilkyWebhookUrls.Clear();
-        foreach (var url in _config.Milky.Webhook.Urls)
+        finally
         {
-            MilkyWebhookUrls.Add(url);
+            _isLoading = false;
+            HasUnsavedChanges = false;
         }
-
-        // 其他
-        EnableLocalFile2Url = _config.EnableLocalFile2Url;
-        LogEnable = _config.Log;
-        AutoDeleteFile = _config.AutoDeleteFile;
-        AutoDeleteFileSecond = _config.AutoDeleteFileSecond;
-        MusicSignUrl = _config.MusicSignUrl;
-        MsgCacheExpire = _config.MsgCacheExpire;
-        OnlyLocalhost = _config.OnlyLocalhost;
-        FfmpegPath = _config.Ffmpeg;
     }
 
     private async Task SaveConfigAsync()
@@ -346,6 +369,8 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
                 _logger.LogWarning("无法保存配置：未获取到 UIN");
                 return;
             }
+
+            _logger.LogInformation("保存 LLBot 配置: {Path}", configPath);
 
             // 更新配置对象
             _config.WebUI.Enable = WebuiEnable;
@@ -396,6 +421,7 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             });
             await File.WriteAllTextAsync(configPath, json);
 
+            HasUnsavedChanges = false;
             _logger.LogInformation("LLBot 配置已保存: {Path}", configPath);
         }
         catch (Exception ex)
@@ -409,6 +435,7 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         try
         {
             var url = $"http://localhost:{WebuiPort}";
+            _logger.LogInformation("打开 WebUI: {Url}", url);
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
         catch (Exception ex)
@@ -419,6 +446,7 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
 
     private void AddConnection(string type)
     {
+        _logger.LogInformation("添加 OB11 连接: {Type}", type);
         var conn = new OB11Connection
         {
             Type = type,
@@ -429,21 +457,26 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         };
         Ob11Connections.Add(new OB11ConnectionViewModel(conn));
         SelectedConnectionIndex = Ob11Connections.Count - 1;
+        HasUnsavedChanges = true;
     }
 
     private void RemoveConnection(OB11ConnectionViewModel conn)
     {
+        _logger.LogInformation("移除 OB11 连接: {Type}", conn.Type);
         Ob11Connections.Remove(conn);
+        HasUnsavedChanges = true;
     }
 
     private void AddWebhookUrl()
     {
         MilkyWebhookUrls.Add(string.Empty);
+        HasUnsavedChanges = true;
     }
 
     private void RemoveWebhookUrl(string url)
     {
         MilkyWebhookUrls.Remove(url);
+        HasUnsavedChanges = true;
     }
 
     public void Dispose()
@@ -474,10 +507,10 @@ public class OB11ConnectionViewModel : ViewModelBase
 
     public string TypeName => Type switch
     {
-        "ws" => "WebSocket",
-        "ws-reverse" => "反向WS",
-        "http" => "HTTP",
-        "http-post" => "HTTP POST",
+        "ws" => "WebSocket 服务端(正向)",
+        "ws-reverse" => "WebSocket 客户端(反向)",
+        "http" => "HTTP 服务端",
+        "http-post" => "WebHook",
         _ => Type
     };
 
@@ -535,6 +568,12 @@ public class OB11ConnectionViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _messageFormat, value);
     }
 
+    public int MessageFormatIndex
+    {
+        get => _messageFormat == "string" ? 1 : 0;
+        set => MessageFormat = value == 1 ? "string" : "array";
+    }
+
     public bool Debug
     {
         get => _debug;
@@ -549,6 +588,13 @@ public class OB11ConnectionViewModel : ViewModelBase
     public bool HasHeart => Type != "http";
     // 辅助属性 - 是否显示启用心跳
     public bool HasEnableHeart => Type == "http-post";
+    // 辅助属性 - URL 占位符
+    public string UrlPlaceholder => Type switch
+    {
+        "ws-reverse" => "ws://127.0.0.1:8080/onebot/v11/ws",
+        "http-post" => "http://127.0.0.1:5700",
+        _ => ""
+    };
 
     public OB11ConnectionViewModel(OB11Connection model)
     {

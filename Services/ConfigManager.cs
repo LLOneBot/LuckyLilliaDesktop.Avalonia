@@ -89,10 +89,15 @@ public class ConfigManager : IConfigManager
             {
                 if (_rawJson.TryGetPropertyValue(key, out var node) && node != null)
                 {
-                    return node.Deserialize<T>() ?? defaultValue;
+                    var value = node.Deserialize<T>() ?? defaultValue;
+                    _logger.LogDebug("读取设置: {Key}", key);
+                    return value;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "读取设置失败: {Key}", key);
+            }
             
             return defaultValue;
         }
@@ -110,6 +115,7 @@ public class ConfigManager : IConfigManager
                 json = JsonSerializer.Serialize(_rawJson, new JsonSerializerOptions { WriteIndented = true });
             }
             await File.WriteAllTextAsync(ConfigPath, json);
+            _logger.LogInformation("设置已保存: {Key} = {Value}", key, value);
         }
         catch (Exception ex)
         {

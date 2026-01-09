@@ -378,6 +378,7 @@ public class HomeViewModel : ViewModelBase
         // 查看全部日志命令
         ViewAllLogsCommand = ReactiveCommand.Create(() =>
         {
+            _logger.LogDebug("导航到日志页面");
             NavigateToLogs?.Invoke();
         });
 
@@ -391,6 +392,7 @@ public class HomeViewModel : ViewModelBase
         // 取消下载命令
         CancelDownloadCommand = ReactiveCommand.Create(() =>
         {
+            _logger.LogInformation("用户取消下载");
             _downloadCts?.Cancel();
             IsDownloading = false;
             DownloadStatus = "下载已取消";
@@ -636,15 +638,21 @@ public class HomeViewModel : ViewModelBase
     {
         if (IsServicesRunning || BotStatus == ProcessStatus.Running)
         {
+            _logger.LogInformation("用户请求停止服务");
             if (ConfirmDialog != null)
             {
                 var confirmed = await ConfirmDialog("确认停止", "确定要停止所有服务吗？");
-                if (!confirmed) return;
+                if (!confirmed)
+                {
+                    _logger.LogDebug("用户取消停止操作");
+                    return;
+                }
             }
             await StopAllServicesAsync();
         }
         else
         {
+            _logger.LogInformation("用户请求启动服务");
             await StartAllServicesAsync();
         }
     }

@@ -69,7 +69,7 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
     {
         if (_monitorTask != null && !_monitorTask.IsCompleted)
         {
-            _logger.LogWarning("资源监控已在运行");
+            _logger.LogDebug("资源监控已在运行");
             return Task.CompletedTask;
         }
 
@@ -92,6 +92,7 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         _lastUin = null;
         _cachedQQVersion = null;
         _qqPid = null;
+        _logger.LogDebug("资源监控状态已重置");
     }
 
     private async Task MonitorLoopAsync(CancellationToken ct)

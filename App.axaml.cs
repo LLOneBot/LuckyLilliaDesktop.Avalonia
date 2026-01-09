@@ -21,17 +21,18 @@ public partial class App : Application
     {
         AvaloniaXamlLoader.Load(this);
         ConfigureServices();
+        Log.Information("应用初始化完成");
     }
 
     private void ConfigureServices()
     {
         var services = new ServiceCollection();
 
-        // 配置 Serilog
+        // 配置 Serilog - 每次启动创建新日志文件
+        var logFileName = $"logs/{DateTime.Now:yyyyMMdd_HHmmss}.log";
         var logger = new LoggerConfiguration()
             .WriteTo.Console(outputTemplate: "{Timestamp:HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
-            .WriteTo.File("logs/app.log",
-                rollingInterval: RollingInterval.Day,
+            .WriteTo.File(logFileName,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
 
@@ -89,10 +90,12 @@ public partial class App : Application
                 }
             }
 
+            Log.Information("框架初始化完成，主窗口已创建");
             base.OnFrameworkInitializationCompleted();
         }
         catch (Exception ex)
         {
+            Log.Fatal(ex, "框架初始化失败");
             System.IO.File.WriteAllText("startup_error.log", $"{DateTime.Now}: {ex}");
             throw;
         }
@@ -110,6 +113,7 @@ public partial class App : Application
             {
                 trayIcons[0].ToolTipText = $"{nickname}({uin})";
             }
+            Log.Information("托盘菜单已更新: {Nickname}({Uin})", nickname, uin);
         }
         else
         {
@@ -150,12 +154,14 @@ public partial class App : Application
     /// </summary>
     public async Task ExitApplicationAsync()
     {
+        Log.Information("开始退出应用...");
         if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop) return;
         
         // 保存窗口位置
         if (desktop.MainWindow is MainWindow mainWindow)
         {
             await mainWindow.SaveWindowStateAsync();
+            Log.Information("窗口状态已保存");
         }
         
         // 停止所有进程
@@ -163,8 +169,10 @@ public partial class App : Application
         if (processManager != null)
         {
             await processManager.StopAllAsync();
+            Log.Information("所有进程已停止");
         }
         
+        Log.Information("应用退出");
         desktop.Shutdown();
     }
 

@@ -72,7 +72,10 @@ public class PmhqClient : IPmhqClient, IDisposable
     private async Task<JsonElement?> CallAsync(string func, object[]? args = null, CancellationToken ct = default)
     {
         if (!_port.HasValue)
+        {
+            _logger.LogDebug("PMHQ 端口未设置，跳过 API 调用: {Func}", func);
             return null;
+        }
 
         var url = $"http://127.0.0.1:{_port.Value}";
         var payload = new
@@ -90,10 +93,11 @@ public class PmhqClient : IPmhqClient, IDisposable
 
         try
         {
+            _logger.LogDebug("调用 PMHQ API: {Func}", func);
             var response = await _httpClient.PostAsJsonAsync(url, payload, linkedCts.Token);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogDebug("PMHQ API 返回 HTTP {StatusCode}", response.StatusCode);
+                _logger.LogWarning("PMHQ API 返回 HTTP {StatusCode}: {Func}", response.StatusCode, func);
                 return null;
             }
 
@@ -107,11 +111,13 @@ public class PmhqClient : IPmhqClient, IDisposable
                     var dataStr = dataElem.GetString();
                     if (!string.IsNullOrEmpty(dataStr))
                     {
+                        _logger.LogDebug("PMHQ API 调用成功: {Func}", func);
                         return JsonSerializer.Deserialize<JsonElement>(dataStr);
                     }
                 }
                 else if (dataElem.ValueKind == JsonValueKind.Object)
                 {
+                    _logger.LogDebug("PMHQ API 调用成功: {Func}", func);
                     return dataElem;
                 }
             }
@@ -120,15 +126,17 @@ public class PmhqClient : IPmhqClient, IDisposable
         }
         catch (OperationCanceledException)
         {
+            _logger.LogDebug("PMHQ API 调用已取消: {Func}", func);
             return null;
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+            _logger.LogDebug("PMHQ API 连接失败: {Func} - {Message}", func, ex.Message);
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "PMHQ API 调用异常");
+            _logger.LogWarning(ex, "PMHQ API 调用异常: {Func}", func);
             return null;
         }
     }
@@ -248,23 +256,40 @@ public class PmhqClient : IPmhqClient, IDisposable
 
     public async Task<bool> QuickLoginAsync(string uin, CancellationToken ct = default)
     {
+        _logger.LogInformation("尝试快速登录: {Uin}", uin);
         var data = await CallAsync("loginService.quickLoginWithUin", [uin], ct);
-        if (data == null) return false;
+        if (data == null)
+        {
+            _logger.LogWarning("快速登录失败: API 返回空");
+            return false;
+        }
 
         // 返回格式: {result: {result: "0", loginErrorInfo: {...}}}
         if (data.Value.TryGetProperty("result", out var outer) &&
             outer.TryGetProperty("result", out var inner))
         {
-            return inner.GetString() == "0";
+            var success = inner.GetString() == "0";
+            if (success)
+                _logger.LogInformation("快速登录成功: {Uin}", uin);
+            else
+                _logger.LogWarning("快速登录失败: {Uin}", uin);
+            return success;
         }
         
+        _logger.LogWarning("快速登录失败: 响应格式异常");
         return false;
     }
 
     public async Task<bool> RequestQRCodeAsync(CancellationToken ct = default)
     {
+        _logger.LogInformation("请求二维码登录...");
         var data = await CallAsync("loginService.getQRCodePicture", ct: ct);
-        return data != null;
+        var success = data != null;
+        if (success)
+            _logger.LogInformation("二维码请求成功");
+        else
+            _logger.LogWarning("二维码请求失败");
+        return success;
     }
 
     public void Dispose()
