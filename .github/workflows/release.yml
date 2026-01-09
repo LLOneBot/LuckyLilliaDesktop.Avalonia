@@ -16,6 +16,7 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -61,8 +62,6 @@ jobs:
 
       - name: Prepare and publish npm package
         if: github.event_name == 'push'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
           mkdir package
@@ -78,4 +77,4 @@ jobs:
           }
           "@ | Out-File -FilePath package\package.json -Encoding utf8
           tar -czf lucky-lillia-desktop-win-x64.tgz package
-          npm publish lucky-lillia-desktop-win-x64.tgz --access public
+          npm publish lucky-lillia-desktop-win-x64.tgz --provenance --access public
