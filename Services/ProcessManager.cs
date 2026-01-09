@@ -50,7 +50,7 @@ public class ProcessManager : IProcessManager, IDisposable
         _logCollector = logCollector;
     }
 
-    public async Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, bool autoLogin, bool headless)
+    public async Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, string autoLoginQQ, bool headless)
     {
         try
         {
@@ -97,6 +97,12 @@ public class ProcessManager : IProcessManager, IDisposable
 
             // 添加端口参数
             startInfo.ArgumentList.Add($"--port={PmhqPort}");
+
+            // 如果指定了自动登录QQ号，添加 --qq 参数
+            if (!string.IsNullOrEmpty(autoLoginQQ))
+            {
+                startInfo.ArgumentList.Add($"--qq={autoLoginQQ}");
+            }
 
             // 如果启用无头模式
             if (headless)

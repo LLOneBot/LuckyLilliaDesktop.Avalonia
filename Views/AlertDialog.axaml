@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LuckyLilliaDesktop.Views.AlertDialog"
+        Title="提示"
+        Width="320"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+    <Border CornerRadius="12"
+            Background="#2D2D2D"
+            Padding="24,20">
+        <StackPanel Spacing="20">
+            <TextBlock x:Name="MessageText"
+                       Text="提示信息"
+                       FontSize="15"
+                       Foreground="#E0E0E0"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       MaxWidth="280"/>
+
+            <Button Content="确定"
+                    HorizontalAlignment="Center"
+                    Width="120"
+                    Padding="0,10"
+                    Background="#6C7BFF"
+                    Foreground="White"
+                    CornerRadius="8"
+                    HorizontalContentAlignment="Center"
+                    Click="OnConfirmClick"/>
+        </StackPanel>
+    </Border>
+</Window>

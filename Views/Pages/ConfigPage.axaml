@@ -64,6 +64,9 @@
                     <CheckBox Content="启动后自动缩进托盘"
                               IsChecked="{Binding MinimizeToTrayOnStart}"
                               Foreground="{DynamicResource TextPrimary}"/>
+                    <CheckBox Content="开机自启"
+                              IsChecked="{Binding StartupEnabled}"
+                              Foreground="{DynamicResource TextPrimary}"/>
 
                     <Border Height="1" Background="{DynamicResource BorderColor}"/>
 

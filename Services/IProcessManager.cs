@@ -19,7 +19,7 @@ public interface IProcessManager
     /// </summary>
     bool IsAnyProcessRunning { get; }
 
-    Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, bool autoLogin, bool headless);
+    Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, string autoLoginQQ, bool headless);
     Task<bool> StartLLBotAsync(string nodePath, string scriptPath);
     Task StopPmhqAsync();
     Task StopLLBotAsync();

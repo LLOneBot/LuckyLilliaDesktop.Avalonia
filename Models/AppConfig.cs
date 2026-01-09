@@ -70,17 +70,9 @@ public class AppConfig
     [JsonPropertyName("window_top")]
     public double? WindowTop { get; set; } = null;
 
-    // 兼容性属性
+    // 兼容性属性 - 只读取不写入
     [JsonPropertyName("auto_login")]
     public bool AutoLogin { get; set; } = true;
-
-    [JsonPropertyName("llbot_script_path")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public string LLBotScriptPath
-    {
-        get => LLBotPath;
-        set { } // 忽略读取，只为兼容旧配置
-    }
 
     /// <summary>
     /// 默认配置

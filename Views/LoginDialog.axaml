@@ -1,0 +1,195 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:svc="using:LuckyLilliaDesktop.Services"
+        xmlns:ctrl="using:LuckyLilliaDesktop.Controls"
+        x:Class="LuckyLilliaDesktop.Views.LoginDialog"
+        Title="登录"
+        Width="300"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+    <Border CornerRadius="12"
+            Background="#2D2D2D"
+            Padding="20,16">
+        <Grid RowDefinitions="Auto,*">
+            <!-- 标题栏 -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                <TextBlock x:Name="TitleText"
+                           Text="快速登录"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="#E0E0E0"
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="1"
+                        Background="Transparent"
+                        Foreground="#808080"
+                        Padding="4"
+                        Width="28" Height="28"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Click="OnCloseClick">
+                    <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                              Width="14" Height="14"/>
+                </Button>
+            </Grid>
+
+            <StackPanel Grid.Row="1" Spacing="8">
+                <!-- 加载中面板 -->
+                <StackPanel x:Name="LoadingPanel" Spacing="16" HorizontalAlignment="Center" Margin="0,30">
+                    <ctrl:LoadingSpinner SpinnerSize="40" HorizontalAlignment="Center"/>
+                    <TextBlock Text="正在获取登录信息..."
+                               FontSize="13"
+                               Foreground="#808080"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- 快速登录面板 -->
+                <StackPanel x:Name="QuickLoginPanel" Spacing="4" HorizontalAlignment="Center" IsVisible="False">
+                    <Border Width="80" Height="80" CornerRadius="40" ClipToBounds="True"
+                            HorizontalAlignment="Center"
+                            Background="#3D3D3D"
+                            Margin="0,4,0,0">
+                        <Grid>
+                            <PathIcon x:Name="DefaultAvatar"
+                                      Data="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
+                                      Width="40" Height="40"
+                                      Foreground="#808080"/>
+                            <Image x:Name="AvatarImage" Stretch="UniformToFill"/>
+                        </Grid>
+                    </Border>
+                    
+                    <TextBlock x:Name="NicknameText"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="#E0E0E0"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"/>
+                    
+                    <TextBlock x:Name="UinText"
+                               FontSize="13"
+                               Foreground="#808080"
+                               HorizontalAlignment="Center"/>
+                    
+                    <TextBlock x:Name="StatusText"
+                               FontSize="12"
+                               Foreground="#808080"
+                               HorizontalAlignment="Center"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               IsVisible="False"/>
+                    
+                    <Button x:Name="LoginButton"
+                            HorizontalAlignment="Stretch"
+                            Padding="0,10"
+                            Background="#2196F3"
+                            Foreground="White"
+                            CornerRadius="20"
+                            HorizontalContentAlignment="Center"
+                            Margin="0,8,0,0"
+                            Width="200"
+                            Click="OnLoginClick">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Data="M10,17V14H3V10H10V7L15,12L10,17M7,2H17A2,2 0 0,1 19,4V20A2,2 0 0,1 17,22H7A2,2 0 0,1 5,20V16H7V20H17V4H7V8H5V4A2,2 0 0,1 7,2Z"
+                                      Width="16" Height="16" Foreground="White"/>
+                            <TextBlock Text="登录" FontSize="14" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    
+                    <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                        <Button x:Name="SwitchAccountButton"
+                                Grid.Column="0"
+                                Background="Transparent"
+                                Foreground="#B0B0B0"
+                                Padding="8,6"
+                                HorizontalAlignment="Center"
+                                Click="OnSwitchAccountClick">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <PathIcon Data="M16,13C15.71,13 15.38,13 15.03,13.05C16.19,13.89 17,15 17,16.5V19H23V16.5C23,14.17 18.33,13 16,13M8,13C5.67,13 1,14.17 1,16.5V19H15V16.5C15,14.17 10.33,13 8,13M8,11A3,3 0 0,0 11,8A3,3 0 0,0 8,5A3,3 0 0,0 5,8A3,3 0 0,0 8,11M16,11A3,3 0 0,0 19,8A3,3 0 0,0 16,5A3,3 0 0,0 13,8A3,3 0 0,0 16,11Z"
+                                          Width="14" Height="14" Foreground="#B0B0B0"/>
+                                <TextBlock Text="切换账号" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="QRCodeModeButton"
+                                Grid.Column="1"
+                                Background="Transparent"
+                                Foreground="#B0B0B0"
+                                Padding="8,6"
+                                HorizontalAlignment="Center"
+                                Click="OnQRCodeModeClick">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <PathIcon Data="M3,11H5V13H3V11M11,5H13V9H11V5M9,11H13V15H11V13H9V11M15,11H17V13H19V11H21V13H19V15H21V19H19V21H17V19H13V21H11V17H15V15H17V13H15V11M19,19V15H17V19H19M15,3H21V9H15V3M17,5V7H19V5H17M3,3H9V9H3V3M5,5V7H7V5H5M3,15H9V21H3V15M5,17V19H7V17H5Z"
+                                          Width="14" Height="14" Foreground="#B0B0B0"/>
+                                <TextBlock Text="扫码登录" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+
+                <!-- 扫码登录面板 -->
+                <StackPanel x:Name="QRCodePanel" Spacing="8" HorizontalAlignment="Center" IsVisible="False">
+                    <Border Width="180" Height="180" 
+                            Background="White" 
+                            CornerRadius="8"
+                            HorizontalAlignment="Center"
+                            Padding="8"
+                            Margin="0,4,0,0">
+                        <Grid>
+                            <StackPanel x:Name="QRCodeLoading" 
+                                        HorizontalAlignment="Center" 
+                                        VerticalAlignment="Center"
+                                        Spacing="12">
+                                <ctrl:LoadingSpinner SpinnerSize="32" HorizontalAlignment="Center"/>
+                                <TextBlock Text="加载中..."
+                                           FontSize="12"
+                                           Foreground="#808080"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                            <Image x:Name="QRCodeImage" Stretch="Uniform" IsVisible="False"/>
+                        </Grid>
+                    </Border>
+                    
+                    <TextBlock x:Name="QRCodeTipText"
+                               Text="正在获取二维码..."
+                               FontSize="13"
+                               Foreground="#808080"
+                               HorizontalAlignment="Center"/>
+                    
+                    <Button x:Name="QuickLoginModeButton"
+                            Background="Transparent"
+                            Foreground="#B0B0B0"
+                            Padding="8,6"
+                            HorizontalAlignment="Center"
+                            Click="OnQuickLoginModeClick"
+                            IsVisible="False">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Data="M11,4A4,4 0 0,1 15,8A4,4 0 0,1 11,12A4,4 0 0,1 7,8A4,4 0 0,1 11,4M11,14C15.42,14 19,15.79 19,18V20H3V18C3,15.79 6.58,14 11,14M18,8H20V11H23V13H20V16H18V13H15V11H18V8Z"
+                                      Width="14" Height="14" Foreground="#B0B0B0"/>
+                            <TextBlock Text="快速登录" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- 账号列表面板 -->
+                <StackPanel x:Name="AccountListPanel" Spacing="8" IsVisible="False">
+                    <ScrollViewer MaxHeight="240">
+                        <ItemsControl x:Name="AccountList"/>
+                    </ScrollViewer>
+                    <Button Content="返回" 
+                            Background="Transparent"
+                            Foreground="#B0B0B0"
+                            Click="OnBackFromAccountList" 
+                            HorizontalAlignment="Center"
+                            Padding="16,6"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

@@ -53,6 +53,7 @@ public class ConfigViewModel : ViewModelBase
     private bool _autoStartBot;
     private bool _headless;
     private bool _minimizeToTrayOnStart;
+    private bool _startupEnabled;
     private bool _startupCommandEnabled;
     private string _startupCommand = string.Empty;
 
@@ -78,6 +79,21 @@ public class ConfigViewModel : ViewModelBase
     {
         get => _minimizeToTrayOnStart;
         set => this.RaiseAndSetIfChanged(ref _minimizeToTrayOnStart, value);
+    }
+
+    public bool StartupEnabled
+    {
+        get => _startupEnabled;
+        set
+        {
+            if (this.RaiseAndSetIfChanged(ref _startupEnabled, value) && value != Utils.StartupManager.IsStartupEnabled())
+            {
+                if (value)
+                    Utils.StartupManager.EnableStartup();
+                else
+                    Utils.StartupManager.DisableStartup();
+            }
+        }
     }
 
     public bool StartupCommandEnabled
@@ -323,6 +339,8 @@ public class ConfigViewModel : ViewModelBase
             AutoStartBot = config.AutoStartBot;
             Headless = config.Headless;
             MinimizeToTrayOnStart = config.MinimizeToTrayOnStart;
+            _startupEnabled = Utils.StartupManager.IsStartupEnabled();
+            this.RaisePropertyChanged(nameof(StartupEnabled));
             StartupCommandEnabled = config.StartupCommandEnabled;
             StartupCommand = config.StartupCommand;
 

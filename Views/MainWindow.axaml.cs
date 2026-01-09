@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using LuckyLilliaDesktop.Services;
 using LuckyLilliaDesktop.ViewModels;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +12,7 @@ namespace LuckyLilliaDesktop.Views;
 public partial class MainWindow : Window
 {
     private IConfigManager? _configManager;
+    private ILogger<LoginDialog>? _loginDialogLogger;
     private bool _windowPositionLoaded;
 
     public MainWindow()
@@ -25,6 +27,23 @@ public partial class MainWindow : Window
     {
         base.OnOpened(e);
         await LoadWindowPositionAsync();
+        await CheckMinimizeToTrayOnStartAsync();
+    }
+
+    private async Task CheckMinimizeToTrayOnStartAsync()
+    {
+        if (_configManager == null) return;
+        
+        try
+        {
+            var config = await _configManager.LoadConfigAsync();
+            if (config.MinimizeToTrayOnStart)
+            {
+                await Task.Delay(100);
+                MinimizeToTray();
+            }
+        }
+        catch { }
     }
 
     private async Task LoadWindowPositionAsync()
@@ -127,10 +146,21 @@ public partial class MainWindow : Window
         {
             var app = Application.Current as App;
             _configManager = app?.Services?.GetService(typeof(IConfigManager)) as IConfigManager;
+            _loginDialogLogger = app?.Services?.GetService(typeof(ILogger<LoginDialog>)) as ILogger<LoginDialog>;
+            var pmhqClient = app?.Services?.GetService(typeof(IPmhqClient)) as IPmhqClient;
             
             vm.HomeVM.ConfirmDialog = ShowConfirmDialogAsync;
             vm.HomeVM.ChoiceDialog = ShowChoiceDialogAsync;
+            vm.HomeVM.ShowLoginDialog = port => ShowLoginDialogAsync(pmhqClient!, port);
+            vm.HomeVM.ShowLoginDialogWithHeadless = (port, headless) => ShowLoginDialogAsync(pmhqClient!, port, headless);
+            vm.HomeVM.ShowAlertDialog = ShowAlertDialogAsync;
         }
+    }
+
+    private async Task ShowAlertDialogAsync(string title, string message)
+    {
+        var dialog = new AlertDialog(message);
+        await dialog.ShowDialog<object?>(this);
     }
 
     private async Task<bool> ShowConfirmDialogAsync(string title, string message)
@@ -145,6 +175,32 @@ public partial class MainWindow : Window
         var dialog = new ChoiceDialog(title, message, option1, option2);
         var result = await dialog.ShowDialog<int?>(this);
         return result ?? -1;
+    }
+
+    private async Task<string?> ShowLoginDialogAsync(IPmhqClient pmhqClient, int port)
+    {
+        return await ShowLoginDialogAsync(pmhqClient, port, false);
+    }
+
+    private async Task<string?> ShowLoginDialogAsync(IPmhqClient pmhqClient, int port, bool isHeadlessMode)
+    {
+        while (true)
+        {
+            var dialog = new LoginDialog(pmhqClient, port, _loginDialogLogger, isHeadlessMode);
+            var result = await dialog.ShowDialog<bool?>(this);
+            
+            if (result == true)
+                return dialog.LoggedInUin;
+            
+            if (dialog.IsLoginFailed && isHeadlessMode)
+            {
+                var confirmDialog = new ConfirmDialog(dialog.LoginFailedReason ?? "登录失败");
+                await confirmDialog.ShowDialog<bool?>(this);
+                continue;
+            }
+            
+            return null;
+        }
     }
 
     private bool _isClosingHandled;

@@ -1,13 +1,17 @@
 using Avalonia.Media;
+using Avalonia.Threading;
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
+using Serilog;
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Net.Http;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,9 +31,13 @@ public class HomeViewModel : ViewModelBase
     private readonly ILogger<HomeViewModel> _logger;
     private CancellationTokenSource? _downloadCts;
     private CancellationTokenSource? _infoPollingCts;
+    private CancellationTokenSource? _sseCts;
 
     public Func<string, string, Task<bool>>? ConfirmDialog { get; set; }
     public Func<string, string, string, string, Task<int>>? ChoiceDialog { get; set; }
+    public Func<int, Task<string?>>? ShowLoginDialog { get; set; }
+    public Func<int, bool, Task<string?>>? ShowLoginDialogWithHeadless { get; set; }
+    public Func<string, string, Task>? ShowAlertDialog { get; set; }
 
     // 标题
     private string _title = "控制面板";
@@ -396,6 +404,56 @@ public class HomeViewModel : ViewModelBase
 
         // 检查更新
         _ = CheckForUpdatesAsync();
+
+        // 检查是否需要自动启动 Bot
+        _ = CheckAutoStartBotAsync();
+    }
+
+    private async Task CheckAutoStartBotAsync()
+    {
+        try
+        {
+            var config = await _configManager.LoadConfigAsync();
+            if (config.AutoStartBot)
+            {
+                _logger.LogInformation("配置启用了自动启动 Bot，正在启动...");
+                await Task.Delay(1000);
+                await StartAllServicesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "检查自动启动配置失败");
+        }
+    }
+
+    private async Task ExecuteStartupCommandAsync(AppConfig config)
+    {
+        if (!config.StartupCommandEnabled || string.IsNullOrWhiteSpace(config.StartupCommand))
+            return;
+
+        try
+        {
+            _logger.LogInformation("执行启动后命令: {Command}", config.StartupCommand);
+            await Task.Run(() =>
+            {
+                var process = new System.Diagnostics.Process
+                {
+                    StartInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "cmd.exe",
+                        Arguments = $"/c {config.StartupCommand}",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "执行启动后命令失败");
+        }
     }
 
     /// <summary>
@@ -872,7 +930,7 @@ public class HomeViewModel : ViewModelBase
             var pmhqSuccess = await _processManager.StartPmhqAsync(
                 config.PmhqPath,
                 config.QQPath,
-                config.AutoLogin,
+                config.AutoLoginQQ,
                 config.Headless);
 
             if (pmhqSuccess)
@@ -883,8 +941,33 @@ public class HomeViewModel : ViewModelBase
                 if (_processManager.PmhqPort.HasValue)
                 {
                     _pmhqClient.SetPort(_processManager.PmhqPort.Value);
-                    StartInfoPolling(); // 端口可用后立即开始轮询
+                    
+                    // 如果设置了自动登录QQ号，启动 SSE 监听以捕获登录失败事件
+                    if (!string.IsNullOrEmpty(config.AutoLoginQQ) && config.Headless)
+                    {
+                        StartSSEListener(_processManager.PmhqPort.Value);
+                    }
                 }
+
+                // 无头模式且没有自动登录QQ号时，显示登录对话框
+                if (config.Headless && string.IsNullOrEmpty(config.AutoLoginQQ))
+                {
+                    _logger.LogInformation("无头模式，显示登录对话框");
+                    if (ShowLoginDialogWithHeadless != null && _processManager.PmhqPort.HasValue)
+                    {
+                        var loggedInUin = await ShowLoginDialogWithHeadless(_processManager.PmhqPort.Value, true);
+                        if (string.IsNullOrEmpty(loggedInUin))
+                        {
+                            _logger.LogWarning("用户取消登录");
+                            await _processManager.StopPmhqAsync();
+                            BotStatus = ProcessStatus.Stopped;
+                            return;
+                        }
+                        _logger.LogInformation("登录成功: {Uin}", loggedInUin);
+                    }
+                }
+
+                StartInfoPolling();
 
                 // 等待一段时间后启动 LLBot
                 await Task.Delay(2000);
@@ -893,13 +976,16 @@ public class HomeViewModel : ViewModelBase
                 _logger.LogInformation("正在启动 LLBot...");
                 var llbotSuccess = await _processManager.StartLLBotAsync(
                     config.NodePath,
-                    config.LLBotScriptPath);
+                    config.LLBotPath);
 
                 if (llbotSuccess)
                 {
                     _logger.LogInformation("LLBot 启动成功");
                     IsServicesRunning = true;
                     BotStatus = ProcessStatus.Running;
+                    
+                    // 执行启动后命令
+                    await ExecuteStartupCommandAsync(config);
                 }
                 else
                 {
@@ -1154,5 +1240,149 @@ private void OnUinReceived(SelfInfo selfInfo)
             BotStatus = ProcessStatus.Stopped;
             IsServicesRunning = false;
         }
+    }
+
+    private void StartSSEListener(int port)
+    {
+        _sseCts?.Cancel();
+        _sseCts = new CancellationTokenSource();
+        var ct = _sseCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            var url = $"http://127.0.0.1:{port}";
+            Log.Information("[SSE] 开始监听: {Url}", url);
+
+            while (!ct.IsCancellationRequested)
+            {
+                try
+                {
+                    using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+                    Log.Information("[SSE] 连接中...");
+                    
+                    using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+                    Log.Information("[SSE] 已连接, StatusCode={StatusCode}", response.StatusCode);
+                    
+                    await using var stream = await response.Content.ReadAsStreamAsync(ct);
+                    using var reader = new StreamReader(stream, Encoding.UTF8);
+
+                    var buffer = new StringBuilder();
+
+                    while (!ct.IsCancellationRequested)
+                    {
+                        var chunk = new char[4096];
+                        var read = await reader.ReadAsync(chunk, 0, chunk.Length);
+                        if (read == 0) break;
+
+                        buffer.Append(chunk, 0, read);
+                        var content = buffer.ToString();
+
+                        while (content.Contains("\n\n"))
+                        {
+                            var idx = content.IndexOf("\n\n", StringComparison.Ordinal);
+                            var message = content[..idx];
+                            content = content[(idx + 2)..];
+                            buffer.Clear();
+                            buffer.Append(content);
+
+                            ProcessSSEMessage(message);
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "[SSE] 连接异常");
+                    if (!ct.IsCancellationRequested)
+                        await Task.Delay(1000, ct);
+                }
+            }
+            Log.Information("[SSE] 监听结束");
+        }, ct);
+    }
+
+    private void ProcessSSEMessage(string message)
+    {
+        foreach (var line in message.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (!trimmed.StartsWith("data:")) continue;
+
+            var json = trimmed[5..].Trim();
+            if (string.IsNullOrEmpty(json)) continue;
+
+            Log.Information("[SSE] 收到: {Json}", json);
+
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("type", out var typeElem) &&
+                    typeElem.GetString() == "nodeIKernelLoginListener" &&
+                    root.TryGetProperty("data", out var dataElem) &&
+                    dataElem.TryGetProperty("sub_type", out var subType))
+                {
+                    var subTypeStr = subType.GetString();
+                    Log.Information("[SSE] 事件: {SubType}", subTypeStr);
+
+                    if (subTypeStr == "onQuickLoginFailed" &&
+                        dataElem.TryGetProperty("data", out var failData))
+                    {
+                        var errMsg = "登录失败";
+                        if (failData.TryGetProperty("loginErrorInfo", out var errorInfo) &&
+                            errorInfo.TryGetProperty("errMsg", out var errMsgElem))
+                        {
+                            errMsg = errMsgElem.GetString() ?? "登录失败";
+                        }
+
+                        Log.Warning("[SSE] 自动登录失败: {ErrMsg}", errMsg);
+                        _sseCts?.Cancel();
+                        
+                        Dispatcher.UIThread.Post(async () =>
+                        {
+                            await HandleAutoLoginFailedAsync(errMsg);
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[SSE] 解析失败");
+            }
+        }
+    }
+
+    private async Task HandleAutoLoginFailedAsync(string errMsg)
+    {
+        // 显示错误提示
+        if (ShowAlertDialog != null)
+        {
+            await ShowAlertDialog("登录失败", errMsg);
+        }
+
+        // 弹出登录对话框
+        if (ShowLoginDialogWithHeadless != null && _processManager.PmhqPort.HasValue)
+        {
+            var loggedInUin = await ShowLoginDialogWithHeadless(_processManager.PmhqPort.Value, true);
+            if (string.IsNullOrEmpty(loggedInUin))
+            {
+                _logger.LogWarning("用户取消登录");
+                await StopAllServicesAsync();
+            }
+            else
+            {
+                _logger.LogInformation("登录成功: {Uin}", loggedInUin);
+            }
+        }
+    }
+
+    private void StopSSEListener()
+    {
+        _sseCts?.Cancel();
+        _sseCts = null;
     }
 }
