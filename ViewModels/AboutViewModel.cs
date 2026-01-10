@@ -486,6 +486,7 @@ public class AboutViewModel : ViewModelBase
                         {
                             LLBotHasUpdate = false;
                             LLBotIsLatest = true;
+                            _updateStateService.ClearUpdate("LLBot");
                         }
                         break;
 
@@ -495,6 +496,7 @@ public class AboutViewModel : ViewModelBase
                         {
                             PmhqHasUpdate = false;
                             PmhqIsLatest = true;
+                            _updateStateService.ClearUpdate("PMHQ");
                         }
                         break;
 
@@ -505,6 +507,7 @@ public class AboutViewModel : ViewModelBase
                             _pendingAppUpdateScript = result.UpdateScriptPath;
                             AppHasUpdate = false;
                             AppIsLatest = true;
+                            _updateStateService.ClearUpdate("管理器");
                         }
                         break;
                 }

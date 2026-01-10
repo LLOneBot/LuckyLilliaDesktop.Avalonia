@@ -366,6 +366,11 @@ public class HomeViewModel : ViewModelBase
         // 订阅进程状态变化
         _processManager.ProcessStatusChanged += OnProcessStatusChanged;
 
+        // 订阅更新状态变化
+        _updateStateService.StateChanged
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(OnUpdateStateChanged);
+
         // 订阅日志流（最近10条），批量处理避免 UI 卡顿
         _logCollector.LogStream
             .Buffer(TimeSpan.FromMilliseconds(100))
@@ -1144,6 +1149,19 @@ public class HomeViewModel : ViewModelBase
             RecentLogs.Add(new LogEntryViewModel(log));
         }
         HasRecentLogs = RecentLogs.Count > 0;
+    }
+
+    private void OnUpdateStateChanged(UpdateState state)
+    {
+        HasUpdate = state.HasAnyUpdate;
+        if (state.HasAnyUpdate)
+        {
+            var names = new System.Collections.Generic.List<string>();
+            if (state.AppHasUpdate) names.Add("管理器");
+            if (state.PmhqHasUpdate) names.Add("PMHQ");
+            if (state.LLBotHasUpdate) names.Add("LLBot");
+            UpdateBannerText = $"发现新版本: {string.Join(", ", names)}";
+        }
     }
 
 private void OnUinReceived(SelfInfo selfInfo)
