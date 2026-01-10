@@ -25,9 +25,9 @@ public class AboutViewModel : ViewModelBase
     private string? _pendingAppUpdateScript;
 
     // GitHub 仓库地址
-    private const string AppGitHubUrl = "https://github.com/linyyyang/LuckyLilliaDesktop";
-    private const string PmhqGitHubUrl = "https://github.com/pakkipatty/PMHQ";
-    private const string LLBotGitHubUrl = "https://github.com/LLBot-dev/LLBot";
+    private const string AppGitHubUrl = "https://github.com/LLOneBot/LuckyLilliaDesktop.Avalonia";
+    private const string PmhqGitHubUrl = "https://github.com/linyuchen/PMHQ";
+    private const string LLBotGitHubUrl = "https://github.com/LLOneBot/LuckyLilliaBot";
     private const string QQGroupUrl = "https://qm.qq.com/q/4XrMj9iReU";
 
     // 应用信息
@@ -262,7 +262,7 @@ public class AboutViewModel : ViewModelBase
     /// <summary>
     /// 加载本地版本信息
     /// </summary>
-    private async Task LoadVersionsAsync()
+    public async Task LoadVersionsAsync()
     {
         try
         {

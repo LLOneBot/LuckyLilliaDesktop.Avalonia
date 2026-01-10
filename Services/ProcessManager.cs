@@ -2,11 +2,13 @@ using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -21,6 +23,7 @@ public class ProcessManager : IProcessManager, IDisposable
 {
     private readonly ILogger<ProcessManager> _logger;
     private readonly ILogCollector _logCollector;
+    private static readonly ConcurrentDictionary<int, string> _instanceNameCache = new();
 
     private Process? _pmhqProcess;
     private Process? _llbotProcess;
@@ -506,13 +509,181 @@ public class ProcessManager : IProcessManager, IDisposable
         try
         {
             var cpuPercent = GetCpuUsage(process);
-            var memoryMB = process.PrivateMemorySize64 / 1024.0 / 1024.0;
+            var memoryMB = GetMemoryMB(process);
             return new ProcessResourceInfo(processName, cpuPercent, memoryMB);
         }
         catch
         {
             return new ProcessResourceInfo(processName, 0, 0);
         }
+    }
+
+    private static double GetMemoryMB(Process process)
+    {
+        try
+        {
+            // 获取进程及其所有子进程的内存总和
+            var totalMemory = GetProcessTreeMemory(process.Id);
+            if (totalMemory > 0)
+                return totalMemory;
+        }
+        catch { }
+
+        // fallback: 只获取当前进程
+        try
+        {
+            var pid = process.Id;
+            if (!_instanceNameCache.TryGetValue(pid, out var instanceName))
+            {
+                instanceName = FindInstanceName(process);
+                if (instanceName != null)
+                {
+                    _instanceNameCache[pid] = instanceName;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(instanceName))
+            {
+                using var counter = new PerformanceCounter("Process", "Working Set - Private", instanceName, true);
+                return counter.RawValue / 1024.0 / 1024.0;
+            }
+        }
+        catch { }
+
+        try
+        {
+            process.Refresh();
+            return process.WorkingSet64 / 1024.0 / 1024.0;
+        }
+        catch { return 0; }
+    }
+
+    private static double GetProcessTreeMemory(int parentPid)
+    {
+        double totalMemory = 0;
+        var pidsToCheck = new List<int> { parentPid };
+        var checkedPids = new HashSet<int>();
+
+        while (pidsToCheck.Count > 0)
+        {
+            var currentPid = pidsToCheck[0];
+            pidsToCheck.RemoveAt(0);
+
+            if (checkedPids.Contains(currentPid))
+                continue;
+            checkedPids.Add(currentPid);
+
+            try
+            {
+                var proc = Process.GetProcessById(currentPid);
+                totalMemory += GetSingleProcessMemory(proc);
+
+                // 查找子进程
+                foreach (var p in Process.GetProcesses())
+                {
+                    try
+                    {
+                        if (GetParentProcessId(p.Id) == currentPid && !checkedPids.Contains(p.Id))
+                        {
+                            pidsToCheck.Add(p.Id);
+                        }
+                    }
+                    catch { }
+                    finally { p.Dispose(); }
+                }
+            }
+            catch { }
+        }
+
+        return totalMemory;
+    }
+
+    private static double GetSingleProcessMemory(Process process)
+    {
+        try
+        {
+            var pid = process.Id;
+            if (!_instanceNameCache.TryGetValue(pid, out var instanceName))
+            {
+                instanceName = FindInstanceName(process);
+                if (instanceName != null)
+                    _instanceNameCache[pid] = instanceName;
+            }
+
+            if (!string.IsNullOrEmpty(instanceName))
+            {
+                using var counter = new PerformanceCounter("Process", "Working Set - Private", instanceName, true);
+                return counter.RawValue / 1024.0 / 1024.0;
+            }
+        }
+        catch { }
+
+        try
+        {
+            process.Refresh();
+            return process.WorkingSet64 / 1024.0 / 1024.0;
+        }
+        catch { return 0; }
+    }
+
+    [DllImport("ntdll.dll")]
+    private static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, ref PROCESS_BASIC_INFORMATION processInformation, int processInformationLength, out int returnLength);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PROCESS_BASIC_INFORMATION
+    {
+        public IntPtr Reserved1;
+        public IntPtr PebBaseAddress;
+        public IntPtr Reserved2_0;
+        public IntPtr Reserved2_1;
+        public IntPtr UniqueProcessId;
+        public IntPtr InheritedFromUniqueProcessId;
+    }
+
+    private static int GetParentProcessId(int pid)
+    {
+        try
+        {
+            var process = Process.GetProcessById(pid);
+            var pbi = new PROCESS_BASIC_INFORMATION();
+            int returnLength;
+            var status = NtQueryInformationProcess(process.Handle, 0, ref pbi, Marshal.SizeOf(pbi), out returnLength);
+            if (status == 0)
+                return pbi.InheritedFromUniqueProcessId.ToInt32();
+        }
+        catch { }
+        return 0;
+    }
+
+    private static string? FindInstanceName(Process process)
+    {
+        try
+        {
+            var name = process.ProcessName;
+            var pid = process.Id;
+
+            try
+            {
+                using var counter = new PerformanceCounter("Process", "ID Process", name, true);
+                if ((int)counter.RawValue == pid)
+                    return name;
+            }
+            catch { }
+
+            for (int i = 1; i <= 20; i++)
+            {
+                var instanceName = $"{name}#{i}";
+                try
+                {
+                    using var counter = new PerformanceCounter("Process", "ID Process", instanceName, true);
+                    if ((int)counter.RawValue == pid)
+                        return instanceName;
+                }
+                catch { break; }
+            }
+        }
+        catch { }
+        return null;
     }
 
     private double GetCpuUsage(Process process)

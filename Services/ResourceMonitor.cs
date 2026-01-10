@@ -1,6 +1,8 @@
 using LuckyLilliaDesktop.Models;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reactive.Subjects;
 using System.Runtime.InteropServices;
@@ -35,6 +37,9 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
     private string? _cachedQQVersion;
     private int? _qqPid;
 
+    // 缓存性能计数器实例名，避免重复查找
+    private static readonly ConcurrentDictionary<int, string> _instanceNameCache = new();
+
     public IObservable<ProcessResourceInfo> ResourceStream => _resourceSubject;
     public IObservable<SelfInfo> UinStream => _uinSubject;
     public IObservable<string> QQVersionStream => _qqVersionSubject;
@@ -58,6 +63,73 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
 
+    private static double GetPrivateWorkingSetMB(Process process)
+    {
+        try
+        {
+            var pid = process.Id;
+            if (!_instanceNameCache.TryGetValue(pid, out var instanceName))
+            {
+                instanceName = FindInstanceName(process);
+                if (instanceName != null)
+                {
+                    _instanceNameCache[pid] = instanceName;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(instanceName))
+            {
+                using var counter = new PerformanceCounter("Process", "Working Set - Private", instanceName, true);
+                return counter.RawValue / 1024.0 / 1024.0;
+            }
+        }
+        catch { }
+
+        // fallback
+        try
+        {
+            process.Refresh();
+            return process.WorkingSet64 / 1024.0 / 1024.0;
+        }
+        catch { return 0; }
+    }
+
+    private static string? FindInstanceName(Process process)
+    {
+        try
+        {
+            var name = process.ProcessName;
+            var pid = process.Id;
+
+            // 先尝试直接用进程名
+            try
+            {
+                using var counter = new PerformanceCounter("Process", "ID Process", name, true);
+                if ((int)counter.RawValue == pid)
+                    return name;
+            }
+            catch { }
+
+            // 尝试带序号的实例名 (qq#1, qq#2, ...)
+            for (int i = 1; i <= 50; i++)
+            {
+                var instanceName = $"{name}#{i}";
+                try
+                {
+                    using var counter = new PerformanceCounter("Process", "ID Process", instanceName, true);
+                    if ((int)counter.RawValue == pid)
+                        return instanceName;
+                }
+                catch
+                {
+                    // 实例不存在，继续尝试下一个
+                }
+            }
+        }
+        catch { }
+        return null;
+    }
+
     public ResourceMonitor(ILogger<ResourceMonitor> logger, IProcessManager processManager, IPmhqClient pmhqClient)
     {
         _logger = logger;
@@ -74,7 +146,7 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         }
 
         _monitorCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        _monitorTask = MonitorLoopAsync(_monitorCts.Token);
+        _monitorTask = Task.Run(() => MonitorLoopAsync(_monitorCts.Token), _monitorCts.Token);
 
         _logger.LogInformation("资源监控已启动");
         return Task.CompletedTask;
@@ -92,8 +164,10 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         _lastUin = null;
         _cachedQQVersion = null;
         _qqPid = null;
+        _instanceNameCache.Clear();
         _logger.LogDebug("资源监控状态已重置");
     }
+
 
     private async Task MonitorLoopAsync(CancellationToken ct)
     {
@@ -103,14 +177,12 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         {
             while (await timer.WaitForNextTickAsync(ct))
             {
-                // 监控管理器自身
+                // 在后台线程执行所有监控操作
                 try
                 {
                     var currentProcess = Process.GetCurrentProcess();
-                    var managerCpu = 0.0;
-                    // 使用私有内存大小，更接近资源管理器显示的值
-                    var managerMemory = currentProcess.PrivateMemorySize64 / 1024.0 / 1024.0;
-                    var managerResources = new ProcessResourceInfo("Manager", managerCpu, managerMemory);
+                    var managerMemory = GetPrivateWorkingSetMB(currentProcess);
+                    var managerResources = new ProcessResourceInfo("Manager", 0.0, managerMemory);
                     _resourceSubject.OnNext(managerResources);
                 }
                 catch (Exception ex)
@@ -118,7 +190,6 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
                     _logger.LogDebug(ex, "监控管理器进程失败");
                 }
 
-                // 监控 PMHQ
                 var pmhqStatus = _processManager.GetProcessStatus("PMHQ");
                 if (pmhqStatus == ProcessStatus.Running)
                 {
@@ -126,7 +197,6 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
                     _resourceSubject.OnNext(pmhqResources);
                 }
 
-                // 监控 LLBot
                 var llbotStatus = _processManager.GetProcessStatus("LLBot");
                 if (llbotStatus == ProcessStatus.Running)
                 {
@@ -134,10 +204,8 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
                     _resourceSubject.OnNext(llbotResources);
                 }
 
-                // 监控 Node.js 进程
                 await MonitorNodeProcessAsync();
 
-                // 获取系统可用内存
                 try
                 {
                     var memStatus = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
@@ -149,19 +217,13 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
                 }
                 catch { }
 
-                // 尝试获取 UIN 和 QQ PID
                 await TryFetchSelfInfoAsync();
                 await TryFetchQQPidAsync();
                 await TryFetchQQVersionAsync();
-
-                // 监控 QQ 进程
                 await MonitorQQProcessAsync();
             }
         }
-        catch (OperationCanceledException)
-        {
-            // 正常取消
-        }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             _logger.LogError(ex, "资源监控循环出错");
@@ -229,19 +291,16 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
     {
         try
         {
-            // 查找 Node.js 进程（通过进程名和命令行参数）
             var processes = Process.GetProcessesByName("node");
             foreach (var process in processes)
             {
                 try
                 {
-                    // 检查是否是运行 LLBot 的 Node.js 进程
                     var commandLine = process.StartInfo.Arguments;
                     if (commandLine.Contains("llbot.js") || process.ProcessName.Contains("node"))
                     {
-                        var nodeCpu = 0.0;
-                        var nodeMemory = process.PrivateMemorySize64 / 1024.0 / 1024.0;
-                        var nodeResources = new ProcessResourceInfo("Node", nodeCpu, nodeMemory);
+                        var nodeMemory = GetPrivateWorkingSetMB(process);
+                        var nodeResources = new ProcessResourceInfo("Node", 0.0, nodeMemory);
                         _resourceSubject.OnNext(nodeResources);
                         break;
                     }
@@ -274,15 +333,13 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
             var qqProcess = Process.GetProcessById(_qqPid.Value);
             if (qqProcess != null && !qqProcess.HasExited)
             {
-                var cpuPercent = 0.0;
-                var memoryMB = qqProcess.PrivateMemorySize64 / 1024.0 / 1024.0;
-                var qqResources = new ProcessResourceInfo("QQ", cpuPercent, memoryMB);
+                var memoryMB = GetProcessTreeMemory(_qqPid.Value);
+                var qqResources = new ProcessResourceInfo("QQ", 0.0, memoryMB);
                 _resourceSubject.OnNext(qqResources);
             }
         }
         catch (ArgumentException)
         {
-            // 进程不存在，发送停止状态
             _qqPid = null;
             var qqStoppedResources = new ProcessResourceInfo("QQ", 0.0, 0.0);
             _resourceSubject.OnNext(qqStoppedResources);
@@ -294,6 +351,56 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         }
 
         await Task.CompletedTask;
+    }
+
+    private static double GetProcessTreeMemory(int parentPid)
+    {
+        double totalMemory = 0;
+        var pidsToCheck = new List<int> { parentPid };
+        var checkedPids = new HashSet<int>();
+
+        // 一次性获取所有进程的父子关系
+        var parentMap = new Dictionary<int, int>();
+        try
+        {
+            using var searcher = new System.Management.ManagementObjectSearcher("SELECT ProcessId, ParentProcessId FROM Win32_Process");
+            foreach (var obj in searcher.Get())
+            {
+                var pid = Convert.ToInt32(obj["ProcessId"]);
+                var ppid = Convert.ToInt32(obj["ParentProcessId"]);
+                parentMap[pid] = ppid;
+            }
+        }
+        catch { }
+
+        while (pidsToCheck.Count > 0)
+        {
+            var currentPid = pidsToCheck[0];
+            pidsToCheck.RemoveAt(0);
+
+            if (checkedPids.Contains(currentPid))
+                continue;
+            checkedPids.Add(currentPid);
+
+            try
+            {
+                var proc = Process.GetProcessById(currentPid);
+                totalMemory += GetPrivateWorkingSetMB(proc);
+                proc.Dispose();
+            }
+            catch { }
+
+            // 查找子进程
+            foreach (var kvp in parentMap)
+            {
+                if (kvp.Value == currentPid && !checkedPids.Contains(kvp.Key))
+                {
+                    pidsToCheck.Add(kvp.Key);
+                }
+            }
+        }
+
+        return totalMemory;
     }
 
     public void Dispose()

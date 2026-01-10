@@ -94,6 +94,9 @@ public class MainWindowViewModel : ViewModelBase
         // 设置导航到关于页面的回调（用于更新）
         homeViewModel.NavigateToAbout = () => SelectedIndex = 4;
 
+        // 下载完成后刷新版本信息
+        homeViewModel.OnDownloadCompleted = async () => await AboutVM.LoadVersionsAsync();
+
         _logger.LogInformation("MainWindowViewModel 已初始化");
     }
 

@@ -286,6 +286,7 @@ public class HomeViewModel : ViewModelBase
     // 导航回调
     public Action? NavigateToLogs { get; set; }
     public Action? NavigateToAbout { get; set; }
+    public Func<Task>? OnDownloadCompleted { get; set; }
 
     // 下载状态
     private bool _isDownloading;
@@ -896,6 +897,12 @@ public class HomeViewModel : ViewModelBase
                     // 保存更新后的配置
                     await _configManager.SaveConfigAsync(config);
                     _logger.LogInformation("下载完成，配置已更新");
+                    
+                    // 通知版本信息刷新
+                    if (OnDownloadCompleted != null)
+                    {
+                        await OnDownloadCompleted();
+                    }
                 }
                 finally
                 {
