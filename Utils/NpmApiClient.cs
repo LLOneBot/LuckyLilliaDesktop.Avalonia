@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
@@ -66,12 +68,6 @@ public class NpmApiClient
                     dist.TryGetProperty("tarball", out var tarball))
                 {
                     tarballUrl = tarball.GetString() ?? "";
-                    
-                    // 将 tarball URL 替换为下载优先的镜像源
-                    if (!string.IsNullOrEmpty(tarballUrl))
-                    {
-                        tarballUrl = ConvertToDownloadMirror(tarballUrl);
-                    }
                 }
 
                 return new NpmPackageInfo
@@ -94,32 +90,41 @@ public class NpmApiClient
     }
 
     /// <summary>
-    /// 将 tarball URL 转换为下载优先的镜像源
+    /// 获取所有可用的 tarball 下载地址（镜像源优先）
     /// </summary>
-    private string ConvertToDownloadMirror(string tarballUrl)
+    public string[] GetTarballUrls(string originalTarballUrl)
     {
-        // 下载优先使用镜像源（第一个是镜像）
-        var preferredMirror = _downloadMirrors[0];
+        if (string.IsNullOrEmpty(originalTarballUrl))
+            return Array.Empty<string>();
+
+        var urls = new List<string>();
         
-        foreach (var mirror in _versionCheckMirrors)
+        // 从原始 URL 中提取路径部分
+        string? pathPart = null;
+        foreach (var mirror in _versionCheckMirrors.Concat(_downloadMirrors).Distinct())
         {
-            if (tarballUrl.StartsWith(mirror, StringComparison.OrdinalIgnoreCase))
+            if (originalTarballUrl.StartsWith(mirror, StringComparison.OrdinalIgnoreCase))
             {
-                return tarballUrl.Replace(mirror, preferredMirror);
+                pathPart = originalTarballUrl.Substring(mirror.Length);
+                break;
             }
         }
-        
-        return tarballUrl;
+
+        if (pathPart == null)
+        {
+            // 无法解析，直接返回原始 URL
+            return new[] { originalTarballUrl };
+        }
+
+        // 按下载镜像优先顺序生成 URL 列表
+        foreach (var mirror in _downloadMirrors)
+        {
+            urls.Add(mirror + pathPart);
+        }
+
+        return urls.ToArray();
     }
 
-    /// <summary>
-    /// 获取包的 tarball 下载地址
-    /// </summary>
-    public async Task<string?> GetTarballUrlAsync(string packageName, CancellationToken ct = default)
-    {
-        var info = await GetPackageInfoAsync(packageName, ct);
-        return info?.TarballUrl;
-    }
 }
 
 /// <summary>

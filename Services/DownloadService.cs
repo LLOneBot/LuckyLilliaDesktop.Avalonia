@@ -209,46 +209,74 @@ public class DownloadService : IDownloadService
         {
             progress?.Report(new DownloadProgress { Status = "正在获取下载地址..." });
 
-            var tarballUrl = await _npmClient.GetTarballUrlAsync(Constants.NpmPackages.App, ct);
-            if (string.IsNullOrEmpty(tarballUrl))
+            var packageInfo = await _npmClient.GetPackageInfoAsync(Constants.NpmPackages.App, ct);
+            if (packageInfo == null || string.IsNullOrEmpty(packageInfo.TarballUrl))
             {
                 return new AppUpdateResult { Success = false, Error = "无法获取下载地址" };
             }
 
-            _logger.LogInformation("开始下载应用更新: {Url}", tarballUrl);
-            progress?.Report(new DownloadProgress { Status = "正在下载更新..." });
+            var tarballUrls = _npmClient.GetTarballUrls(packageInfo.TarballUrl);
+            _logger.LogInformation("获取到 {Count} 个下载地址", tarballUrls.Length);
 
             var tempDir = Path.Combine(Path.GetTempPath(), $"app_update_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
 
             var tempFile = Path.Combine(tempDir, "update.tgz");
 
-            // 下载文件
-            using (var response = await _httpClient.GetAsync(tarballUrl, HttpCompletionOption.ResponseHeadersRead, ct))
+            // 依次尝试各个镜像源
+            Exception? lastException = null;
+            foreach (var tarballUrl in tarballUrls)
             {
-                response.EnsureSuccessStatusCode();
-
-                var totalBytes = response.Content.Headers.ContentLength ?? 0;
-                var downloadedBytes = 0L;
-
-                await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
-
-                var buffer = new byte[65536]; // 64KB chunk 提高下载速度
-                int bytesRead;
-
-                while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
+                try
                 {
-                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                    downloadedBytes += bytesRead;
+                    _logger.LogInformation("尝试下载应用更新: {Url}", tarballUrl);
+                    progress?.Report(new DownloadProgress { Status = "正在下载更新..." });
 
-                    progress?.Report(new DownloadProgress
+                    using var response = await _httpClient.GetAsync(tarballUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+                    
+                    if (!response.IsSuccessStatusCode)
                     {
-                        Downloaded = downloadedBytes,
-                        Total = totalBytes,
-                        Status = $"正在下载更新... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB"
-                    });
+                        _logger.LogWarning("下载失败: {StatusCode} from {Url}", response.StatusCode, tarballUrl);
+                        continue;
+                    }
+
+                    var totalBytes = response.Content.Headers.ContentLength ?? 0;
+                    var downloadedBytes = 0L;
+
+                    await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+                    await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
+
+                    var buffer = new byte[65536];
+                    int bytesRead;
+
+                    while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
+                    {
+                        await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                        downloadedBytes += bytesRead;
+
+                        progress?.Report(new DownloadProgress
+                        {
+                            Downloaded = downloadedBytes,
+                            Total = totalBytes,
+                            Status = $"正在下载更新... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB"
+                        });
+                    }
+
+                    _logger.LogInformation("下载成功: {Url}", tarballUrl);
+                    lastException = null;
+                    break;
                 }
+                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+                {
+                    lastException = ex;
+                    _logger.LogWarning(ex, "从 {Url} 下载失败，尝试下一个镜像源", tarballUrl);
+                }
+            }
+
+            if (lastException != null)
+            {
+                Directory.Delete(tempDir, true);
+                return new AppUpdateResult { Success = false, Error = "所有下载源都失败" };
             }
 
             progress?.Report(new DownloadProgress { Status = "正在解压..." });
@@ -380,47 +408,78 @@ public class DownloadService : IDownloadService
             _logger.LogInformation("开始下载包: {Package}", packageName);
             progress?.Report(new DownloadProgress { Status = "正在获取下载地址..." });
 
-            var tarballUrl = await _npmClient.GetTarballUrlAsync(packageName, ct);
-            if (string.IsNullOrEmpty(tarballUrl))
+            var packageInfo = await _npmClient.GetPackageInfoAsync(packageName, ct);
+            if (packageInfo == null || string.IsNullOrEmpty(packageInfo.TarballUrl))
             {
                 _logger.LogError("无法获取 {Package} 的下载地址", packageName);
                 return false;
             }
 
-            _logger.LogInformation("下载地址: {Url}", tarballUrl);
-            progress?.Report(new DownloadProgress { Status = "正在下载..." });
+            // 获取所有可用的下载地址（镜像源优先）
+            var tarballUrls = _npmClient.GetTarballUrls(packageInfo.TarballUrl);
+            _logger.LogInformation("获取到 {Count} 个下载地址", tarballUrls.Length);
 
             // 确保目录存在
             Directory.CreateDirectory(extractDir);
 
             var tempFile = Path.Combine(extractDir, "temp_download.tgz");
 
-            // 下载文件
-            using (var response = await _httpClient.GetAsync(tarballUrl, HttpCompletionOption.ResponseHeadersRead, ct))
+            // 依次尝试各个镜像源
+            Exception? lastException = null;
+            foreach (var tarballUrl in tarballUrls)
             {
-                response.EnsureSuccessStatusCode();
-
-                var totalBytes = response.Content.Headers.ContentLength ?? 0;
-                var downloadedBytes = 0L;
-
-                await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
-
-                var buffer = new byte[65536]; // 64KB chunk 提高下载速度
-                int bytesRead;
-
-                while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
+                try
                 {
-                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                    downloadedBytes += bytesRead;
+                    _logger.LogInformation("尝试下载: {Url}", tarballUrl);
+                    progress?.Report(new DownloadProgress { Status = "正在下载..." });
 
-                    progress?.Report(new DownloadProgress
+                    using var response = await _httpClient.GetAsync(tarballUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+                    
+                    if (!response.IsSuccessStatusCode)
                     {
-                        Downloaded = downloadedBytes,
-                        Total = totalBytes,
-                        Status = $"正在下载... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB"
-                    });
+                        _logger.LogWarning("下载失败: {StatusCode} from {Url}", response.StatusCode, tarballUrl);
+                        continue;
+                    }
+
+                    var totalBytes = response.Content.Headers.ContentLength ?? 0;
+                    var downloadedBytes = 0L;
+
+                    await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+                    await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
+
+                    var buffer = new byte[65536];
+                    int bytesRead;
+
+                    while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
+                    {
+                        await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                        downloadedBytes += bytesRead;
+
+                        progress?.Report(new DownloadProgress
+                        {
+                            Downloaded = downloadedBytes,
+                            Total = totalBytes,
+                            Status = $"正在下载... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB"
+                        });
+                    }
+
+                    // 下载成功，跳出循环
+                    _logger.LogInformation("下载成功: {Url}", tarballUrl);
+                    lastException = null;
+                    break;
                 }
+                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+                {
+                    lastException = ex;
+                    _logger.LogWarning(ex, "从 {Url} 下载失败，尝试下一个镜像源", tarballUrl);
+                }
+            }
+
+            if (lastException != null)
+            {
+                _logger.LogError(lastException, "所有镜像源都无法下载: {Package}", packageName);
+                progress?.Report(new DownloadProgress { Status = "所有下载源都失败" });
+                return false;
             }
 
             progress?.Report(new DownloadProgress { Status = "正在解压..." });
