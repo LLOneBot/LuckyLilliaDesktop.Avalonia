@@ -63,6 +63,10 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Update npm
+        if: github.event_name == 'push'
+        run: npm update -g npm
+
       - name: Prepare and publish npm package
         if: github.event_name == 'push'
         run: |
