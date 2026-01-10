@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using LuckyLilliaDesktop.ViewModels;
+using System;
 using System.Linq;
 
 namespace LuckyLilliaDesktop.Views.Pages;
@@ -10,6 +11,7 @@ namespace LuckyLilliaDesktop.Views.Pages;
 public partial class LogPage : UserControl
 {
     private ListBox? _logListBox;
+    private bool _scrollPending;
 
     public LogPage()
     {
@@ -32,8 +34,8 @@ public partial class LogPage : UserControl
             vm.ClearSelectionRequested += OnClearSelectionRequested;
         }
         
-        // 页面加载时自动滚动到底部（延迟执行确保列表已渲染）
-        Avalonia.Threading.Dispatcher.UIThread.Post(OnScrollToBottomRequested, Avalonia.Threading.DispatcherPriority.Loaded);
+        // 页面加载时自动滚动到底部
+        Avalonia.Threading.Dispatcher.UIThread.Post(DoScrollToBottom, Avalonia.Threading.DispatcherPriority.Loaded);
     }
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
@@ -56,10 +58,8 @@ public partial class LogPage : UserControl
             var item = (e.Source as Visual)?.FindAncestorOfType<ListBoxItem>();
             if (item != null)
             {
-                // 切换选中状态
                 item.IsSelected = !item.IsSelected;
                 e.Handled = true;
-                
                 UpdateSelection();
             }
         }
@@ -79,9 +79,29 @@ public partial class LogPage : UserControl
 
     private void OnScrollToBottomRequested()
     {
-        if (_logListBox?.ItemCount > 0)
+        // 防抖：如果已有滚动请求待处理，跳过
+        if (_scrollPending) return;
+        _scrollPending = true;
+        
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            _logListBox.ScrollIntoView(_logListBox.ItemCount - 1);
+            DoScrollToBottom();
+            _scrollPending = false;
+        }, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
+    private void DoScrollToBottom()
+    {
+        try
+        {
+            if (_logListBox?.ItemCount > 0)
+            {
+                _logListBox.ScrollIntoView(_logListBox.ItemCount - 1);
+            }
+        }
+        catch (Exception)
+        {
+            // 忽略滚动异常
         }
     }
 

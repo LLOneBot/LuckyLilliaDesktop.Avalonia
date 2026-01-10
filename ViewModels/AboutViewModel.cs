@@ -101,6 +101,13 @@ public class AboutViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _pmhqLatestVersion, value);
     }
 
+    private string _pmhqReleaseUrl = string.Empty;
+    public string PmhqReleaseUrl
+    {
+        get => _pmhqReleaseUrl;
+        set => this.RaiseAndSetIfChanged(ref _pmhqReleaseUrl, value);
+    }
+
     // 更新状态 - LLBot
     private bool _llbotIsLatest;
     public bool LLBotIsLatest
@@ -121,6 +128,13 @@ public class AboutViewModel : ViewModelBase
     {
         get => _llbotLatestVersion;
         set => this.RaiseAndSetIfChanged(ref _llbotLatestVersion, value);
+    }
+
+    private string _llbotReleaseUrl = string.Empty;
+    public string LLBotReleaseUrl
+    {
+        get => _llbotReleaseUrl;
+        set => this.RaiseAndSetIfChanged(ref _llbotReleaseUrl, value);
     }
 
     // 检查更新状态
@@ -170,6 +184,9 @@ public class AboutViewModel : ViewModelBase
     // 命令
     public ReactiveCommand<Unit, Unit> CheckOrUpdateCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenAppReleaseCommand { get; }
+    public ReactiveCommand<Unit, Unit> OpenPmhqReleaseCommand { get; }
+    public ReactiveCommand<Unit, Unit> OpenLLBotReleaseCommand { get; }
+    public ReactiveCommand<Unit, Unit> OpenDocsCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenQQGroupCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenAppGitHubCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenPmhqGitHubCommand { get; }
@@ -202,6 +219,9 @@ public class AboutViewModel : ViewModelBase
 
         // 打开链接命令
         OpenAppReleaseCommand = ReactiveCommand.Create(() => OpenUrl(AppReleaseUrl));
+        OpenPmhqReleaseCommand = ReactiveCommand.Create(() => OpenUrl(PmhqReleaseUrl));
+        OpenLLBotReleaseCommand = ReactiveCommand.Create(() => OpenUrl(LLBotReleaseUrl));
+        OpenDocsCommand = ReactiveCommand.Create(() => OpenUrl("https://luckylillia.com"));
         OpenQQGroupCommand = ReactiveCommand.Create(() => OpenUrl(QQGroupUrl));
         OpenAppGitHubCommand = ReactiveCommand.Create(() => OpenUrl(AppGitHubUrl));
         OpenPmhqGitHubCommand = ReactiveCommand.Create(() => OpenUrl(PmhqGitHubUrl));
@@ -227,10 +247,12 @@ public class AboutViewModel : ViewModelBase
 
         PmhqHasUpdate = state.PmhqHasUpdate;
         PmhqLatestVersion = state.PmhqLatestVersion;
+        PmhqReleaseUrl = state.PmhqReleaseUrl;
         PmhqIsLatest = !state.PmhqHasUpdate;
 
         LLBotHasUpdate = state.LLBotHasUpdate;
         LLBotLatestVersion = state.LLBotLatestVersion;
+        LLBotReleaseUrl = state.LLBotReleaseUrl;
         LLBotIsLatest = !state.LLBotHasUpdate;
 
         HasAnyUpdate = state.HasAnyUpdate;
@@ -390,6 +412,7 @@ public class AboutViewModel : ViewModelBase
                 {
                     PmhqHasUpdate = true;
                     PmhqLatestVersion = pmhqUpdate.LatestVersion;
+                    PmhqReleaseUrl = pmhqUpdate.ReleaseUrl;
                     _logger.LogInformation("发现 PMHQ 新版本: {Version}", pmhqUpdate.LatestVersion);
                 }
                 else
@@ -410,6 +433,7 @@ public class AboutViewModel : ViewModelBase
                 {
                     LLBotHasUpdate = true;
                     LLBotLatestVersion = llbotUpdate.LatestVersion;
+                    LLBotReleaseUrl = llbotUpdate.ReleaseUrl;
                     _logger.LogInformation("发现 LLBot 新版本: {Version}", llbotUpdate.LatestVersion);
                 }
                 else
@@ -576,7 +600,12 @@ public class AboutViewModel : ViewModelBase
     /// </summary>
     private void OpenUrl(string url)
     {
-        if (string.IsNullOrEmpty(url)) return;
+        _logger.LogInformation("尝试打开链接: {Url}", url);
+        if (string.IsNullOrEmpty(url))
+        {
+            _logger.LogWarning("链接为空，无法打开");
+            return;
+        }
 
         try
         {
@@ -585,6 +614,7 @@ public class AboutViewModel : ViewModelBase
                 FileName = url,
                 UseShellExecute = true
             });
+            _logger.LogInformation("已打开链接: {Url}", url);
         }
         catch (Exception ex)
         {

@@ -22,8 +22,8 @@ public static class Constants
     /// </summary>
     public static class GitHubRepos
     {
-        public const string LLBot = "LLOneBot/LLOneBot";
-        public const string App = "LLOneBot/lucky-lillia-desktop";
+        public const string LLBot = "LLOneBot/LuckyLilliaBot";
+        public const string App = "LLOneBot/LuckyLilliaDesktop.Avalonia";
         public const string Pmhq = "linyuchen/pmhq";
     }
 

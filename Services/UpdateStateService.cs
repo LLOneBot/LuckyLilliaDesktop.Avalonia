@@ -11,9 +11,11 @@ public class UpdateState
     
     public bool PmhqHasUpdate { get; set; }
     public string PmhqLatestVersion { get; set; } = "";
+    public string PmhqReleaseUrl { get; set; } = "";
     
     public bool LLBotHasUpdate { get; set; }
     public string LLBotLatestVersion { get; set; } = "";
+    public string LLBotReleaseUrl { get; set; } = "";
     
     public bool HasAnyUpdate => AppHasUpdate || PmhqHasUpdate || LLBotHasUpdate;
     public bool IsChecked { get; set; }

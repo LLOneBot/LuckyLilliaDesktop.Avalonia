@@ -36,10 +36,11 @@ public class LogEntryViewModel : ViewModelBase
     }
 }
 
-public class LogViewModel : ViewModelBase
+public class LogViewModel : ViewModelBase, IDisposable
 {
     private readonly ILogCollector _logCollector;
     private readonly ILogger<LogViewModel> _logger;
+    private readonly IDisposable _logSubscription;
 
     public ObservableCollection<LogEntryViewModel> LogEntries { get; } = new();
     public ObservableCollection<LogEntryViewModel> SelectedLogEntries { get; } = new();
@@ -70,8 +71,8 @@ public class LogViewModel : ViewModelBase
         _logCollector = logCollector;
         _logger = logger;
 
-        _logCollector.LogStream
-            .Buffer(TimeSpan.FromMilliseconds(100))
+        _logSubscription = _logCollector.LogStream
+            .Buffer(TimeSpan.FromMilliseconds(200))
             .Where(batch => batch.Count > 0)
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(OnLogBatchReceived);
@@ -145,5 +146,10 @@ public class LogViewModel : ViewModelBase
         {
             ScrollToBottomRequested?.Invoke();
         }
+    }
+
+    public void Dispose()
+    {
+        _logSubscription.Dispose();
     }
 }

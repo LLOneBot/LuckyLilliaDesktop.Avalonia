@@ -502,6 +502,7 @@ public class HomeViewModel : ViewModelBase
                     updateNames.Add("PMHQ");
                     state.PmhqHasUpdate = true;
                     state.PmhqLatestVersion = pmhqUpdate.LatestVersion;
+                    state.PmhqReleaseUrl = pmhqUpdate.ReleaseUrl;
                     _logger.LogInformation("发现 PMHQ 新版本: {Version}", pmhqUpdate.LatestVersion);
                 }
             }
@@ -515,6 +516,7 @@ public class HomeViewModel : ViewModelBase
                     updateNames.Add("LLBot");
                     state.LLBotHasUpdate = true;
                     state.LLBotLatestVersion = llbotUpdate.LatestVersion;
+                    state.LLBotReleaseUrl = llbotUpdate.ReleaseUrl;
                     _logger.LogInformation("发现 LLBot 新版本: {Version}", llbotUpdate.LatestVersion);
                 }
             }
