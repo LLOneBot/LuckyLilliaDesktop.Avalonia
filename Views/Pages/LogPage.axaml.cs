@@ -33,9 +33,17 @@ public partial class LogPage : UserControl
             vm.ScrollToBottomRequested += OnScrollToBottomRequested;
             vm.ClearSelectionRequested += OnClearSelectionRequested;
         }
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
         
-        // 页面加载时自动滚动到底部
-        Avalonia.Threading.Dispatcher.UIThread.Post(DoScrollToBottom, Avalonia.Threading.DispatcherPriority.Loaded);
+        // 监听 IsVisible 变化，页面显示时滚动到底部
+        if (change.Property == IsVisibleProperty && change.NewValue is true)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(DoScrollToBottom, Avalonia.Threading.DispatcherPriority.Background);
+        }
     }
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
