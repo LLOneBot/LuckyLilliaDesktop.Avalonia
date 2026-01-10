@@ -7,6 +7,7 @@ using System;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Threading.Tasks;
 
 namespace LuckyLilliaDesktop.ViewModels;
 
@@ -75,8 +76,8 @@ public class MainWindowViewModel : ViewModelBase
         LLBotConfigVM = llbotConfigViewModel ?? throw new ArgumentNullException(nameof(llbotConfigViewModel));
         AboutVM = aboutViewModel ?? throw new ArgumentNullException(nameof(aboutViewModel));
 
-        // 加载保存的主题设置
-        LoadThemeSettings();
+        // 加载保存的主题设置（异步初始化）
+        _ = LoadThemeSettingsAsync();
 
         // 监听 QQ 信息变化更新标题
         homeViewModel.WhenAnyValue(x => x.QQUin, x => x.QQNickname)
@@ -100,10 +101,13 @@ public class MainWindowViewModel : ViewModelBase
         _logger.LogInformation("MainWindowViewModel 已初始化");
     }
 
-    private void LoadThemeSettings()
+    private async Task LoadThemeSettingsAsync()
     {
         try
         {
+            // 先确保配置已加载
+            await _configManager.LoadConfigAsync();
+            
             var themeMode = _configManager.GetSetting("theme_mode", "dark");
             IsDarkTheme = themeMode == "dark";
             ThemeIcon = IsDarkTheme ? "\u263d" : "\u2600"; // Moon or Sun

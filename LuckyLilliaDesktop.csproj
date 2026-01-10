@@ -13,7 +13,7 @@
     <Product>Lucky Lillia Desktop</Product>
     <AssemblyTitle>Lucky Lillia Desktop</AssemblyTitle>
     <Description>幸运莉莉娅桌面端</Description>
-    <Version>2.0.2</Version>
+    <Version>2.0.3</Version>
     
     <!-- 发布配置 -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
