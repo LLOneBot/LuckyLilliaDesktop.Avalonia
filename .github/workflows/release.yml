@@ -65,7 +65,7 @@ jobs:
 
       - name: Update npm
         if: github.event_name == 'push'
-        run: npm update -g npm@latest
+        run: npm install -g npm@latest
 
       - name: Prepare and publish npm package
         if: github.event_name == 'push'
