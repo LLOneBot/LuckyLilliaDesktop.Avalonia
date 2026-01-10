@@ -42,14 +42,25 @@ public static class Constants
     }
 
     /// <summary>
-    /// NPM 镜像源
+    /// NPM 镜像源（下载优先）
     /// </summary>
-    public static readonly string[] NpmRegistryMirrors =
+    public static readonly string[] NpmDownloadMirrors =
     {
         "https://registry.npmmirror.com",
         "https://mirrors.huaweicloud.com/repository/npm",
         "https://mirrors.cloud.tencent.com/npm",
         "https://registry.npmjs.org"
+    };
+
+    /// <summary>
+    /// NPM 官方源（版本检查优先）
+    /// </summary>
+    public static readonly string[] NpmVersionCheckMirrors =
+    {
+        "https://registry.npmjs.org",
+        "https://registry.npmmirror.com",
+        "https://mirrors.huaweicloud.com/repository/npm",
+        "https://mirrors.cloud.tencent.com/npm"
     };
 
     /// <summary>

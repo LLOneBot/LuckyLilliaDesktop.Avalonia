@@ -14,12 +14,14 @@ public class NpmApiClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<NpmApiClient>? _logger;
-    private readonly string[] _registryMirrors;
+    private readonly string[] _versionCheckMirrors;
+    private readonly string[] _downloadMirrors;
 
     public NpmApiClient(ILogger<NpmApiClient>? logger = null)
     {
         _logger = logger;
-        _registryMirrors = Constants.NpmRegistryMirrors;
+        _versionCheckMirrors = Constants.NpmVersionCheckMirrors;
+        _downloadMirrors = Constants.NpmDownloadMirrors;
         _httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(Constants.Timeouts.UpdateCheck)
@@ -27,13 +29,13 @@ public class NpmApiClient
     }
 
     /// <summary>
-    /// 获取 NPM 包信息
+    /// 获取 NPM 包信息（版本检查，优先使用官方源）
     /// </summary>
     public async Task<NpmPackageInfo?> GetPackageInfoAsync(string packageName, CancellationToken ct = default)
     {
         Exception? lastException = null;
 
-        foreach (var registry in _registryMirrors)
+        foreach (var registry in _versionCheckMirrors)
         {
             try
             {
@@ -64,6 +66,12 @@ public class NpmApiClient
                     dist.TryGetProperty("tarball", out var tarball))
                 {
                     tarballUrl = tarball.GetString() ?? "";
+                    
+                    // 将 tarball URL 替换为下载优先的镜像源
+                    if (!string.IsNullOrEmpty(tarballUrl))
+                    {
+                        tarballUrl = ConvertToDownloadMirror(tarballUrl);
+                    }
                 }
 
                 return new NpmPackageInfo
@@ -83,6 +91,25 @@ public class NpmApiClient
 
         _logger?.LogError(lastException, "所有镜像源都无法获取包信息: {Package}", packageName);
         return null;
+    }
+
+    /// <summary>
+    /// 将 tarball URL 转换为下载优先的镜像源
+    /// </summary>
+    private string ConvertToDownloadMirror(string tarballUrl)
+    {
+        // 下载优先使用镜像源（第一个是镜像）
+        var preferredMirror = _downloadMirrors[0];
+        
+        foreach (var mirror in _versionCheckMirrors)
+        {
+            if (tarballUrl.StartsWith(mirror, StringComparison.OrdinalIgnoreCase))
+            {
+                return tarballUrl.Replace(mirror, preferredMirror);
+            }
+        }
+        
+        return tarballUrl;
     }
 
     /// <summary>
