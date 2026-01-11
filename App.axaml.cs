@@ -74,7 +74,7 @@ public partial class App : Application
                 {
                     DataContext = mainVM
                 };
-                
+
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 desktop.ShutdownRequested += OnShutdownRequested;
 
@@ -104,7 +104,7 @@ public partial class App : Application
     public void UpdateTrayMenuText(string? nickname, string? uin)
     {
         if (_trayShowMenuItem == null) return;
-        
+
         var trayIcons = TrayIcon.GetIcons(this);
         if (!string.IsNullOrEmpty(nickname) && !string.IsNullOrEmpty(uin))
         {
@@ -156,14 +156,14 @@ public partial class App : Application
     {
         Log.Information("开始退出应用...");
         if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop) return;
-        
+
         // 保存窗口位置
         if (desktop.MainWindow is MainWindow mainWindow)
         {
             await mainWindow.SaveWindowStateAsync();
             Log.Information("窗口状态已保存");
         }
-        
+
         // 停止所有进程
         var processManager = Services.GetService<IProcessManager>();
         if (processManager != null)
@@ -171,7 +171,7 @@ public partial class App : Application
             await processManager.StopAllAsync();
             Log.Information("所有进程已停止");
         }
-        
+
         Log.Information("应用退出");
         desktop.Shutdown();
     }

@@ -64,9 +64,9 @@ public class DownloadService : IDownloadService
         {
             Timeout = TimeSpan.FromSeconds(Constants.Timeouts.Download)
         };
-        
+
         // 设置 User-Agent 提高下载速度
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", 
+        _httpClient.DefaultRequestHeaders.Add("User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
     }
 
@@ -233,7 +233,7 @@ public class DownloadService : IDownloadService
                     progress?.Report(new DownloadProgress { Status = "正在下载更新..." });
 
                     using var response = await _httpClient.GetAsync(tarballUrl, HttpCompletionOption.ResponseHeadersRead, ct);
-                    
+
                     if (!response.IsSuccessStatusCode)
                     {
                         _logger.LogWarning("下载失败: {StatusCode} from {Url}", response.StatusCode, tarballUrl);
@@ -434,7 +434,7 @@ public class DownloadService : IDownloadService
                     progress?.Report(new DownloadProgress { Status = "正在下载..." });
 
                     using var response = await _httpClient.GetAsync(tarballUrl, HttpCompletionOption.ResponseHeadersRead, ct);
-                    
+
                     if (!response.IsSuccessStatusCode)
                     {
                         _logger.LogWarning("下载失败: {StatusCode} from {Url}", response.StatusCode, tarballUrl);

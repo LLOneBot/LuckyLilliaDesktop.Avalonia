@@ -114,7 +114,7 @@ public class ConfigViewModel : ViewModelBase
         set
         {
             if (_startupEnabled == value) return;
-            
+
             if (value && string.IsNullOrWhiteSpace(AutoLoginQQ))
             {
                 ShowStartupConfirmDialog();

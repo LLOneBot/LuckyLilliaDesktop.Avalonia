@@ -42,7 +42,7 @@ public class ProcessManager : IProcessManager, IDisposable
     /// <summary>
     /// 是否有任何进程在运行
     /// </summary>
-    public bool IsAnyProcessRunning => 
+    public bool IsAnyProcessRunning =>
         _pmhqStatus == ProcessStatus.Running || _llbotStatus == ProcessStatus.Running;
 
     public event EventHandler<ProcessStatus>? ProcessStatusChanged;
@@ -329,7 +329,7 @@ public class ProcessManager : IProcessManager, IDisposable
 
             var process = _pmhqProcess;
             _pmhqProcess = null;
-            
+
             try
             {
                 if (!process.HasExited)
@@ -370,7 +370,7 @@ public class ProcessManager : IProcessManager, IDisposable
 
         var process = _llbotProcess;
         _llbotProcess = null;
-        
+
         try
         {
             if (!process.HasExited)
@@ -421,13 +421,13 @@ public class ProcessManager : IProcessManager, IDisposable
                     var json = await response.Content.ReadFromJsonAsync<JsonElement>(cts.Token);
                     if (json.TryGetProperty("data", out var dataElem))
                     {
-                        var dataStr = dataElem.ValueKind == JsonValueKind.String 
-                            ? dataElem.GetString() 
+                        var dataStr = dataElem.ValueKind == JsonValueKind.String
+                            ? dataElem.GetString()
                             : dataElem.GetRawText();
                         if (!string.IsNullOrEmpty(dataStr))
                         {
                             var data = JsonSerializer.Deserialize<JsonElement>(dataStr);
-                            if (data.TryGetProperty("result", out var result) && 
+                            if (data.TryGetProperty("result", out var result) &&
                                 result.TryGetProperty("pid", out var pidElem))
                             {
                                 var qqPid = pidElem.GetInt32();

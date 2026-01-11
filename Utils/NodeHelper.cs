@@ -13,17 +13,17 @@ public static class NodeHelper
     {
         var nodeExe = FindExecutableInPath("node.exe");
         if (nodeExe != null) return nodeExe;
-        
+
         return FindExecutableInPath("node");
     }
-    
+
     private static string? FindExecutableInPath(string executable)
     {
         var pathEnv = Environment.GetEnvironmentVariable("PATH");
         if (string.IsNullOrEmpty(pathEnv)) return null;
-        
+
         var paths = pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-        
+
         foreach (var path in paths)
         {
             try
@@ -36,10 +36,10 @@ public static class NodeHelper
             }
             catch { }
         }
-        
+
         return null;
     }
-    
+
     public static async Task<int?> GetNodeVersionAsync(string nodePath, ILogger? logger = null)
     {
         try
@@ -56,11 +56,11 @@ public static class NodeHelper
                     CreateNoWindow = true
                 }
             };
-            
+
             process.Start();
             var output = await process.StandardOutput.ReadToEndAsync();
             await process.WaitForExitAsync();
-            
+
             if (process.ExitCode == 0)
             {
                 // 版本格式: v22.0.0 或 v18.17.1
@@ -77,10 +77,10 @@ public static class NodeHelper
         {
             logger?.LogWarning(ex, "获取Node.js版本失败");
         }
-        
+
         return null;
     }
-    
+
     public static async Task<bool> CheckNodeVersionValidAsync(string nodePath, int minVersion = 22, ILogger? logger = null)
     {
         var version = await GetNodeVersionAsync(nodePath, logger);

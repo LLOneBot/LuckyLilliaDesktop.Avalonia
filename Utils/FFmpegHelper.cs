@@ -13,7 +13,7 @@ public static class FFmpegHelper
         if (string.IsNullOrEmpty(pathEnv)) return null;
 
         var paths = pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-        
+
         foreach (var path in paths)
         {
             try
@@ -26,7 +26,7 @@ public static class FFmpegHelper
             }
             catch { }
         }
-        
+
         return null;
     }
 
@@ -45,7 +45,7 @@ public static class FFmpegHelper
         if (!string.IsNullOrEmpty(pathEnv))
         {
             var paths = pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-            
+
             foreach (var path in paths)
             {
                 try

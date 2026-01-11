@@ -150,12 +150,13 @@ public partial class LoginDialog : Window
     private void BuildAccountList()
     {
         var panel = new StackPanel { Spacing = 4 };
-        
+
         foreach (var account in _accounts)
         {
             var avatarBorder = new Border
             {
-                Width = 44, Height = 44,
+                Width = 44,
+                Height = 44,
                 CornerRadius = new Avalonia.CornerRadius(22),
                 ClipToBounds = true,
                 Background = new SolidColorBrush(Color.Parse("#4D4D4D"))
@@ -172,12 +173,14 @@ public partial class LoginDialog : Window
             };
             infoPanel.Children.Add(new TextBlock
             {
-                Text = account.NickName, FontSize = 14,
+                Text = account.NickName,
+                FontSize = 14,
                 Foreground = new SolidColorBrush(Color.Parse("#E0E0E0"))
             });
             infoPanel.Children.Add(new TextBlock
             {
-                Text = account.Uin, FontSize = 12,
+                Text = account.Uin,
+                FontSize = 12,
                 Foreground = new SolidColorBrush(Color.Parse("#808080")),
                 Margin = new Avalonia.Thickness(0, 2, 0, 0)
             });
@@ -190,7 +193,8 @@ public partial class LoginDialog : Window
 
             var arrow = new TextBlock
             {
-                Text = "›", FontSize = 20,
+                Text = "›",
+                FontSize = 20,
                 Foreground = new SolidColorBrush(Color.Parse("#606060")),
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -199,7 +203,8 @@ public partial class LoginDialog : Window
 
             var btn = new Button
             {
-                Content = grid, Tag = account.Uin,
+                Content = grid,
+                Tag = account.Uin,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 Background = new SolidColorBrush(Color.Parse("#3D3D3D")),
                 CornerRadius = new Avalonia.CornerRadius(8),
@@ -267,10 +272,10 @@ public partial class LoginDialog : Window
             {
                 using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
                 Log.Information("[SSE] 发送 GET 请求...");
-                
+
                 using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
                 Log.Information("[SSE] 响应状态: {StatusCode}", response.StatusCode);
-                
+
                 await using var stream = await response.Content.ReadAsStreamAsync(ct);
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 Log.Information("[SSE] 开始读取流...");
@@ -324,7 +329,7 @@ public partial class LoginDialog : Window
     private void ProcessSSEMessage(string message)
     {
         Log.Information("[SSE] 处理消息: {Message}", message);
-        
+
         foreach (var line in message.Split('\n'))
         {
             var trimmed = line.Trim();
@@ -369,7 +374,7 @@ public partial class LoginDialog : Window
                             {
                                 errMsg = errMsgElem.GetString() ?? "登录失败";
                             }
-                            
+
                             Log.Warning("[SSE] 快速登录失败: {ErrMsg}", errMsg);
                             Dispatcher.UIThread.Post(() => HandleLoginFailed(errMsg));
                         }
@@ -387,10 +392,10 @@ public partial class LoginDialog : Window
     {
         LoginFailedReason = errMsg;
         IsLoginFailed = true;
-        
+
         _pollCts?.Cancel();
         _sseCts?.Cancel();
-        
+
         if (_isHeadlessMode)
         {
             Close(false);
@@ -417,7 +422,7 @@ public partial class LoginDialog : Window
             Log.Information("解析二维码 base64, 长度={Length}", base64.Length);
             var bytes = Convert.FromBase64String(base64);
             Log.Information("二维码图片大小: {Size} bytes", bytes.Length);
-            
+
             using var stream = new MemoryStream(bytes);
             QRCodeImage.Source = new Bitmap(stream);
             QRCodeImage.IsVisible = true;
@@ -484,7 +489,7 @@ public partial class LoginDialog : Window
 
         var success = await _pmhqClient.QuickLoginAsync(_selectedAccount.Uin);
         Log.Information("[Login] QuickLogin 结果: {Success}", success);
-        
+
         if (success)
         {
             StatusText.Text = "登录成功，请稍候...";

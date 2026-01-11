@@ -193,7 +193,7 @@ public class AboutViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> OpenLLBotGitHubCommand { get; }
 
     public AboutViewModel(
-        ILogger<AboutViewModel> logger, 
+        ILogger<AboutViewModel> logger,
         IConfigManager configManager,
         IUpdateChecker updateChecker,
         IDownloadService downloadService,

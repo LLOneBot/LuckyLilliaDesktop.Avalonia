@@ -77,7 +77,7 @@ public class LogViewModel : ViewModelBase, IDisposable
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(OnLogBatchReceived);
 
-        SelectedLogEntries.CollectionChanged += (_, _) => 
+        SelectedLogEntries.CollectionChanged += (_, _) =>
         {
             HasSelection = SelectedLogEntries.Count > 0;
         };
@@ -92,21 +92,21 @@ public class LogViewModel : ViewModelBase, IDisposable
         CopySelectedCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             if (SelectedLogEntries.Count == 0) return;
-            
-            var text = string.Join(Environment.NewLine, 
+
+            var text = string.Join(Environment.NewLine,
                 SelectedLogEntries.Select(e => e.FormattedText));
-            
-            var clipboard = Avalonia.Application.Current?.ApplicationLifetime 
+
+            var clipboard = Avalonia.Application.Current?.ApplicationLifetime
                 is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
                 ? desktop.MainWindow?.Clipboard
                 : null;
-            
+
             if (clipboard != null)
             {
                 await clipboard.SetTextAsync(text);
                 _logger.LogInformation("已复制 {Count} 条日志", SelectedLogEntries.Count);
             }
-            
+
             SelectedLogEntries.Clear();
             ClearSelectionRequested?.Invoke();
         });

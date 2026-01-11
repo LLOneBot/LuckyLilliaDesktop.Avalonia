@@ -107,7 +107,7 @@ public class MainWindowViewModel : ViewModelBase
         {
             // 先确保配置已加载
             await _configManager.LoadConfigAsync();
-            
+
             var themeMode = _configManager.GetSetting("theme_mode", "dark");
             IsDarkTheme = themeMode == "dark";
             ThemeIcon = IsDarkTheme ? "\u263d" : "\u2600"; // Moon or Sun

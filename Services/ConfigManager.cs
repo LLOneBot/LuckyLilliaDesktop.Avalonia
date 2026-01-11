@@ -84,7 +84,7 @@ public class ConfigManager : IConfigManager
         lock (_lock)
         {
             if (_rawJson == null) return defaultValue;
-            
+
             try
             {
                 if (_rawJson.TryGetPropertyValue(key, out var node) && node != null)
@@ -98,7 +98,7 @@ public class ConfigManager : IConfigManager
             {
                 _logger.LogWarning(ex, "读取设置失败: {Key}", key);
             }
-            
+
             return defaultValue;
         }
     }

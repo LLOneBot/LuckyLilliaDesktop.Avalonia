@@ -160,12 +160,12 @@ public class HomeViewModel : ViewModelBase
             this.RaiseAndSetIfChanged(ref _qqUin, value);
             UpdateTitle();
             this.RaisePropertyChanged(nameof(HasQQInfo));
-            
+
             if (oldValue != value && !string.IsNullOrEmpty(value))
             {
                 _ = LoadAvatarAsync(value);
             }
-            
+
             UpdateTrayMenu();
         }
     }
@@ -203,7 +203,7 @@ public class HomeViewModel : ViewModelBase
     private async Task LoadAvatarAsync(string uin)
     {
         if (string.IsNullOrEmpty(uin)) return;
-        
+
         try
         {
             var url = $"https://q1.qlogo.cn/g?b=qq&nk={uin}&s=640";
@@ -676,7 +676,7 @@ public class HomeViewModel : ViewModelBase
             BotStatus = ProcessStatus.Starting;
 
             var config = await _configManager.LoadConfigAsync();
-            
+
             // 如果 QQ 路径为空，尝试自动检测
             if (string.IsNullOrEmpty(config.QQPath))
             {
@@ -696,14 +696,14 @@ public class HomeViewModel : ViewModelBase
                             "未检测到已安装的 QQ，请选择操作：",
                             "自动安装 QQ",
                             "手动选择 QQ 路径");
-                        
+
                         if (choice == 0)
                         {
                             // 自动安装 QQ
                             _downloadCts = new CancellationTokenSource();
                             IsDownloading = true;
                             DownloadingItem = "QQ";
-                            
+
                             try
                             {
                                 var progress = new Progress<DownloadProgress>(p =>
@@ -711,7 +711,7 @@ public class HomeViewModel : ViewModelBase
                                     DownloadProgress = p.Percentage;
                                     DownloadStatus = p.Status;
                                 });
-                                
+
                                 var success = await _downloadService.DownloadQQAsync(progress, _downloadCts.Token);
                                 if (success)
                                 {
@@ -754,13 +754,13 @@ public class HomeViewModel : ViewModelBase
                     }
                 }
             }
-            
+
             _logger.LogInformation("配置加载完成: PmhqPath={PmhqPath}, NodePath={NodePath}, LLBotPath={LLBotPath}, QQPath={QQPath}",
                 config.PmhqPath, config.NodePath, config.LLBotPath, config.QQPath);
 
             // 检查并下载缺失的文件
             var pmhqExists = !string.IsNullOrEmpty(config.PmhqPath) && File.Exists(config.PmhqPath);
-            
+
             // 检查 Node.js：优先使用 PATH 中的 Node.js（版本 >= 22）
             var nodeExists = false;
             var systemNode = Utils.NodeHelper.FindNodeInPath();
@@ -777,7 +777,7 @@ public class HomeViewModel : ViewModelBase
                     _logger.LogWarning("系统PATH中的Node.js版本低于22: {Path}", systemNode);
                 }
             }
-            
+
             // 如果 PATH 中没有合适的 Node.js，检查本地 bin/llbot/node.exe
             if (!nodeExists)
             {
@@ -796,13 +796,13 @@ public class HomeViewModel : ViewModelBase
                     }
                 }
             }
-            
+
             var llbotExists = !string.IsNullOrEmpty(config.LLBotPath) && File.Exists(config.LLBotPath);
 
             // 检查 FFmpeg 和 FFprobe
             var ffmpegExists = Utils.FFmpegHelper.CheckFFmpegExists();
             var ffprobeExists = Utils.FFmpegHelper.CheckFFprobeExists();
-            
+
             if (ffmpegExists)
             {
                 var systemFFmpeg = Utils.FFmpegHelper.FindFFmpegInPath();
@@ -897,7 +897,7 @@ public class HomeViewModel : ViewModelBase
                     // 保存更新后的配置
                     await _configManager.SaveConfigAsync(config);
                     _logger.LogInformation("下载完成，配置已更新");
-                    
+
                     // 通知版本信息刷新
                     if (OnDownloadCompleted != null)
                     {
@@ -965,7 +965,7 @@ public class HomeViewModel : ViewModelBase
                 if (_processManager.PmhqPort.HasValue)
                 {
                     _pmhqClient.SetPort(_processManager.PmhqPort.Value);
-                    
+
                     // 如果设置了自动登录QQ号，启动 SSE 监听以捕获登录失败事件
                     if (!string.IsNullOrEmpty(config.AutoLoginQQ) && config.Headless)
                     {
@@ -1007,7 +1007,7 @@ public class HomeViewModel : ViewModelBase
                     _logger.LogInformation("LLBot 启动成功");
                     IsServicesRunning = true;
                     BotStatus = ProcessStatus.Running;
-                    
+
                     // 执行启动后命令
                     await ExecuteStartupCommandAsync(config);
                 }
@@ -1044,7 +1044,7 @@ public class HomeViewModel : ViewModelBase
             _pmhqClient.CancelAll();
             _pmhqClient.ClearPort();
             _resourceMonitor.ResetState();
-            
+
             await _processManager.StopAllAsync();
 
             IsServicesRunning = false;
@@ -1070,7 +1070,7 @@ public class HomeViewModel : ViewModelBase
         _infoPollingCts?.Cancel();
         _infoPollingCts = new CancellationTokenSource();
         var ct = _infoPollingCts.Token;
-        
+
         _ = Task.Run(async () =>
         {
             _logger.LogInformation("等待 PMHQ API 可用...");
@@ -1090,11 +1090,11 @@ public class HomeViewModel : ViewModelBase
                     }
                     break;
                 }
-                
+
                 try { await Task.Delay(1000, ct); }
                 catch (OperationCanceledException) { return; }
             }
-            
+
             // 获取 QQ 版本（只获取一次）
             string? cachedVersion = null;
             _logger.LogInformation("开始获取 QQ 版本...");
@@ -1105,7 +1105,7 @@ public class HomeViewModel : ViewModelBase
                     _logger.LogDebug("正在调用 FetchDeviceInfoAsync...");
                     var deviceInfo = await _pmhqClient.FetchDeviceInfoAsync(ct);
                     _logger.LogDebug("FetchDeviceInfoAsync 返回: {DeviceInfo}", deviceInfo != null ? $"BuildVer={deviceInfo.BuildVer}" : "null");
-                    
+
                     if (deviceInfo != null && !string.IsNullOrEmpty(deviceInfo.BuildVer))
                     {
                         cachedVersion = deviceInfo.BuildVer;
@@ -1126,17 +1126,17 @@ public class HomeViewModel : ViewModelBase
                 {
                     _logger.LogWarning(ex, "获取 QQ 版本时出错");
                 }
-                
+
                 try { await Task.Delay(1000, ct); }
                 catch (OperationCanceledException) { return; }
             }
-            
+
             // 继续轮询 SelfInfo
             while (!ct.IsCancellationRequested)
             {
                 try { await Task.Delay(3000, ct); }
                 catch (OperationCanceledException) { break; }
-                
+
                 var selfInfo = await _pmhqClient.FetchSelfInfoAsync(ct);
                 if (selfInfo != null && !string.IsNullOrEmpty(selfInfo.Uin))
                 {
@@ -1173,7 +1173,7 @@ public class HomeViewModel : ViewModelBase
         }
     }
 
-private void OnUinReceived(SelfInfo selfInfo)
+    private void OnUinReceived(SelfInfo selfInfo)
     {
         if (selfInfo != null)
         {
@@ -1298,10 +1298,10 @@ private void OnUinReceived(SelfInfo selfInfo)
                 {
                     using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
                     Log.Information("[SSE] 连接中...");
-                    
+
                     using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
                     Log.Information("[SSE] 已连接, StatusCode={StatusCode}", response.StatusCode);
-                    
+
                     await using var stream = await response.Content.ReadAsStreamAsync(ct);
                     using var reader = new StreamReader(stream, Encoding.UTF8);
 
@@ -1380,7 +1380,7 @@ private void OnUinReceived(SelfInfo selfInfo)
 
                         Log.Warning("[SSE] 自动登录失败: {ErrMsg}", errMsg);
                         _sseCts?.Cancel();
-                        
+
                         Dispatcher.UIThread.Post(async () =>
                         {
                             await HandleAutoLoginFailedAsync(errMsg);

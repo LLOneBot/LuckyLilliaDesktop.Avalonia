@@ -22,12 +22,12 @@ public partial class LogPage : UserControl
     {
         base.OnLoaded(e);
         _logListBox = this.FindControl<ListBox>("LogListBox");
-        
+
         if (_logListBox != null)
         {
             _logListBox.AddHandler(PointerPressedEvent, OnListBoxPointerPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         }
-        
+
         if (DataContext is LogViewModel vm)
         {
             vm.ScrollToBottomRequested += OnScrollToBottomRequested;
@@ -38,7 +38,7 @@ public partial class LogPage : UserControl
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        
+
         // 监听 IsVisible 变化，页面显示时滚动到底部
         if (change.Property == IsVisibleProperty && change.NewValue is true)
         {
@@ -59,7 +59,7 @@ public partial class LogPage : UserControl
     private void OnListBoxPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (_logListBox == null) return;
-        
+
         var point = e.GetCurrentPoint(_logListBox);
         if (point.Properties.IsLeftButtonPressed)
         {
@@ -90,7 +90,7 @@ public partial class LogPage : UserControl
         // 防抖：如果已有滚动请求待处理，跳过
         if (_scrollPending) return;
         _scrollPending = true;
-        
+
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             DoScrollToBottom();

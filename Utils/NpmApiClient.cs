@@ -98,7 +98,7 @@ public class NpmApiClient
             return Array.Empty<string>();
 
         var urls = new List<string>();
-        
+
         // 从原始 URL 中提取路径部分
         string? pathPart = null;
         foreach (var mirror in _versionCheckMirrors.Concat(_downloadMirrors).Distinct())

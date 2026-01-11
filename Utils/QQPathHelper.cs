@@ -14,9 +14,9 @@ public static class QQPathHelper
         {
             using var key = Registry.LocalMachine.OpenSubKey(
                 @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\QQ");
-            
+
             if (key == null) return null;
-            
+
             var uninstallPath = key.GetValue("UninstallString") as string;
             if (string.IsNullOrEmpty(uninstallPath)) return null;
 

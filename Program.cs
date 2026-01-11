@@ -10,7 +10,7 @@ namespace LuckyLilliaDesktop;
 class Program
 {
     private static App? _app;
-    
+
     [STAThread]
     public static void Main(string[] args)
     {
@@ -23,10 +23,10 @@ class Program
                 Console.InputEncoding = Encoding.UTF8;
             }
             catch { }
-            
+
             AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-            
+
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         catch (Exception ex)

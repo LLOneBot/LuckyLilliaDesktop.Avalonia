@@ -102,7 +102,7 @@ public class PmhqClient : IPmhqClient, IDisposable
             }
 
             var json = await response.Content.ReadFromJsonAsync<JsonElement>(linkedCts.Token);
-            
+
             if (json.TryGetProperty("type", out var typeElem) && typeElem.GetString() == "call" &&
                 json.TryGetProperty("data", out var dataElem))
             {
@@ -157,8 +157,8 @@ public class PmhqClient : IPmhqClient, IDisposable
         var uin = "";
         if (result.TryGetProperty("uin", out var uinElem))
         {
-            uin = uinElem.ValueKind == JsonValueKind.Number 
-                ? uinElem.GetInt64().ToString() 
+            uin = uinElem.ValueKind == JsonValueKind.Number
+                ? uinElem.GetInt64().ToString()
                 : uinElem.GetString() ?? "";
         }
 
@@ -275,7 +275,7 @@ public class PmhqClient : IPmhqClient, IDisposable
                 _logger.LogWarning("快速登录失败: {Uin}", uin);
             return success;
         }
-        
+
         _logger.LogWarning("快速登录失败: 响应格式异常");
         return false;
     }
