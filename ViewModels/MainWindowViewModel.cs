@@ -22,7 +22,6 @@ public class MainWindowViewModel : ViewModelBase
     private int _selectedIndex;
     private string _title = "LLBot";
     private bool _isDarkTheme = true;
-    private string _themeIcon = "\u263d"; // Moon icon
 
     public string Title
     {
@@ -40,12 +39,6 @@ public class MainWindowViewModel : ViewModelBase
     {
         get => _isDarkTheme;
         set => this.RaiseAndSetIfChanged(ref _isDarkTheme, value);
-    }
-
-    public string ThemeIcon
-    {
-        get => _themeIcon;
-        set => this.RaiseAndSetIfChanged(ref _themeIcon, value);
     }
 
     // 子页面 ViewModels
@@ -98,6 +91,9 @@ public class MainWindowViewModel : ViewModelBase
         // 下载完成后刷新版本信息
         homeViewModel.OnDownloadCompleted = async () => await AboutVM.LoadVersionsAsync();
 
+        // 更新完成后重启服务的回调
+        aboutViewModel.RestartServicesCallback = async () => await HomeVM.StartServicesAsync();
+
         _logger.LogInformation("MainWindowViewModel 已初始化");
     }
 
@@ -110,7 +106,6 @@ public class MainWindowViewModel : ViewModelBase
 
             var themeMode = _configManager.GetSetting("theme_mode", "dark");
             IsDarkTheme = themeMode == "dark";
-            ThemeIcon = IsDarkTheme ? "\u263d" : "\u2600"; // Moon or Sun
             ApplyTheme();
         }
         catch (Exception ex)
@@ -122,7 +117,6 @@ public class MainWindowViewModel : ViewModelBase
     private void ToggleTheme()
     {
         IsDarkTheme = !IsDarkTheme;
-        ThemeIcon = IsDarkTheme ? "\u263d" : "\u2600"; // Moon or Sun
 
         ApplyTheme();
 

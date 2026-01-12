@@ -67,7 +67,7 @@
                     <DataTemplate>
                         <TextBlock x:Name="LogText"
                                    Text="{Binding FormattedText}"
-                                   FontFamily="Cascadia Code,Consolas,Courier New"
+                                   FontFamily="Cascadia Code,Consolas,Courier New,Microsoft YaHei"
                                    FontSize="13"
                                    Foreground="{DynamicResource TextPrimary}"
                                    TextWrapping="Wrap"

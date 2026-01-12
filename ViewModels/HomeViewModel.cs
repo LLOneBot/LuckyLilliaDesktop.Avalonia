@@ -288,6 +288,11 @@ public class HomeViewModel : ViewModelBase
     public Action? NavigateToAbout { get; set; }
     public Func<Task>? OnDownloadCompleted { get; set; }
 
+    /// <summary>
+    /// 启动所有服务（供外部调用）
+    /// </summary>
+    public async Task StartServicesAsync() => await StartAllServicesAsync();
+
     // 下载状态
     private bool _isDownloading;
     public bool IsDownloading

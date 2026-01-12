@@ -24,6 +24,12 @@ public class AboutViewModel : ViewModelBase
 
     private string? _pendingAppUpdateScript;
 
+    // 对话框委托
+    public Func<string, string, Task<bool>>? ConfirmDialog { get; set; }
+    
+    // 重启服务回调
+    public Func<Task>? RestartServicesCallback { get; set; }
+
     // GitHub 仓库地址
     private const string AppGitHubUrl = "https://github.com/LLOneBot/LuckyLilliaDesktop.Avalonia";
     private const string PmhqGitHubUrl = "https://github.com/linyuchen/PMHQ";
@@ -467,6 +473,19 @@ public class AboutViewModel : ViewModelBase
     {
         if (IsDownloadingUpdate) return;
 
+        var wasRunning = _processManager.IsAnyProcessRunning;
+
+        // 如果服务正在运行，弹出确认对话框
+        if (wasRunning && ConfirmDialog != null)
+        {
+            var confirmed = await ConfirmDialog("确认更新", "服务正在运行中，更新需要先停止服务。更新完成后将自动重启服务。\n\n确定要继续吗？");
+            if (!confirmed)
+            {
+                _logger.LogInformation("用户取消更新");
+                return;
+            }
+        }
+
         IsDownloadingUpdate = true;
         DownloadProgress = 0;
 
@@ -476,12 +495,10 @@ public class AboutViewModel : ViewModelBase
         if (PmhqHasUpdate) updates.Add("PMHQ");
         if (AppHasUpdate) updates.Add("管理器");
 
-        var hadRunningProcesses = _processManager.IsAnyProcessRunning;
-
         try
         {
             // 如果有进程在运行，先停止
-            if (hadRunningProcesses)
+            if (wasRunning)
             {
                 DownloadStatus = "正在停止所有进程...";
                 _logger.LogInformation("更新前停止所有进程...");
@@ -553,11 +570,13 @@ public class AboutViewModel : ViewModelBase
                 await Task.Delay(500);
                 LaunchAppUpdate();
             }
-            else if (hadRunningProcesses)
+            else if (wasRunning && RestartServicesCallback != null)
             {
-                // 如果之前有进程在运行，自动重启服务
+                // 更新前服务在运行，自动重启
                 _logger.LogInformation("更新完成，自动重启服务...");
-                // 这里可以触发重启服务的逻辑
+                DownloadStatus = "正在重启服务...";
+                await Task.Delay(500);
+                await RestartServicesCallback();
             }
         }
         catch (Exception ex)
