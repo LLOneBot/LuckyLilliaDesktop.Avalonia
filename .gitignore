@@ -5,7 +5,6 @@ publish/
 
 # IDE
 .vs/
-.vscode/
 *.user
 *.suo
 *.userosscache

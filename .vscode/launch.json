@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "LuckyLilliaDesktop",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/net8.0-windows/win-x64/LuckyLilliaDesktop.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Publish Release",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "publish",
+            "program": "${workspaceFolder}/bin/Release/net8.0-windows/win-x64/LuckyLilliaDesktop.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/bin/Release/net8.0-windows/win-x64",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        }
+    ]
+}
