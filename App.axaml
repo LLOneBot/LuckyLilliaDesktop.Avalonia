@@ -1,9 +1,11 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="using:LuckyLilliaDesktop.Converters"
              x:Class="LuckyLilliaDesktop.App"
              RequestedThemeVariant="Dark">
     <Application.Resources>
         <ResourceDictionary>
+            <converters:EqualToIntConverter x:Key="EqualToIntConverter"/>
             <ResourceDictionary.ThemeDictionaries>
                 <!-- 深色主题 -->
                 <ResourceDictionary x:Key="Dark">

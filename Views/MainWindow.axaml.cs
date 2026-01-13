@@ -158,6 +158,7 @@ public partial class MainWindow : Window
             vm.HomeVM.ShowLoginDialogWithHeadless = (port, headless) => ShowLoginDialogAsync(pmhqClient!, port, headless);
             vm.HomeVM.ShowAlertDialog = ShowAlertDialogAsync;
             vm.AboutVM.ConfirmDialog = ShowConfirmDialogAsync;
+            vm.LLBotConfigVM.ShowAlertDialog = ShowAlertDialogAsync;
         }
     }
 

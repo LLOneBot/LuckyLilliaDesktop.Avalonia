@@ -15,6 +15,7 @@ public interface IResourceMonitor
 {
     IObservable<ProcessResourceInfo> ResourceStream { get; }
     IObservable<SelfInfo> UinStream { get; }
+    string? CurrentUin { get; }
     IObservable<string> QQVersionStream { get; }
     IObservable<double> AvailableMemoryStream { get; }
     Task StartMonitoringAsync(CancellationToken ct = default);
@@ -42,6 +43,7 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
 
     public IObservable<ProcessResourceInfo> ResourceStream => _resourceSubject;
     public IObservable<SelfInfo> UinStream => _uinSubject;
+    public string? CurrentUin => _lastUin;
     public IObservable<string> QQVersionStream => _qqVersionSubject;
     public IObservable<double> AvailableMemoryStream => _availableMemorySubject;
 

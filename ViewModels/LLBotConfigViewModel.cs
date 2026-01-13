@@ -17,12 +17,15 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
 {
     private readonly IPmhqClient _pmhqClient;
     private readonly IResourceMonitor _resourceMonitor;
+    private readonly IProcessManager _processManager;
     private readonly ILogger<LLBotConfigViewModel> _logger;
     private readonly IDisposable _uinSubscription;
 
     private string? _currentUin;
     private LLBotConfig _config = LLBotConfig.Default;
     private bool _isLoading;
+
+    public Func<string, string, Task>? ShowAlertDialog { get; set; }
 
     // 未保存更改标志
     private bool _hasUnsavedChanges;
@@ -48,6 +51,9 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     // WebUI 配置
     private bool _webuiEnable = true;
     private int _webuiPort = 3080;
+    private int _webuiHostMode; // 0=全部, 1=本地, 2=自定义
+    private string _webuiCustomHost = string.Empty;
+    private string _webuiPassword = string.Empty;
 
     public bool WebuiEnable
     {
@@ -59,6 +65,24 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     {
         get => _webuiPort;
         set { this.RaiseAndSetIfChanged(ref _webuiPort, value); MarkAsModified(); }
+    }
+
+    public int WebuiHostMode
+    {
+        get => _webuiHostMode;
+        set { this.RaiseAndSetIfChanged(ref _webuiHostMode, value); MarkAsModified(); }
+    }
+
+    public string WebuiCustomHost
+    {
+        get => _webuiCustomHost;
+        set { this.RaiseAndSetIfChanged(ref _webuiCustomHost, value); MarkAsModified(); }
+    }
+
+    public string WebuiPassword
+    {
+        get => _webuiPassword;
+        set { this.RaiseAndSetIfChanged(ref _webuiPassword, value); MarkAsModified(); }
     }
 
     // OB11 配置
@@ -82,6 +106,8 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     private bool _satoriEnable;
     private int _satoriPort = 5600;
     private string _satoriToken = string.Empty;
+    private int _satoriHostMode;
+    private string _satoriCustomHost = string.Empty;
 
     public bool SatoriEnable
     {
@@ -101,6 +127,18 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         set { this.RaiseAndSetIfChanged(ref _satoriToken, value); MarkAsModified(); }
     }
 
+    public int SatoriHostMode
+    {
+        get => _satoriHostMode;
+        set { this.RaiseAndSetIfChanged(ref _satoriHostMode, value); MarkAsModified(); }
+    }
+
+    public string SatoriCustomHost
+    {
+        get => _satoriCustomHost;
+        set { this.RaiseAndSetIfChanged(ref _satoriCustomHost, value); MarkAsModified(); }
+    }
+
     // Milky 配置
     private bool _milkyEnable;
     private bool _milkyReportSelf;
@@ -108,6 +146,8 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     private string _milkyHttpPrefix = string.Empty;
     private string _milkyHttpToken = string.Empty;
     private string _milkyWebhookToken = string.Empty;
+    private int _milkyHostMode;
+    private string _milkyCustomHost = string.Empty;
 
     public bool MilkyEnable
     {
@@ -145,6 +185,18 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         set { this.RaiseAndSetIfChanged(ref _milkyWebhookToken, value); MarkAsModified(); }
     }
 
+    public int MilkyHostMode
+    {
+        get => _milkyHostMode;
+        set { this.RaiseAndSetIfChanged(ref _milkyHostMode, value); MarkAsModified(); }
+    }
+
+    public string MilkyCustomHost
+    {
+        get => _milkyCustomHost;
+        set { this.RaiseAndSetIfChanged(ref _milkyCustomHost, value); MarkAsModified(); }
+    }
+
     public ObservableCollection<string> MilkyWebhookUrls { get; } = new();
 
     // 其他配置
@@ -154,7 +206,6 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     private int _autoDeleteFileSecond = 60;
     private string _musicSignUrl = "https://llob.linyuchen.net/sign/music";
     private int _msgCacheExpire = 120;
-    private bool _onlyLocalhost = true;
     private string _ffmpegPath = string.Empty;
 
     public bool EnableLocalFile2Url
@@ -193,16 +244,32 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         set { this.RaiseAndSetIfChanged(ref _msgCacheExpire, value); MarkAsModified(); }
     }
 
-    public bool OnlyLocalhost
-    {
-        get => _onlyLocalhost;
-        set { this.RaiseAndSetIfChanged(ref _onlyLocalhost, value); MarkAsModified(); }
-    }
-
     public string FfmpegPath
     {
         get => _ffmpegPath;
         set { this.RaiseAndSetIfChanged(ref _ffmpegPath, value); MarkAsModified(); }
+    }
+
+    // host 字符串转 mode+customHost
+    private static (int mode, string customHost) HostToMode(string host)
+    {
+        return host switch
+        {
+            "" => (0, ""),
+            "127.0.0.1" => (1, ""),
+            _ => (2, host)
+        };
+    }
+
+    // mode+customHost 转 host 字符串
+    private static string ModeToHost(int mode, string customHost)
+    {
+        return mode switch
+        {
+            0 => "",
+            1 => "127.0.0.1",
+            _ => customHost
+        };
     }
 
     // 命令
@@ -217,10 +284,12 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public LLBotConfigViewModel(
         IPmhqClient pmhqClient,
         IResourceMonitor resourceMonitor,
+        IProcessManager processManager,
         ILogger<LLBotConfigViewModel> logger)
     {
         _pmhqClient = pmhqClient;
         _resourceMonitor = resourceMonitor;
+        _processManager = processManager;
         _logger = logger;
 
         SaveConfigCommand = ReactiveCommand.CreateFromTask(SaveConfigAsync);
@@ -236,8 +305,18 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(OnUinReceived);
 
-        // 初始化时尝试加载配置
-        _ = RefreshAsync();
+        // 订阅进程状态变化
+        _processManager.ProcessStatusChanged += OnProcessStatusChanged;
+    }
+
+    private void OnProcessStatusChanged(object? sender, ProcessStatus status)
+    {
+        var pmhqStatus = _processManager.GetProcessStatus("PMHQ");
+        if (pmhqStatus != ProcessStatus.Running)
+        {
+            _currentUin = null;
+            HasUin = false;
+        }
     }
 
     private async void OnUinReceived(SelfInfo selfInfo)
@@ -247,6 +326,11 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             _currentUin = selfInfo.Uin;
             HasUin = true;
             await LoadConfigAsync();
+        }
+        else
+        {
+            _currentUin = null;
+            HasUin = false;
         }
     }
 
@@ -258,11 +342,51 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         return Path.Combine("bin", "llbot", "data", $"config_{_currentUin}.json");
     }
 
+    private string GetWebuiTokenPath()
+    {
+        return Path.Combine("bin", "llbot", "data", "webui_token.txt");
+    }
+
+    private async Task<string> LoadWebuiTokenAsync()
+    {
+        try
+        {
+            var tokenPath = GetWebuiTokenPath();
+            if (File.Exists(tokenPath))
+            {
+                return await File.ReadAllTextAsync(tokenPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "加载 WebUI Token 失败");
+        }
+        return string.Empty;
+    }
+
+    private async Task SaveWebuiTokenAsync(string token)
+    {
+        try
+        {
+            var tokenPath = GetWebuiTokenPath();
+            var dir = Path.GetDirectoryName(tokenPath);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+
+            await File.WriteAllTextAsync(tokenPath, token);
+            _logger.LogInformation("WebUI Token 已保存: {Path}", tokenPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "保存 WebUI Token 失败");
+        }
+    }
+
     public async Task RefreshAsync()
     {
         try
         {
-            // 尝试获取 UIN
+            // 直接调用 API 获取 UIN，不依赖 ResourceMonitor 的缓存
             var selfInfo = await _pmhqClient.FetchSelfInfoAsync();
             if (selfInfo != null && !string.IsNullOrEmpty(selfInfo.Uin))
             {
@@ -282,6 +406,11 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public async Task OnPageEnterAsync()
+    {
+        await RefreshAsync();
+    }
+
     private async Task LoadConfigAsync()
     {
         try
@@ -296,6 +425,10 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
 
             var json = await File.ReadAllTextAsync(configPath);
             _config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            
+            // 加载 WebUI token
+            WebuiPassword = await LoadWebuiTokenAsync();
+            
             UpdateUIFromConfig();
             _logger.LogInformation("LLBot 配置已加载: {Path}", configPath);
         }
@@ -315,6 +448,9 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             // WebUI
             WebuiEnable = _config.WebUI.Enable;
             WebuiPort = _config.WebUI.Port;
+            var (webuiMode, webuiCustom) = HostToMode(_config.WebUI.Host);
+            WebuiHostMode = webuiMode;
+            WebuiCustomHost = webuiCustom;
 
             // OB11
             Ob11Enable = _config.OB11.Enable;
@@ -330,6 +466,9 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             SatoriEnable = _config.Satori.Enable;
             SatoriPort = _config.Satori.Port;
             SatoriToken = _config.Satori.Token;
+            var (satoriMode, satoriCustom) = HostToMode(_config.Satori.Host);
+            SatoriHostMode = satoriMode;
+            SatoriCustomHost = satoriCustom;
 
             // Milky
             MilkyEnable = _config.Milky.Enable;
@@ -338,6 +477,9 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             MilkyHttpPrefix = _config.Milky.Http.Prefix;
             MilkyHttpToken = _config.Milky.Http.AccessToken;
             MilkyWebhookToken = _config.Milky.Webhook.AccessToken;
+            var (milkyMode, milkyCustom) = HostToMode(_config.Milky.Http.Host);
+            MilkyHostMode = milkyMode;
+            MilkyCustomHost = milkyCustom;
             MilkyWebhookUrls.Clear();
             foreach (var url in _config.Milky.Webhook.Urls)
             {
@@ -351,7 +493,6 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             AutoDeleteFileSecond = _config.AutoDeleteFileSecond;
             MusicSignUrl = _config.MusicSignUrl;
             MsgCacheExpire = _config.MsgCacheExpire;
-            OnlyLocalhost = _config.OnlyLocalhost;
             FfmpegPath = _config.Ffmpeg;
         }
         finally
@@ -372,11 +513,48 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
                 return;
             }
 
+            // 验证：监听地址为"全部"时必须设置密码/token
+            if (WebuiEnable && WebuiHostMode == 0 && string.IsNullOrWhiteSpace(WebuiPassword))
+            {
+                if (ShowAlertDialog != null)
+                    await ShowAlertDialog("保存失败", "WebUI 监听全部地址时必须设置密码");
+                return;
+            }
+
+            if (SatoriEnable && SatoriHostMode == 0 && string.IsNullOrWhiteSpace(SatoriToken))
+            {
+                if (ShowAlertDialog != null)
+                    await ShowAlertDialog("保存失败", "Satori 监听全部地址时必须设置 Token");
+                return;
+            }
+
+            if (MilkyEnable && MilkyHostMode == 0 && string.IsNullOrWhiteSpace(MilkyHttpToken))
+            {
+                if (ShowAlertDialog != null)
+                    await ShowAlertDialog("保存失败", "Milky 监听全部地址时必须设置 AccessToken");
+                return;
+            }
+
+            // 检查 OB11 连接的 token
+            foreach (var conn in Ob11Connections)
+            {
+                if (conn.Enable && conn.HasPort && conn.HostMode == 0 && string.IsNullOrWhiteSpace(conn.Token))
+                {
+                    if (ShowAlertDialog != null)
+                        await ShowAlertDialog("保存失败", $"OneBot11 {conn.TypeName} 监听全部地址时必须设置 Token");
+                    return;
+                }
+            }
+
             _logger.LogInformation("保存 LLBot 配置: {Path}", configPath);
 
             // 更新配置对象
             _config.WebUI.Enable = WebuiEnable;
             _config.WebUI.Port = WebuiPort;
+            _config.WebUI.Host = ModeToHost(WebuiHostMode, WebuiCustomHost);
+
+            // 单独保存 WebUI token
+            await SaveWebuiTokenAsync(WebuiPassword);
 
             _config.OB11.Enable = Ob11Enable;
             _config.OB11.Connect.Clear();
@@ -388,12 +566,14 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             _config.Satori.Enable = SatoriEnable;
             _config.Satori.Port = SatoriPort;
             _config.Satori.Token = SatoriToken;
+            _config.Satori.Host = ModeToHost(SatoriHostMode, SatoriCustomHost);
 
             _config.Milky.Enable = MilkyEnable;
             _config.Milky.ReportSelfMessage = MilkyReportSelf;
             _config.Milky.Http.Port = MilkyHttpPort;
             _config.Milky.Http.Prefix = MilkyHttpPrefix;
             _config.Milky.Http.AccessToken = MilkyHttpToken;
+            _config.Milky.Http.Host = ModeToHost(MilkyHostMode, MilkyCustomHost);
             _config.Milky.Webhook.AccessToken = MilkyWebhookToken;
             _config.Milky.Webhook.Urls.Clear();
             foreach (var url in MilkyWebhookUrls)
@@ -408,7 +588,6 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             _config.AutoDeleteFileSecond = AutoDeleteFileSecond;
             _config.MusicSignUrl = MusicSignUrl;
             _config.MsgCacheExpire = MsgCacheExpire;
-            _config.OnlyLocalhost = OnlyLocalhost;
             _config.Ffmpeg = FfmpegPath;
 
             // 确保目录存在
@@ -453,6 +632,7 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         {
             Type = type,
             Enable = false,
+            Host = "127.0.0.1", // 默认本地
             Port = type == "ws" ? 3001 : type == "http" ? 3000 : 0,
             HeartInterval = 60000,
             MessageFormat = "array"
@@ -487,6 +667,7 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _uinSubscription.Dispose();
+        _processManager.ProcessStatusChanged -= OnProcessStatusChanged;
     }
 }
 
@@ -510,6 +691,8 @@ public class OB11ConnectionViewModel : ViewModelBase
     private bool _reportOfflineMessage;
     private string _messageFormat = "array";
     private bool _debug;
+    private int _hostMode = 1; // 默认本地
+    private string _customHost = string.Empty;
 
     public string Type
     {
@@ -592,6 +775,18 @@ public class OB11ConnectionViewModel : ViewModelBase
         set { this.RaiseAndSetIfChanged(ref _debug, value); NotifyModified(); }
     }
 
+    public int HostMode
+    {
+        get => _hostMode;
+        set { this.RaiseAndSetIfChanged(ref _hostMode, value); NotifyModified(); }
+    }
+
+    public string CustomHost
+    {
+        get => _customHost;
+        set { this.RaiseAndSetIfChanged(ref _customHost, value); NotifyModified(); }
+    }
+
     // 辅助属性 - 是否显示端口
     public bool HasPort => Type is "ws" or "http";
     // 辅助属性 - 是否显示 URL
@@ -621,12 +816,18 @@ public class OB11ConnectionViewModel : ViewModelBase
         _reportOfflineMessage = model.ReportOfflineMessage;
         _messageFormat = model.MessageFormat;
         _debug = model.Debug;
+        
+        // host 字符串转 mode+customHost
+        var (mode, customHost) = HostToMode(model.Host);
+        _hostMode = mode;
+        _customHost = customHost;
     }
 
     public OB11Connection ToModel() => new()
     {
         Type = Type,
         Enable = Enable,
+        Host = ModeToHost(HostMode, CustomHost),
         Port = Port,
         Url = Url,
         HeartInterval = HeartInterval,
@@ -637,4 +838,26 @@ public class OB11ConnectionViewModel : ViewModelBase
         MessageFormat = MessageFormat,
         Debug = Debug
     };
+
+    // host 字符串转 mode+customHost
+    private static (int mode, string customHost) HostToMode(string host)
+    {
+        return host switch
+        {
+            "" => (0, ""),
+            "127.0.0.1" => (1, ""),
+            _ => (2, host)
+        };
+    }
+
+    // mode+customHost 转 host 字符串
+    private static string ModeToHost(int mode, string customHost)
+    {
+        return mode switch
+        {
+            0 => "",
+            1 => "127.0.0.1",
+            _ => customHost
+        };
+    }
 }

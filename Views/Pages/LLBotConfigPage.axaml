@@ -85,8 +85,26 @@
                                 <CheckBox Content="启用" IsChecked="{Binding WebuiEnable}" Foreground="{DynamicResource TextPrimary}"/>
                             </StackPanel>
                             <StackPanel Spacing="4">
+                                <TextBlock Text="监听地址" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                <ComboBox SelectedIndex="{Binding WebuiHostMode}" Width="100">
+                                    <ComboBoxItem Content="全部"/>
+                                    <ComboBoxItem Content="本地"/>
+                                    <ComboBoxItem Content="自定义"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Spacing="4" IsVisible="{Binding WebuiHostMode, Converter={StaticResource EqualToIntConverter}, ConverterParameter=2}">
+                                <TextBlock Text="自定义地址" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                <TextBox Text="{Binding WebuiCustomHost}" Width="150" Watermark="192.168.1.1"/>
+                            </StackPanel>
+                            <StackPanel Spacing="4">
                                 <TextBlock Text="端口" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
                                 <NumericUpDown Value="{Binding WebuiPort}" Minimum="1" Maximum="65535" Width="120" ShowButtonSpinner="False"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="密码" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                <TextBox Text="{Binding WebuiPassword}" Width="200" Watermark="监听全部地址时必填"/>
                             </StackPanel>
                             <StackPanel Spacing="4">
                                 <TextBlock Text=" " Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
@@ -130,6 +148,18 @@
                                             <DockPanel>
                                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                                     <CheckBox Content="启用" IsChecked="{Binding Enable}" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Bottom"/>
+                                                    <StackPanel Spacing="4" IsVisible="{Binding HasPort}">
+                                                        <TextBlock Text="监听地址" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                                        <ComboBox SelectedIndex="{Binding HostMode}" Width="100">
+                                                            <ComboBoxItem Content="全部"/>
+                                                            <ComboBoxItem Content="本地"/>
+                                                            <ComboBoxItem Content="自定义"/>
+                                                        </ComboBox>
+                                                    </StackPanel>
+                                                    <StackPanel Spacing="4" IsVisible="{Binding HasPort}">
+                                                        <TextBlock Text="自定义地址" Foreground="{DynamicResource TextSecondary}" FontSize="12" IsVisible="{Binding HostMode, Converter={StaticResource EqualToIntConverter}, ConverterParameter=2}"/>
+                                                        <TextBox Text="{Binding CustomHost}" Width="120" Watermark="192.168.1.1" IsVisible="{Binding HostMode, Converter={StaticResource EqualToIntConverter}, ConverterParameter=2}"/>
+                                                    </StackPanel>
                                                     <StackPanel Spacing="4" IsVisible="{Binding HasPort}">
                                                         <TextBlock Text="端口" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
                                                         <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" Width="100" ShowButtonSpinner="False"/>
@@ -204,12 +234,24 @@
                         <StackPanel Orientation="Horizontal" Spacing="16">
                             <CheckBox Content="启用" IsChecked="{Binding SatoriEnable}" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Bottom"/>
                             <StackPanel Spacing="4">
+                                <TextBlock Text="监听地址" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                <ComboBox SelectedIndex="{Binding SatoriHostMode}" Width="100">
+                                    <ComboBoxItem Content="全部"/>
+                                    <ComboBoxItem Content="本地"/>
+                                    <ComboBoxItem Content="自定义"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Spacing="4" IsVisible="{Binding SatoriHostMode, Converter={StaticResource EqualToIntConverter}, ConverterParameter=2}">
+                                <TextBlock Text="自定义地址" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                <TextBox Text="{Binding SatoriCustomHost}" Width="150" Watermark="192.168.1.1"/>
+                            </StackPanel>
+                            <StackPanel Spacing="4">
                                 <TextBlock Text="端口" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
                                 <NumericUpDown Value="{Binding SatoriPort}" Minimum="1" Maximum="65535" Width="120" ShowButtonSpinner="False"/>
                             </StackPanel>
                             <StackPanel Spacing="4">
                                 <TextBlock Text="Token" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
-                                <TextBox Text="{Binding SatoriToken}" Width="250" Watermark="可选"/>
+                                <TextBox Text="{Binding SatoriToken}" Width="200" Watermark="可选"/>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
@@ -235,16 +277,28 @@
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="16">
                             <StackPanel Spacing="4">
+                                <TextBlock Text="监听地址" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                <ComboBox SelectedIndex="{Binding MilkyHostMode}" Width="100">
+                                    <ComboBoxItem Content="全部"/>
+                                    <ComboBoxItem Content="本地"/>
+                                    <ComboBoxItem Content="自定义"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Spacing="4" IsVisible="{Binding MilkyHostMode, Converter={StaticResource EqualToIntConverter}, ConverterParameter=2}">
+                                <TextBlock Text="自定义地址" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                <TextBox Text="{Binding MilkyCustomHost}" Width="150" Watermark="192.168.1.1"/>
+                            </StackPanel>
+                            <StackPanel Spacing="4">
                                 <TextBlock Text="HTTP端口" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
                                 <NumericUpDown Value="{Binding MilkyHttpPort}" Minimum="1" Maximum="65535" Width="120" ShowButtonSpinner="False"/>
                             </StackPanel>
                             <StackPanel Spacing="4">
                                 <TextBlock Text="前缀" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
-                                <TextBox Text="{Binding MilkyHttpPrefix}" Width="150" Watermark="可选"/>
+                                <TextBox Text="{Binding MilkyHttpPrefix}" Width="120" Watermark="可选"/>
                             </StackPanel>
                             <StackPanel Spacing="4">
                                 <TextBlock Text="AccessToken" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
-                                <TextBox Text="{Binding MilkyHttpToken}" Width="200" Watermark="可选"/>
+                                <TextBox Text="{Binding MilkyHttpToken}" Width="150" Watermark="可选"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -291,7 +345,6 @@
                             <CheckBox Content="本地文件转URL" IsChecked="{Binding EnableLocalFile2Url}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,16,8"/>
                             <CheckBox Content="启用日志" IsChecked="{Binding LogEnable}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,16,8"/>
                             <CheckBox Content="自动删除文件" IsChecked="{Binding AutoDeleteFile}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,16,8"/>
-                            <CheckBox Content="仅本地访问" IsChecked="{Binding OnlyLocalhost}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,16,8"/>
                         </WrapPanel>
                         <StackPanel Orientation="Horizontal" Spacing="16">
                             <StackPanel Spacing="4">

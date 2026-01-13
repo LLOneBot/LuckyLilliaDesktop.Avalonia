@@ -39,9 +39,6 @@ public class LLBotConfig
     [JsonPropertyName("msgCacheExpire")]
     public int MsgCacheExpire { get; set; } = 120;
 
-    [JsonPropertyName("onlyLocalhost")]
-    public bool OnlyLocalhost { get; set; } = true;
-
     [JsonPropertyName("ffmpeg")]
     public string Ffmpeg { get; set; } = string.Empty;
 
@@ -53,6 +50,9 @@ public class WebUIConfig
     [JsonPropertyName("enable")]
     public bool Enable { get; set; } = true;
 
+    [JsonPropertyName("host")]
+    public string Host { get; set; } = "127.0.0.1";
+
     [JsonPropertyName("port")]
     public int Port { get; set; } = 3080;
 }
@@ -61,6 +61,9 @@ public class SatoriConfig
 {
     [JsonPropertyName("enable")]
     public bool Enable { get; set; } = false;
+
+    [JsonPropertyName("host")]
+    public string Host { get; set; } = string.Empty;
 
     [JsonPropertyName("port")]
     public int Port { get; set; } = 5600;
@@ -85,6 +88,9 @@ public class OB11Connection
 
     [JsonPropertyName("enable")]
     public bool Enable { get; set; } = false;
+
+    [JsonPropertyName("host")]
+    public string Host { get; set; } = "127.0.0.1";
 
     [JsonPropertyName("port")]
     public int Port { get; set; } = 3001;
@@ -131,6 +137,9 @@ public class MilkyConfig
 
 public class MilkyHttpConfig
 {
+    [JsonPropertyName("host")]
+    public string Host { get; set; } = string.Empty;
+
     [JsonPropertyName("port")]
     public int Port { get; set; } = 3010;
 
