@@ -19,12 +19,17 @@ public class LogEntryViewModel : ViewModelBase
         get
         {
             var prefix = LogEntry.Level == "stderr" ? "ERR" : "   ";
+            string text;
             if (LogEntry.ProcessName == "LLBot")
             {
-                return $"{prefix} {LogEntry.Message}";
+                text = $"{prefix} {LogEntry.Message}";
             }
-            var timestamp = LogEntry.Timestamp.ToString("HH:mm:ss");
-            return $"{prefix} {timestamp} [{LogEntry.ProcessName}] {LogEntry.Message}";
+            else
+            {
+                var timestamp = LogEntry.Timestamp.ToString("HH:mm:ss");
+                text = $"{prefix} {timestamp} [{LogEntry.ProcessName}] {LogEntry.Message}";
+            }
+            return SanitizeText(text);
         }
     }
 
@@ -33,6 +38,48 @@ public class LogEntryViewModel : ViewModelBase
     public LogEntryViewModel(LogEntry logEntry)
     {
         LogEntry = logEntry;
+    }
+
+    private static string SanitizeText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+
+        var sb = new System.Text.StringBuilder(text.Length);
+        for (int i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            
+            // 保留常用字符范围
+            // - ASCII 可打印字符 (0x20-0x7E)
+            // - 常用标点和符号
+            // - 中日韩字符 (CJK)
+            // - 常用拉丁扩展
+            // - Emoji (通过代理对)
+            
+            // 控制字符（保留 tab, newline, cr）
+            if (c < 0x20 && c != '\t' && c != '\n' && c != '\r')
+                continue;
+            
+            // 代理对（emoji等），保留完整的代理对
+            if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+            {
+                sb.Append(c);
+                sb.Append(text[++i]);
+                continue;
+            }
+            
+            // 单独的代理字符（不完整），跳过
+            if (char.IsSurrogate(c))
+                continue;
+            
+            // 私用区字符，跳过
+            if (c >= 0xE000 && c <= 0xF8FF)
+                continue;
+            
+            // 其他字符保留，让字体回退机制处理
+            sb.Append(c);
+        }
+        return sb.ToString();
     }
 }
 

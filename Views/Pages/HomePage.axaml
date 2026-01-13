@@ -236,6 +236,7 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:LogEntryViewModel">
                                                 <TextBlock Text="{Binding FormattedText}"
+                                                           FontFamily="Cascadia Code,Consolas,Courier New,Segoe UI Emoji,Microsoft YaHei"
                                                            FontSize="13"
                                                            Foreground="{DynamicResource TextPrimary}"
                                                            TextTrimming="CharacterEllipsis"

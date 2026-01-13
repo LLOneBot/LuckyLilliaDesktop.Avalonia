@@ -42,22 +42,22 @@
         <FluentTheme />
         <StyleInclude Source="/Styles/AppStyles.axaml"/>
         <Style Selector="TextBlock">
-            <Setter Property="FontFamily" Value="Microsoft YaHei"/>
+            <Setter Property="FontFamily" Value="Microsoft YaHei,Segoe UI Emoji"/>
         </Style>
         <Style Selector="Button">
-            <Setter Property="FontFamily" Value="Microsoft YaHei"/>
+            <Setter Property="FontFamily" Value="Microsoft YaHei,Segoe UI Emoji"/>
         </Style>
         <Style Selector="TextBox">
-            <Setter Property="FontFamily" Value="Microsoft YaHei"/>
+            <Setter Property="FontFamily" Value="Microsoft YaHei,Segoe UI Emoji"/>
         </Style>
         <Style Selector="CheckBox">
-            <Setter Property="FontFamily" Value="Microsoft YaHei"/>
+            <Setter Property="FontFamily" Value="Microsoft YaHei,Segoe UI Emoji"/>
         </Style>
         <Style Selector="ComboBox">
-            <Setter Property="FontFamily" Value="Microsoft YaHei"/>
+            <Setter Property="FontFamily" Value="Microsoft YaHei,Segoe UI Emoji"/>
         </Style>
         <Style Selector="TabItem">
-            <Setter Property="FontFamily" Value="Microsoft YaHei"/>
+            <Setter Property="FontFamily" Value="Microsoft YaHei,Segoe UI Emoji"/>
         </Style>
     </Application.Styles>
     
