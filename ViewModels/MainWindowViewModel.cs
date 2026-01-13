@@ -46,6 +46,7 @@ public class MainWindowViewModel : ViewModelBase
     public LogViewModel LogVM { get; }
     public ConfigViewModel ConfigVM { get; }
     public LLBotConfigViewModel LLBotConfigVM { get; }
+    public IntegrationWizardViewModel IntegrationWizardVM { get; }
     public AboutViewModel AboutVM { get; }
 
     // 主题切换命令
@@ -56,6 +57,7 @@ public class MainWindowViewModel : ViewModelBase
         LogViewModel logViewModel,
         ConfigViewModel configViewModel,
         LLBotConfigViewModel llbotConfigViewModel,
+        IntegrationWizardViewModel integrationWizardViewModel,
         AboutViewModel aboutViewModel,
         IConfigManager configManager,
         ILogger<MainWindowViewModel> logger)
@@ -67,6 +69,7 @@ public class MainWindowViewModel : ViewModelBase
         LogVM = logViewModel ?? throw new ArgumentNullException(nameof(logViewModel));
         ConfigVM = configViewModel ?? throw new ArgumentNullException(nameof(configViewModel));
         LLBotConfigVM = llbotConfigViewModel ?? throw new ArgumentNullException(nameof(llbotConfigViewModel));
+        IntegrationWizardVM = integrationWizardViewModel ?? throw new ArgumentNullException(nameof(integrationWizardViewModel));
         AboutVM = aboutViewModel ?? throw new ArgumentNullException(nameof(aboutViewModel));
 
         // 加载保存的主题设置（异步初始化）
@@ -86,7 +89,7 @@ public class MainWindowViewModel : ViewModelBase
         homeViewModel.NavigateToLogs = () => SelectedIndex = 1;
 
         // 设置导航到关于页面的回调（用于更新）
-        homeViewModel.NavigateToAbout = () => SelectedIndex = 4;
+        homeViewModel.NavigateToAbout = () => SelectedIndex = 5;
 
         // 下载完成后刷新版本信息
         homeViewModel.OnDownloadCompleted = async () => await AboutVM.LoadVersionsAsync();

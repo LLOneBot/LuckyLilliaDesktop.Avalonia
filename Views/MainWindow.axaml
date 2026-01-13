@@ -121,6 +121,15 @@
                             </StackPanel>
                         </ListBoxItem>
 
+                        <!-- 安装Bot -->
+                        <ListBoxItem>
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <PathIcon Data="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"
+                                          Width="24" Height="24"/>
+                                <TextBlock Text="安装Bot" FontSize="11" TextAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+
                         <!-- 关于 -->
                         <ListBoxItem>
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
@@ -174,8 +183,10 @@
                                      IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=2}"/>
                     <views:LLBotConfigPage DataContext="{Binding LLBotConfigVM}"
                                           IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=3}"/>
+                    <views:IntegrationWizardPage DataContext="{Binding IntegrationWizardVM}"
+                                                 IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=4}"/>
                     <views:AboutPage DataContext="{Binding AboutVM}"
-                                    IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=4}"/>
+                                    IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=5}"/>
                 </Panel>
             </Border>
         </Grid>

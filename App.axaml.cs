@@ -45,6 +45,7 @@ public partial class App : Application
         services.AddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<IUpdateChecker, UpdateChecker>();
         services.AddSingleton<IUpdateStateService, UpdateStateService>();
+        services.AddSingleton<IKoishiInstallService, KoishiInstallService>();
 
         // ViewModels（瞬态）
         services.AddTransient<MainWindowViewModel>();
@@ -52,6 +53,7 @@ public partial class App : Application
         services.AddTransient<LogViewModel>();
         services.AddTransient<ConfigViewModel>();
         services.AddTransient<LLBotConfigViewModel>();
+        services.AddTransient<IntegrationWizardViewModel>();
         services.AddTransient<AboutViewModel>();
 
         // 日志
