@@ -5,6 +5,7 @@ using Avalonia.Markup.Xaml;
 using LuckyLilliaDesktop.ViewModels;
 using LuckyLilliaDesktop.Views;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using System;
@@ -35,17 +36,24 @@ public partial class App : Application
             .WriteTo.File(logFileName,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
+        
+        // 设置为全局 logger
+        Log.Logger = logger;
 
         // 核心服务（单例）
         services.AddSingleton<IConfigManager, ConfigManager>();
         services.AddSingleton<ILogCollector, LogCollector>();
         services.AddSingleton<IProcessManager, ProcessManager>();
         services.AddSingleton<IResourceMonitor, ResourceMonitor>();
+        services.AddSingleton<ISelfInfoService, SelfInfoService>();
         services.AddSingleton<IPmhqClient, PmhqClient>();
         services.AddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<IUpdateChecker, UpdateChecker>();
         services.AddSingleton<IUpdateStateService, UpdateStateService>();
+        services.AddSingleton<IGitHubHelper, GitHubHelper>();
+        services.AddSingleton<IPythonHelper, PythonHelper>();
         services.AddSingleton<IKoishiInstallService, KoishiInstallService>();
+        services.AddSingleton<IAstrBotInstallService, AstrBotInstallService>();
 
         // ViewModels（瞬态）
         services.AddTransient<MainWindowViewModel>();
@@ -127,13 +135,9 @@ public partial class App : Application
         }
     }
 
-    private async void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
+    private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
     {
-        var processManager = Services.GetService<IProcessManager>();
-        if (processManager != null)
-        {
-            await processManager.StopAllAsync();
-        }
+        ExitApplicationAsync();
     }
 
     private void TrayIcon_Clicked(object? sender, EventArgs e)
@@ -154,28 +158,87 @@ public partial class App : Application
     /// <summary>
     /// 统一的应用退出方法
     /// </summary>
-    public async Task ExitApplicationAsync()
+    public Task ExitApplicationAsync()
     {
-        Log.Information("开始退出应用...");
-        if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop) return;
-
-        // 保存窗口位置
-        if (desktop.MainWindow is MainWindow mainWindow)
+        Log.Information("ExitApplicationAsync 被调用");
+        
+        try
         {
-            await mainWindow.SaveWindowStateAsync();
-            Log.Information("窗口状态已保存");
+            var resourceMonitor = Services.GetService<IResourceMonitor>();
+            var pmhqClient = Services.GetService<IPmhqClient>();
+            var qqPid = resourceMonitor?.QQPid;
+            
+            // 如果缓存没有 PID，尝试从 API 获取（在新线程中）
+            if (!qqPid.HasValue && pmhqClient?.HasPort == true)
+            {
+                try
+                {
+                    var task = Task.Run(() => pmhqClient.FetchQQPidAsync());
+                    if (task.Wait(1000))
+                    {
+                        qqPid = task.Result;
+                    }
+                }
+                catch { }
+            }
+            
+            Log.Information("QQ PID: {Pid}", qqPid);
+            
+            // 终止 QQ 进程
+            if (qqPid.HasValue && qqPid.Value > 0)
+            {
+                Log.Information("正在终止 QQ 进程, PID: {Pid}", qqPid.Value);
+                try
+                {
+                    var qqProc = System.Diagnostics.Process.GetProcessById(qqPid.Value);
+                    qqProc.Kill(entireProcessTree: true);
+                    qqProc.Dispose();
+                    Log.Information("QQ 进程已终止");
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "终止 QQ 进程失败");
+                }
+            }
+            
+            // 终止 LLBot 进程
+            var processManager = Services.GetService<IProcessManager>();
+            if (processManager != null)
+            {
+                try
+                {
+                    var llbotStatus = processManager.GetProcessStatus("LLBot");
+                    if (llbotStatus == ProcessStatus.Running)
+                    {
+                        // 通过反射获取 _llbotProcess 的 PID
+                        var field = processManager.GetType().GetField("_llbotProcess", 
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (field?.GetValue(processManager) is System.Diagnostics.Process llbotProc && !llbotProc.HasExited)
+                        {
+                            var llbotPid = llbotProc.Id;
+                            Log.Information("正在终止 LLBot 进程, PID: {Pid}", llbotPid);
+                            
+                            var proc = System.Diagnostics.Process.GetProcessById(llbotPid);
+                            proc.Kill(entireProcessTree: true);
+                            proc.Dispose();
+                            Log.Information("LLBot 进程已终止");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "终止 LLBot 进程失败");
+                }
+            }
         }
-
-        // 停止所有进程
-        var processManager = Services.GetService<IProcessManager>();
-        if (processManager != null)
+        catch (Exception ex)
         {
-            await processManager.StopAllAsync();
-            Log.Information("所有进程已停止");
+            Log.Error(ex, "清理进程失败");
         }
-
+        
         Log.Information("应用退出");
-        desktop.Shutdown();
+        Environment.Exit(0);
+        return Task.CompletedTask;
     }
 
     private void ShowMainWindow()

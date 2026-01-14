@@ -87,8 +87,9 @@
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="AstrBot" FontSize="16" FontWeight="SemiBold" 
                                            Foreground="{DynamicResource TextPrimary}"/>
-                                <Border Background="#6B7280" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock Text="暂未实现" FontSize="10" Foreground="White"/>
+                                <Border Background="#22C55E" CornerRadius="4" Padding="6,2" 
+                                        VerticalAlignment="Center" IsVisible="{Binding AstrBotInstalled}">
+                                    <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="基于大语言模型的聊天机器人" FontSize="12" 

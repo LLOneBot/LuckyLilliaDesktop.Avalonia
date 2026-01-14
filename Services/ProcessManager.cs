@@ -398,57 +398,21 @@ public class ProcessManager : IProcessManager, IDisposable
         _logger.LogInformation("LLBot 已停止");
     }
 
-    public async Task StopAllAsync()
+    public async Task StopAllAsync(int? qqPid = null)
     {
         _monitorCts?.Cancel();
+
+        // 先终止 QQ 进程
+        if (qqPid.HasValue && qqPid.Value > 0)
+        {
+            _logger.LogInformation("正在终止 QQ 进程, PID: {Pid}", qqPid.Value);
+            KillProcessTree(qqPid.Value);
+            _logger.LogInformation("QQ 进程已终止");
+        }
 
         // 停止 LLBot 和 PMHQ
         await StopLLBotAsync();
         await StopPmhqAsync();
-
-        // 尝试终止 QQ 进程
-        if (PmhqPort.HasValue)
-        {
-            var port = PmhqPort.Value;
-            try
-            {
-                using var cts = new CancellationTokenSource(1000);
-                using var client = new HttpClient { Timeout = TimeSpan.FromMilliseconds(1000) };
-                var payload = new { type = "call", data = new { func = "getProcessInfo", args = Array.Empty<object>() } };
-                var response = await client.PostAsJsonAsync($"http://127.0.0.1:{port}", payload, cts.Token);
-                if (response.IsSuccessStatusCode)
-                {
-                    var json = await response.Content.ReadFromJsonAsync<JsonElement>(cts.Token);
-                    if (json.TryGetProperty("data", out var dataElem))
-                    {
-                        var dataStr = dataElem.ValueKind == JsonValueKind.String
-                            ? dataElem.GetString()
-                            : dataElem.GetRawText();
-                        if (!string.IsNullOrEmpty(dataStr))
-                        {
-                            var data = JsonSerializer.Deserialize<JsonElement>(dataStr);
-                            if (data.TryGetProperty("result", out var result) &&
-                                result.TryGetProperty("pid", out var pidElem))
-                            {
-                                var qqPid = pidElem.GetInt32();
-                                if (qqPid > 0)
-                                {
-                                    _logger.LogInformation("正在终止 QQ 进程, PID: {Pid}", qqPid);
-                                    KillProcessTree(qqPid);
-                                    _logger.LogInformation("QQ 进程已终止");
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "终止 QQ 进程时出错");
-            }
-        }
-
-        PmhqPort = null;
     }
 
     /// <summary>

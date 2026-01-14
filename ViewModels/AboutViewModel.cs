@@ -20,6 +20,7 @@ public class AboutViewModel : ViewModelBase
     private readonly IUpdateChecker _updateChecker;
     private readonly IDownloadService _downloadService;
     private readonly IProcessManager _processManager;
+    private readonly IResourceMonitor _resourceMonitor;
     private readonly IUpdateStateService _updateStateService;
 
     private string? _pendingAppUpdateScript;
@@ -204,6 +205,7 @@ public class AboutViewModel : ViewModelBase
         IUpdateChecker updateChecker,
         IDownloadService downloadService,
         IProcessManager processManager,
+        IResourceMonitor resourceMonitor,
         IUpdateStateService updateStateService)
     {
         _logger = logger;
@@ -211,6 +213,7 @@ public class AboutViewModel : ViewModelBase
         _updateChecker = updateChecker;
         _downloadService = downloadService;
         _processManager = processManager;
+        _resourceMonitor = resourceMonitor;
         _updateStateService = updateStateService;
 
         // 获取应用版本
@@ -502,7 +505,7 @@ public class AboutViewModel : ViewModelBase
             {
                 DownloadStatus = "正在停止所有进程...";
                 _logger.LogInformation("更新前停止所有进程...");
-                await _processManager.StopAllAsync();
+                await _processManager.StopAllAsync(_resourceMonitor.QQPid);
                 await Task.Delay(1000);
             }
 

@@ -297,5 +297,6 @@ public class PmhqClient : IPmhqClient, IDisposable
         _cts.Cancel();
         _cts.Dispose();
         _httpClient.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

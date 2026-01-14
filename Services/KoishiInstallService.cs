@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -32,21 +31,18 @@ public interface IKoishiInstallService
 public partial class KoishiInstallService : IKoishiInstallService
 {
     private readonly ILogger<KoishiInstallService> _logger;
-    private readonly HttpClient _httpClient;
+    private readonly IGitHubHelper _gitHubHelper;
     private readonly IConfigManager _configManager;
 
     private const string KoishiDir = "bin/koishi";
-    private const string GithubApiUrl = "https://api.github.com/repos/koishijs/koishi-desktop/releases/latest";
-    private const string GhProxyUrl = "https://gh-proxy.com/";
 
     public bool IsInstalled => File.Exists(Path.Combine(KoishiDir, "koi.exe"));
 
-    public KoishiInstallService(ILogger<KoishiInstallService> logger, IConfigManager configManager)
+    public KoishiInstallService(ILogger<KoishiInstallService> logger, IConfigManager configManager, IGitHubHelper gitHubHelper)
     {
         _logger = logger;
         _configManager = configManager;
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "LuckyLilliaDesktop");
+        _gitHubHelper = gitHubHelper;
     }
 
     public async Task<bool> InstallAsync(bool forceReinstall = false, IProgress<InstallProgress>? progress = null, CancellationToken ct = default)
@@ -62,7 +58,7 @@ public partial class KoishiInstallService : IKoishiInstallService
             {
                 // Step 1: 获取最新版本
                 Report(progress, 1, totalSteps, "获取版本信息", "正在获取最新版本...");
-                var tag = await GetLatestTagAsync(ct);
+                var tag = await _gitHubHelper.GetLatestTagAsync("koishijs", "koishi-desktop", ct);
                 if (string.IsNullOrEmpty(tag))
                 {
                     ReportError(progress, 1, totalSteps, "无法获取最新版本信息");
@@ -73,10 +69,22 @@ public partial class KoishiInstallService : IKoishiInstallService
 
                 // Step 2: 下载
                 Report(progress, 2, totalSteps, "下载 Koishi", "正在下载...");
-                var downloadUrl = $"{GhProxyUrl}https://github.com/koishijs/koishi-desktop/releases/download/{tag}/koishi-desktop-win-x64-{tag}.zip";
                 var tempZip = Path.Combine(Path.GetTempPath(), $"koishi-{tag}.zip");
+                var baseUrl = $"https://github.com/koishijs/koishi-desktop/releases/download/{tag}/koishi-desktop-win-x64-{tag}.zip";
                 
-                if (!await DownloadFileAsync(downloadUrl, tempZip, progress, 2, totalSteps, ct))
+                string[] downloadUrls = [
+                    $"https://gh-proxy.com/{baseUrl}",
+                    $"https://ghproxy.net/{baseUrl}",
+                    $"https://mirror.ghproxy.com/{baseUrl}",
+                    baseUrl
+                ];
+                
+                var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(downloadUrls, tempZip,
+                    (downloaded, total) => Report(progress, 2, totalSteps, "下载 Koishi",
+                        $"正在下载... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
+                        total > 0 ? (double)downloaded / total * 100 : 0), ct);
+                
+                if (!downloadSuccess)
                 {
                     ReportError(progress, 2, totalSteps, "下载失败");
                     return false;
@@ -119,63 +127,6 @@ public partial class KoishiInstallService : IKoishiInstallService
         {
             _logger.LogError(ex, "Koishi 安装失败");
             ReportError(progress, 0, totalSteps, ex.Message);
-            return false;
-        }
-    }
-
-    private async Task<string?> GetLatestTagAsync(CancellationToken ct)
-    {
-        try
-        {
-            var response = await _httpClient.GetStringAsync(GithubApiUrl, ct);
-            using var doc = JsonDocument.Parse(response);
-            return doc.RootElement.GetProperty("tag_name").GetString();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "从 GitHub API 获取版本失败，尝试代理");
-            try
-            {
-                var proxyUrl = $"{GhProxyUrl}{GithubApiUrl}";
-                var response = await _httpClient.GetStringAsync(proxyUrl, ct);
-                using var doc = JsonDocument.Parse(response);
-                return doc.RootElement.GetProperty("tag_name").GetString();
-            }
-            catch { return null; }
-        }
-    }
-
-    private async Task<bool> DownloadFileAsync(string url, string destPath, IProgress<InstallProgress>? progress, 
-        int step, int totalSteps, CancellationToken ct)
-    {
-        try
-        {
-            using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-            response.EnsureSuccessStatusCode();
-
-            var totalBytes = response.Content.Headers.ContentLength ?? 0;
-            var downloadedBytes = 0L;
-
-            await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-            await using var fileStream = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
-
-            var buffer = new byte[65536];
-            int bytesRead;
-
-            while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
-            {
-                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                downloadedBytes += bytesRead;
-
-                var pct = totalBytes > 0 ? (double)downloadedBytes / totalBytes * 100 : 0;
-                Report(progress, step, totalSteps, "下载 Koishi",
-                    $"正在下载... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB", pct);
-            }
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "下载文件失败: {Url}", url);
             return false;
         }
     }

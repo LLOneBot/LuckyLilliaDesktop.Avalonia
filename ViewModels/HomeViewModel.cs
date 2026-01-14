@@ -22,6 +22,7 @@ public class HomeViewModel : ViewModelBase
 {
     private readonly IProcessManager _processManager;
     private readonly IResourceMonitor _resourceMonitor;
+    private readonly ISelfInfoService _selfInfoService;
     private readonly IConfigManager _configManager;
     private readonly IPmhqClient _pmhqClient;
     private readonly ILogCollector _logCollector;
@@ -331,6 +332,7 @@ public class HomeViewModel : ViewModelBase
     public HomeViewModel(
         IProcessManager processManager,
         IResourceMonitor resourceMonitor,
+        ISelfInfoService selfInfoService,
         IConfigManager configManager,
         IPmhqClient pmhqClient,
         ILogCollector logCollector,
@@ -341,6 +343,7 @@ public class HomeViewModel : ViewModelBase
     {
         _processManager = processManager;
         _resourceMonitor = resourceMonitor;
+        _selfInfoService = selfInfoService;
         _configManager = configManager;
         _pmhqClient = pmhqClient;
         _logCollector = logCollector;
@@ -359,12 +362,25 @@ public class HomeViewModel : ViewModelBase
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(mem => AvailableMemory = mem);
 
-        // 订阅 UIN 信息流
-        _resourceMonitor.UinStream
+        _selfInfoService.UinStream
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(OnUinReceived);
+            .Subscribe(uin =>
+            {
+                QQUin = uin ?? string.Empty;
+                QQStatus = string.IsNullOrEmpty(uin) ? ProcessStatus.Stopped : ProcessStatus.Running;
+                if (!string.IsNullOrEmpty(uin))
+                    _logger.LogInformation("UIN 已更新: {Uin}", uin);
+            });
 
-        // 订阅 QQ 版本流
+        _selfInfoService.NicknameStream
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(nickname =>
+            {
+                QQNickname = nickname ?? string.Empty;
+                if (!string.IsNullOrEmpty(nickname))
+                    _logger.LogInformation("昵称已更新: {Nickname}", nickname);
+            });
+
         _resourceMonitor.QQVersionStream
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(version => QQVersion = version);
@@ -1050,7 +1066,7 @@ public class HomeViewModel : ViewModelBase
             _pmhqClient.ClearPort();
             _resourceMonitor.ResetState();
 
-            await _processManager.StopAllAsync();
+            await _processManager.StopAllAsync(_resourceMonitor.QQPid);
 
             IsServicesRunning = false;
             BotStatus = ProcessStatus.Stopped;
@@ -1175,17 +1191,6 @@ public class HomeViewModel : ViewModelBase
             if (state.PmhqHasUpdate) names.Add("PMHQ");
             if (state.LLBotHasUpdate) names.Add("LLBot");
             UpdateBannerText = $"发现新版本: {string.Join(", ", names)}";
-        }
-    }
-
-    private void OnUinReceived(SelfInfo selfInfo)
-    {
-        if (selfInfo != null)
-        {
-            QQUin = selfInfo.Uin;
-            QQNickname = selfInfo.Nickname;
-            QQStatus = ProcessStatus.Running;
-            _logger.LogInformation("UIN 已更新: {Uin} - {Nickname}", QQUin, QQNickname);
         }
     }
 

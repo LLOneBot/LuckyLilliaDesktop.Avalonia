@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Reactive;
 using System.Reactive.Linq;
@@ -17,7 +18,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
 {
     private readonly ILogger<IntegrationWizardViewModel> _logger;
     private readonly IKoishiInstallService _koishiInstallService;
-    private readonly IResourceMonitor _resourceMonitor;
+    private readonly IAstrBotInstallService _astrBotInstallService;
+    private readonly ISelfInfoService _selfInfoService;
     private readonly IDisposable _uinSubscription;
 
     private bool _isInstalling;
@@ -44,6 +46,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     public bool IsCompleted { get => _isCompleted; set => this.RaiseAndSetIfChanged(ref _isCompleted, value); }
     public bool HasUin { get => _hasUin; set => this.RaiseAndSetIfChanged(ref _hasUin, value); }
     public bool KoishiInstalled => _koishiInstallService.IsInstalled;
+    public bool AstrBotInstalled => _astrBotInstallService.IsInstalled;
 
     public ReactiveCommand<string, Unit> SelectFrameworkCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelInstallCommand { get; }
@@ -53,22 +56,24 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
 
     public IntegrationWizardViewModel(
         IKoishiInstallService koishiInstallService,
-        IResourceMonitor resourceMonitor,
+        IAstrBotInstallService astrBotInstallService,
+        ISelfInfoService selfInfoService,
         ILogger<IntegrationWizardViewModel> logger)
     {
         _koishiInstallService = koishiInstallService;
-        _resourceMonitor = resourceMonitor;
+        _astrBotInstallService = astrBotInstallService;
+        _selfInfoService = selfInfoService;
         _logger = logger;
 
         SelectFrameworkCommand = ReactiveCommand.CreateFromTask<string>(OnSelectFrameworkAsync);
         CancelInstallCommand = ReactiveCommand.Create(OnCancelInstall);
 
-        _uinSubscription = _resourceMonitor.UinStream
+        _uinSubscription = _selfInfoService.UinStream
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(info =>
+            .Subscribe(uin =>
             {
-                HasUin = !string.IsNullOrEmpty(info.Uin);
-                _currentUin = info.Uin;
+                HasUin = !string.IsNullOrEmpty(uin);
+                _currentUin = string.IsNullOrEmpty(uin) ? null : uin;
             });
     }
 
@@ -85,10 +90,17 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         if (ConfirmInstallCallback == null) return;
 
         bool forceReinstall = false;
+        
         if (framework == "koishi" && _koishiInstallService.IsInstalled)
         {
             forceReinstall = await ConfirmInstallCallback(frameworkName, 
                 $"{frameworkName} 已存在，是否重新下载安装？\n选择「取消」将跳过下载，仅更新配置和依赖。");
+        }
+        else if (framework == "astrbot" && _astrBotInstallService.IsInstalled)
+        {
+            forceReinstall = await ConfirmInstallCallback(frameworkName,
+                $"{frameworkName} 已存在，是否重新下载安装？\n选择「取消」将跳过安装。");
+            if (!forceReinstall) return;
         }
         else
         {
@@ -177,6 +189,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             bool success = framework switch
             {
                 "koishi" => await _koishiInstallService.InstallAsync(forceReinstall, progress, _cts.Token),
+                "astrbot" => await _astrBotInstallService.InstallAsync(progress, _cts.Token),
                 _ => false
             };
 
@@ -184,8 +197,12 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             {
                 _logger.LogInformation("{Framework} 安装成功", framework);
                 this.RaisePropertyChanged(nameof(KoishiInstalled));
+                this.RaisePropertyChanged(nameof(AstrBotInstalled));
+                
                 if (framework == "koishi")
                     await OnKoishiInstallCompletedAsync();
+                else if (framework == "astrbot")
+                    await OnAstrBotInstallCompletedAsync();
             }
         }
         catch (Exception ex)
@@ -211,9 +228,10 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
 
     private async Task OnKoishiInstallCompletedAsync()
     {
+        var installPath = Path.GetFullPath("bin/koishi");
         if (ShowAlertCallback != null)
             await ShowAlertCallback("Koishi 配置完成", 
-                "等待框架启动完成后，请在群里发送 help 测试机器人是否有响应。\n\n3秒后将自动启动 Koishi...");
+                $"安装路径: {installPath}\n\n等待框架启动完成后，请在群里发送 help 测试机器人是否有响应。\n\n3秒后将自动启动 Koishi...");
 
         await Task.Delay(3000);
 
@@ -221,13 +239,13 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                var koiExe = Path.GetFullPath("bin/koishi/koi.exe");
+                var koiExe = Path.Combine(installPath, "koi.exe");
                 if (File.Exists(koiExe))
                 {
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = koiExe,
-                        WorkingDirectory = Path.GetDirectoryName(koiExe),
+                        WorkingDirectory = installPath,
                         UseShellExecute = true
                     });
                     _logger.LogInformation("Koishi 已启动");
@@ -240,6 +258,123 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         });
     }
 
+    private async Task OnAstrBotInstallCompletedAsync()
+    {
+        var installPath = Path.GetFullPath("bin/astrbot");
+        
+        // 启动前配置 default.py
+        await ConfigureAstrBotDefaultAsync();
+        
+        if (ShowAlertCallback != null)
+            await ShowAlertCallback("AstrBot 配置完成",
+                $"安装路径: {installPath}\n\nAstrBot 已安装完成。\n\n3秒后将自动启动 AstrBot...");
+
+        await Task.Delay(3000);
+
+        _astrBotInstallService.StartAstrBot();
+        
+        // 配置 LLBot 连接
+        await ConfigureLLBotWebSocketAsync(6199);
+    }
+
+    private async Task ConfigureAstrBotDefaultAsync()
+    {
+        var defaultPyPath = Path.GetFullPath("bin/astrbot/astrbot/core/config/default.py");
+        if (!File.Exists(defaultPyPath))
+        {
+            _logger.LogWarning("default.py 不存在，跳过配置");
+            return;
+        }
+
+        try
+        {
+            var content = await File.ReadAllTextAsync(defaultPyPath);
+            
+            // 检查是否已配置
+            if (content.Contains("\"type\": \"aiocqhttp\""))
+            {
+                _logger.LogInformation("AstrBot default.py 已包含 aiocqhttp 配置");
+                return;
+            }
+
+            // 查找 "platform": [] 并替换
+            const string oldPlatform = "\"platform\": []";
+            const string newPlatform = """
+"platform": [
+        {
+            "id": "llbot",
+            "type": "aiocqhttp",
+            "enable": True,
+            "ws_reverse_host": "0.0.0.0",
+            "ws_reverse_port": 6199,
+            "ws_reverse_token": ""
+        }
+    ]
+""";
+
+            if (content.Contains(oldPlatform))
+            {
+                content = content.Replace(oldPlatform, newPlatform);
+                await File.WriteAllTextAsync(defaultPyPath, content);
+                _logger.LogInformation("已配置 AstrBot default.py aiocqhttp");
+            }
+            else
+            {
+                _logger.LogWarning("未找到 platform 配置项");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "配置 AstrBot default.py 失败");
+        }
+    }
+
+    private async Task ConfigureLLBotWebSocketAsync(int wsPort)
+    {
+        if (string.IsNullOrEmpty(_currentUin)) return;
+
+        var configPath = Path.Combine("bin", "llbot", "data", $"config_{_currentUin}.json");
+        if (!File.Exists(configPath)) return;
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(configPath);
+            var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            
+            var wsUrl = $"ws://localhost:{wsPort}";
+            
+            // 检查是否已存在启用的 ws-reverse 连接到该端口
+            var existingWs = config.OB11.Connect.FirstOrDefault(c => 
+                c.Type == "ws-reverse" && c.Url == wsUrl && c.Enable);
+            
+            if (existingWs != null)
+            {
+                _logger.LogInformation("LLBot 已存在 AstrBot WebSocket 连接配置");
+                return;
+            }
+
+            // 添加新的 ws-reverse 连接
+            config.OB11.Connect.Add(new OB11Connection
+            {
+                Type = "ws-reverse",
+                Enable = true,
+                Url = wsUrl,
+                Token = "",
+                MessageFormat = "array",
+                ReportSelfMessage = false,
+                HeartInterval = 60000
+            });
+
+            await File.WriteAllTextAsync(configPath, 
+                JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+            _logger.LogInformation("已添加 LLBot WebSocket 客户端配置: {Url}", wsUrl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "配置 LLBot WebSocket 失败");
+        }
+    }
+
     private void ResetProgress()
     {
         CurrentStep = 0;
@@ -250,6 +385,16 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         HasError = false;
         ErrorMessage = null;
         IsCompleted = false;
+    }
+
+    public void OnPageEnter()
+    {
+        var uin = _selfInfoService.CurrentUin;
+        if (!string.IsNullOrEmpty(uin))
+        {
+            _currentUin = uin;
+            HasUin = true;
+        }
     }
 
     public void Dispose() => _uinSubscription.Dispose();

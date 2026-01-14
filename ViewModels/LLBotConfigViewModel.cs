@@ -16,7 +16,7 @@ namespace LuckyLilliaDesktop.ViewModels;
 public class LLBotConfigViewModel : ViewModelBase, IDisposable
 {
     private readonly IPmhqClient _pmhqClient;
-    private readonly IResourceMonitor _resourceMonitor;
+    private readonly ISelfInfoService _selfInfoService;
     private readonly IProcessManager _processManager;
     private readonly ILogger<LLBotConfigViewModel> _logger;
     private readonly IDisposable _uinSubscription;
@@ -283,12 +283,12 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
 
     public LLBotConfigViewModel(
         IPmhqClient pmhqClient,
-        IResourceMonitor resourceMonitor,
+        ISelfInfoService selfInfoService,
         IProcessManager processManager,
         ILogger<LLBotConfigViewModel> logger)
     {
         _pmhqClient = pmhqClient;
-        _resourceMonitor = resourceMonitor;
+        _selfInfoService = selfInfoService;
         _processManager = processManager;
         _logger = logger;
 
@@ -300,38 +300,34 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         AddWebhookUrlCommand = ReactiveCommand.Create(AddWebhookUrl);
         RemoveWebhookUrlCommand = ReactiveCommand.Create<string>(RemoveWebhookUrl);
 
-        // 订阅 UIN 更新
-        _uinSubscription = _resourceMonitor.UinStream
+        _uinSubscription = _selfInfoService.UinStream
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(OnUinReceived);
 
-        // 订阅进程状态变化
         _processManager.ProcessStatusChanged += OnProcessStatusChanged;
     }
 
     private void OnProcessStatusChanged(object? sender, ProcessStatus status)
     {
-        var pmhqStatus = _processManager.GetProcessStatus("PMHQ");
-        if (pmhqStatus != ProcessStatus.Running)
+        var qqStatus = _processManager.GetProcessStatus("QQ");
+        if (qqStatus != ProcessStatus.Running)
         {
             _currentUin = null;
             HasUin = false;
         }
     }
 
-    private async void OnUinReceived(SelfInfo selfInfo)
+    private async void OnUinReceived(string uin)
     {
-        if (!string.IsNullOrEmpty(selfInfo.Uin))
-        {
-            _currentUin = selfInfo.Uin;
-            HasUin = true;
-            await LoadConfigAsync();
-        }
-        else
+        if (string.IsNullOrEmpty(uin))
         {
             _currentUin = null;
             HasUin = false;
+            return;
         }
+        _currentUin = uin;
+        HasUin = true;
+        await LoadConfigAsync();
     }
 
     private string? GetConfigPath()

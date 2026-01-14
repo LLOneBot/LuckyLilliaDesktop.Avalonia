@@ -26,6 +26,7 @@ public partial class IntegrationWizardPage : UserControl
         {
             vm.ConfirmInstallCallback = ShowConfirmDialogAsync;
             vm.ShowAlertCallback = ShowAlertDialogAsync;
+            vm.OnPageEnter();
         }
     }
 
