@@ -430,11 +430,9 @@ public class ProcessManager : IProcessManager, IDisposable
         }
         catch (ArgumentException)
         {
-            // 进程不存在
         }
-        catch (Exception ex)
+        catch
         {
-            // 如果 Kill 失败，尝试用 taskkill
             try
             {
                 var psi = new ProcessStartInfo

@@ -54,6 +54,7 @@ public partial class App : Application
         services.AddSingleton<IPythonHelper, PythonHelper>();
         services.AddSingleton<IKoishiInstallService, KoishiInstallService>();
         services.AddSingleton<IAstrBotInstallService, AstrBotInstallService>();
+        services.AddSingleton<IZhenxunInstallService, ZhenxunInstallService>();
 
         // ViewModels（瞬态）
         services.AddTransient<MainWindowViewModel>();

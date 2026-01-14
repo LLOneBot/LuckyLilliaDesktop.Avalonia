@@ -158,11 +158,13 @@ public class HomeViewModel : ViewModelBase
         set
         {
             var oldValue = _qqUin;
+            if (oldValue == value) return;
+            
             this.RaiseAndSetIfChanged(ref _qqUin, value);
             UpdateTitle();
             this.RaisePropertyChanged(nameof(HasQQInfo));
 
-            if (oldValue != value && !string.IsNullOrEmpty(value))
+            if (!string.IsNullOrEmpty(value))
             {
                 _ = LoadAvatarAsync(value);
             }
@@ -177,6 +179,8 @@ public class HomeViewModel : ViewModelBase
         get => _qqNickname;
         set
         {
+            if (_qqNickname == value) return;
+            
             this.RaiseAndSetIfChanged(ref _qqNickname, value);
             UpdateTitle();
             this.RaisePropertyChanged(nameof(HasQQInfo));
@@ -1155,22 +1159,7 @@ public class HomeViewModel : ViewModelBase
                 catch (OperationCanceledException) { return; }
             }
 
-            // 继续轮询 SelfInfo
-            while (!ct.IsCancellationRequested)
-            {
-                try { await Task.Delay(3000, ct); }
-                catch (OperationCanceledException) { break; }
-
-                var selfInfo = await _pmhqClient.FetchSelfInfoAsync(ct);
-                if (selfInfo != null && !string.IsNullOrEmpty(selfInfo.Uin))
-                {
-                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        QQUin = selfInfo.Uin;
-                        QQNickname = selfInfo.Nickname;
-                    });
-                }
-            }
+            // 继续轮询 SelfInfo 已由 SelfInfoService 处理
         }, ct);
     }
 

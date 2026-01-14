@@ -173,8 +173,8 @@ public class AstrBotInstallService : IAstrBotInstallService
 
             Process.Start(new ProcessStartInfo
             {
-                FileName = venvPython,
-                Arguments = "main.py",
+                FileName = "cmd.exe",
+                Arguments = $"/k \"\"{venvPython}\" main.py & pause\"",
                 WorkingDirectory = astrBotPath,
                 UseShellExecute = true
             });

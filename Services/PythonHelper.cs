@@ -126,16 +126,75 @@ public class PythonHelper : IPythonHelper
             return false;
         }
 
-        // uv sync 自动创建虚拟环境并安装依赖
-        await RunUvCommandAsync(uvExe, "sync", targetDir, onOutput, ct);
+        // 检查是否是 Poetry 项目
+        var pyprojectFile = Path.Combine(targetDir, "pyproject.toml");
+        var isPoetryProject = false;
+        if (File.Exists(pyprojectFile))
+        {
+            var content = await File.ReadAllTextAsync(pyprojectFile, ct);
+            isPoetryProject = content.Contains("[tool.poetry]");
+        }
+
+        if (isPoetryProject)
+        {
+            // 安装 poetry
+            onOutput?.Invoke("安装 Poetry...");
+            var poetryInstallExitCode = await RunUvCommandAsync(uvExe, "tool install poetry", targetDir, onOutput, ct);
+            if (poetryInstallExitCode != 0)
+                _logger.LogWarning("Poetry 可能已安装，继续执行");
+
+            // 配置 Poetry 使用本地 Python
+            var pythonExe = Path.GetFullPath(PythonExe);
+            onOutput?.Invoke("配置 Poetry Python 路径...");
+            await RunUvCommandAsync(uvExe, $"tool run poetry env use \"{pythonExe}\"", targetDir, onOutput, ct);
+
+            // 先执行 poetry lock
+            onOutput?.Invoke("更新 Poetry lock 文件...");
+            await RunUvCommandAsync(uvExe, "tool run poetry lock", targetDir, onOutput, ct);
+
+            // 使用 poetry install
+            onOutput?.Invoke("使用 Poetry 安装依赖...");
+            var installExitCode = await RunUvCommandAsync(uvExe, "tool run poetry install", targetDir, onOutput, ct);
+            if (installExitCode != 0)
+            {
+                _logger.LogError("poetry install 失败，退出码: {ExitCode}", installExitCode);
+                return false;
+            }
+        }
+        else
+        {
+            // 创建虚拟环境
+            var venvPath = Path.Combine(targetDir, ".venv");
+            if (!Directory.Exists(venvPath))
+            {
+                var venvExitCode = await RunUvCommandAsync(uvExe, "venv --python 3.11", targetDir, onOutput, ct);
+                if (venvExitCode != 0)
+                {
+                    _logger.LogError("uv venv 创建失败，退出码: {ExitCode}", venvExitCode);
+                    return false;
+                }
+            }
+
+            // 使用 requirements.txt 安装依赖
+            var reqFile = Path.Combine(targetDir, "requirements.txt");
+            if (File.Exists(reqFile))
+            {
+                var installExitCode = await RunUvCommandAsync(uvExe, "pip install -r requirements.txt", targetDir, onOutput, ct);
+                if (installExitCode != 0)
+                {
+                    _logger.LogError("uv pip install 失败，退出码: {ExitCode}", installExitCode);
+                    return false;
+                }
+            }
+        }
         
-        _logger.LogInformation("uv 依赖安装完成");
+        _logger.LogInformation("依赖安装完成");
         return true;
     }
 
-    private async Task RunUvCommandAsync(string uvExe, string args, string workDir, Action<string>? onOutput, CancellationToken ct)
+    private async Task<int> RunUvCommandAsync(string uvExe, string args, string workDir, Action<string>? onOutput, CancellationToken ct)
     {
-        _logger.LogInformation("执行命令: {Exe} {Args}", uvExe, args);
+        _logger.LogInformation("执行命令: {Exe} {Args} in {WorkDir}", uvExe, args, workDir);
 
         var psi = new ProcessStartInfo
         {
@@ -151,16 +210,14 @@ public class PythonHelper : IPythonHelper
         psi.Environment["UV_INDEX_URL"] = PipMirror;
         psi.Environment["UV_PYTHON_INSTALL_MIRROR"] = "https://gh-proxy.com/https://github.com/astral-sh/python-build-standalone/releases/download";
 
-        using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
-        
-        var tcs = new TaskCompletionSource<bool>();
+        using var process = new Process { StartInfo = psi };
         
         process.OutputDataReceived += (_, e) =>
         {
             if (e.Data != null)
             {
                 onOutput?.Invoke(e.Data);
-                _logger.LogInformation("{Output}", e.Data);
+                _logger.LogInformation("[uv] {Output}", e.Data);
             }
         };
         
@@ -169,36 +226,18 @@ public class PythonHelper : IPythonHelper
             if (e.Data != null)
             {
                 onOutput?.Invoke(e.Data);
-                _logger.LogInformation("{Output}", e.Data);
+                _logger.LogInformation("[uv] {Output}", e.Data);
             }
         };
-        
-        process.Exited += (_, _) => tcs.TrySetResult(true);
         
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
         
-        using (ct.Register(() => tcs.TrySetCanceled()))
-        {
-            await tcs.Task;
-        }
+        await process.WaitForExitAsync(ct);
         
-        if (process.ExitCode != 0)
-            _logger.LogWarning("uv 命令退出码: {ExitCode}", process.ExitCode);
-    }
-
-    private async Task ReadStreamAsync(StreamReader reader, Action<string>? onOutput, CancellationToken ct)
-    {
-        while (!reader.EndOfStream)
-        {
-            var line = await reader.ReadLineAsync(ct);
-            if (line != null)
-            {
-                onOutput?.Invoke(line);
-                _logger.LogDebug("{Output}", line);
-            }
-        }
+        _logger.LogInformation("uv 命令完成，退出码: {ExitCode}", process.ExitCode);
+        return process.ExitCode;
     }
 
     public async Task RunCommandAsync(string exe, string args, string workDir, Action<string>? onOutput = null, CancellationToken ct = default)

@@ -19,6 +19,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     private readonly ILogger<IntegrationWizardViewModel> _logger;
     private readonly IKoishiInstallService _koishiInstallService;
     private readonly IAstrBotInstallService _astrBotInstallService;
+    private readonly IZhenxunInstallService _zhenxunInstallService;
     private readonly ISelfInfoService _selfInfoService;
     private readonly IDisposable _uinSubscription;
 
@@ -47,21 +48,25 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     public bool HasUin { get => _hasUin; set => this.RaiseAndSetIfChanged(ref _hasUin, value); }
     public bool KoishiInstalled => _koishiInstallService.IsInstalled;
     public bool AstrBotInstalled => _astrBotInstallService.IsInstalled;
+    public bool ZhenxunInstalled => _zhenxunInstallService.IsInstalled;
 
     public ReactiveCommand<string, Unit> SelectFrameworkCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelInstallCommand { get; }
 
     public Func<string, string, Task<bool>>? ConfirmInstallCallback { get; set; }
     public Func<string, string, Task>? ShowAlertCallback { get; set; }
+    public Func<string, string, Task<int>>? ThreeChoiceCallback { get; set; }
 
     public IntegrationWizardViewModel(
         IKoishiInstallService koishiInstallService,
         IAstrBotInstallService astrBotInstallService,
+        IZhenxunInstallService zhenxunInstallService,
         ISelfInfoService selfInfoService,
         ILogger<IntegrationWizardViewModel> logger)
     {
         _koishiInstallService = koishiInstallService;
         _astrBotInstallService = astrBotInstallService;
+        _zhenxunInstallService = zhenxunInstallService;
         _selfInfoService = selfInfoService;
         _logger = logger;
 
@@ -83,26 +88,36 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         {
             "koishi" => "Koishi",
             "astrbot" => "AstrBot",
-            "maimaibot" => "MaimaiBot",
+            "zhenxun" => "真寻Bot",
             _ => framework
         };
 
         if (ConfirmInstallCallback == null) return;
 
-        bool forceReinstall = false;
-        
-        if (framework == "koishi" && _koishiInstallService.IsInstalled)
+        bool isInstalled = framework switch
         {
-            forceReinstall = await ConfirmInstallCallback(frameworkName, 
-                $"{frameworkName} 已存在，是否重新下载安装？\n选择「取消」将跳过下载，仅更新配置和依赖。");
-        }
-        else if (framework == "astrbot" && _astrBotInstallService.IsInstalled)
+            "koishi" => _koishiInstallService.IsInstalled,
+            "astrbot" => _astrBotInstallService.IsInstalled,
+            "zhenxun" => _zhenxunInstallService.IsInstalled,
+            _ => false
+        };
+
+        if (isInstalled && ThreeChoiceCallback != null)
         {
-            forceReinstall = await ConfirmInstallCallback(frameworkName,
-                $"{frameworkName} 已存在，是否重新下载安装？\n选择「取消」将跳过安装。");
-            if (!forceReinstall) return;
+            // 0=启动, 1=重新安装, 2=取消
+            var choice = await ThreeChoiceCallback(frameworkName, $"{frameworkName} 已安装，请选择操作：");
+            
+            if (choice == 2) return; // 取消
+            
+            if (choice == 0) // 启动
+            {
+                StartFramework(framework);
+                return;
+            }
+            
+            // choice == 1: 重新安装，继续执行下面的安装流程
         }
-        else
+        else if (!isInstalled)
         {
             var confirmed = await ConfirmInstallCallback(frameworkName, $"是否下载并自动安装配置 {frameworkName}？");
             if (!confirmed) return;
@@ -111,7 +126,23 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         if (framework == "koishi")
             await EnsureSatoriEnabledAsync();
 
-        await InstallFrameworkAsync(framework, forceReinstall);
+        await InstallFrameworkAsync(framework, true);
+    }
+
+    private void StartFramework(string framework)
+    {
+        switch (framework)
+        {
+            case "koishi":
+                _koishiInstallService.StartKoishi();
+                break;
+            case "astrbot":
+                _astrBotInstallService.StartAstrBot();
+                break;
+            case "zhenxun":
+                _zhenxunInstallService.StartZhenxun();
+                break;
+        }
     }
 
     private async Task<int> EnsureSatoriEnabledAsync()
@@ -190,6 +221,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             {
                 "koishi" => await _koishiInstallService.InstallAsync(forceReinstall, progress, _cts.Token),
                 "astrbot" => await _astrBotInstallService.InstallAsync(progress, _cts.Token),
+                "zhenxun" => await _zhenxunInstallService.InstallAsync(progress, _cts.Token),
                 _ => false
             };
 
@@ -198,11 +230,14 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 _logger.LogInformation("{Framework} 安装成功", framework);
                 this.RaisePropertyChanged(nameof(KoishiInstalled));
                 this.RaisePropertyChanged(nameof(AstrBotInstalled));
+                this.RaisePropertyChanged(nameof(ZhenxunInstalled));
                 
                 if (framework == "koishi")
                     await OnKoishiInstallCompletedAsync();
                 else if (framework == "astrbot")
                     await OnAstrBotInstallCompletedAsync();
+                else if (framework == "zhenxun")
+                    await OnZhenxunInstallCompletedAsync();
             }
         }
         catch (Exception ex)
@@ -267,7 +302,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         
         if (ShowAlertCallback != null)
             await ShowAlertCallback("AstrBot 配置完成",
-                $"安装路径: {installPath}\n\nAstrBot 已安装完成。\n\n3秒后将自动启动 AstrBot...");
+                $"安装路径: {installPath}\n\nAstrBot 已安装完成，群里发送 help 可查看功能\n\n3秒后将自动启动 AstrBot...");
 
         await Task.Delay(3000);
 
@@ -329,7 +364,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task ConfigureLLBotWebSocketAsync(int wsPort)
+    private async Task ConfigureLLBotWebSocketAsync(int wsPort, string path = "")
     {
         if (string.IsNullOrEmpty(_currentUin)) return;
 
@@ -341,7 +376,9 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             var json = await File.ReadAllTextAsync(configPath);
             var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
             
-            var wsUrl = $"ws://localhost:{wsPort}";
+            var wsUrl = string.IsNullOrEmpty(path) 
+                ? $"ws://127.0.0.1:{wsPort}" 
+                : $"ws://127.0.0.1:{wsPort}{path}";
             
             // 检查是否已存在启用的 ws-reverse 连接到该端口
             var existingWs = config.OB11.Connect.FirstOrDefault(c => 
@@ -349,7 +386,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             
             if (existingWs != null)
             {
-                _logger.LogInformation("LLBot 已存在 AstrBot WebSocket 连接配置");
+                _logger.LogInformation("LLBot 已存在 WebSocket 连接配置: {Url}", wsUrl);
                 return;
             }
 
@@ -373,6 +410,27 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         {
             _logger.LogError(ex, "配置 LLBot WebSocket 失败");
         }
+    }
+
+    private async Task OnZhenxunInstallCompletedAsync()
+    {
+        var installPath = _zhenxunInstallService.ZhenxunPath;
+        
+        // 配置 .env.dev
+        var superUser = _currentUin ?? "";
+        var nbPort = FindAvailablePort(8080);
+        await _zhenxunInstallService.ConfigureEnvAsync(superUser, nbPort);
+        
+        // 配置 LLBot 反向 WebSocket 连接到 NoneBot2
+        await ConfigureLLBotWebSocketAsync(nbPort, "/onebot/v11/ws");
+        
+        if (ShowAlertCallback != null)
+            await ShowAlertCallback("真寻Bot 安装完成",
+                $"安装路径: {installPath}\n\n群里@机器人发送 help 查看功能\n\n3秒后将自动启动真寻Bot...");
+
+        await Task.Delay(3000);
+        
+        _zhenxunInstallService.StartZhenxun();
     }
 
     private void ResetProgress()

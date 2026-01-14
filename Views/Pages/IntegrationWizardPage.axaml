@@ -98,28 +98,30 @@
                     </StackPanel>
                 </Button>
 
-                <!-- MaimaiBot -->
-                <Button Command="{Binding SelectFrameworkCommand}" CommandParameter="maimaibot"
+                <!-- 真寻Bot -->
+                <Button Command="{Binding SelectFrameworkCommand}" CommandParameter="zhenxun"
                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                         Padding="12" Background="Transparent">
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <Border Width="48" Height="48" CornerRadius="8" Background="#EC4899">
-                            <TextBlock Text="M" FontSize="24" FontWeight="Bold" Foreground="White"
+                            <TextBlock Text="真" FontSize="24" FontWeight="Bold" Foreground="White"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel VerticalAlignment="Center" Spacing="4">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="MaimaiBot" FontSize="16" FontWeight="SemiBold" 
+                                <TextBlock Text="真寻Bot" FontSize="16" FontWeight="SemiBold" 
                                            Foreground="{DynamicResource TextPrimary}"/>
-                                <Border Background="#6B7280" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock Text="暂未实现" FontSize="10" Foreground="White"/>
+                                <Border Background="#22C55E" CornerRadius="4" Padding="6,2" 
+                                        VerticalAlignment="Center" IsVisible="{Binding ZhenxunInstalled}">
+                                    <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
                                 </Border>
                             </StackPanel>
-                            <TextBlock Text="舞萌 DX 查分机器人" FontSize="12" 
+                            <TextBlock Text="基于 Nonebot2 的多功能群聊机器人" FontSize="12" 
                                        Foreground="{DynamicResource TextSecondary}"/>
                         </StackPanel>
                     </StackPanel>
                 </Button>
+
             </StackPanel>
 
             <!-- 安装进度 -->

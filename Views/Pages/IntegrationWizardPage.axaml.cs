@@ -26,6 +26,7 @@ public partial class IntegrationWizardPage : UserControl
         {
             vm.ConfirmInstallCallback = ShowConfirmDialogAsync;
             vm.ShowAlertCallback = ShowAlertDialogAsync;
+            vm.ThreeChoiceCallback = ShowThreeChoiceDialogAsync;
             vm.OnPageEnter();
         }
     }
@@ -50,5 +51,17 @@ public partial class IntegrationWizardPage : UserControl
             var dialog = new AlertDialog(message);
             await dialog.ShowDialog(window);
         }
+    }
+
+    private async Task<int> ShowThreeChoiceDialogAsync(string title, string message)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is Window window)
+        {
+            var dialog = new ThreeChoiceDialog(message);
+            var result = await dialog.ShowDialog<ThreeChoiceResult>(window);
+            return (int)result;
+        }
+        return 2; // Cancel
     }
 }

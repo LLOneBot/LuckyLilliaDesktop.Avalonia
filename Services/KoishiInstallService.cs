@@ -26,6 +26,7 @@ public interface IKoishiInstallService
 {
     Task<bool> InstallAsync(bool forceReinstall = false, IProgress<InstallProgress>? progress = null, CancellationToken ct = default);
     bool IsInstalled { get; }
+    void StartKoishi();
 }
 
 public partial class KoishiInstallService : IKoishiInstallService
@@ -251,4 +252,32 @@ public partial class KoishiInstallService : IKoishiInstallService
 
     [GeneratedRegex(@"~adapter-satori:\s*\{\}", RegexOptions.Multiline)]
     private static partial Regex SatoriRegex();
+
+    public void StartKoishi()
+    {
+        try
+        {
+            var koishiPath = Path.GetFullPath(KoishiDir);
+            var koiExe = Path.Combine(koishiPath, "koi.exe");
+
+            if (!File.Exists(koiExe))
+            {
+                _logger.LogError("Koishi 未正确安装");
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/k \"\"{koiExe}\" & pause\"",
+                WorkingDirectory = koishiPath,
+                UseShellExecute = true
+            });
+            _logger.LogInformation("Koishi 已启动");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "启动 Koishi 失败");
+        }
+    }
 }
