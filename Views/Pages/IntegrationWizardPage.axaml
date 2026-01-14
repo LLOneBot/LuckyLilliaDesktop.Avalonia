@@ -40,12 +40,12 @@
                 IsVisible="{Binding HasUin}">
             <Panel>
                 <StackPanel Spacing="20" IsVisible="{Binding !IsInstalling}">
-                <TextBlock Text="安装 Bot 框架"
+                <TextBlock Text="选择 Bot 框架"
                            FontSize="20"
                            FontWeight="Bold"
                            Foreground="{DynamicResource TextPrimary}"
                            HorizontalAlignment="Center"/>
-                <TextBlock Text="选择一个框架后将自动下载并配置"
+                <TextBlock Text="选择一个框架后将启动或自动下载并配置"
                            FontSize="13"
                            Foreground="{DynamicResource TextSecondary}"
                            HorizontalAlignment="Center"/>

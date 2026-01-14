@@ -422,27 +422,24 @@ public class ProcessManager : IProcessManager, IDisposable
     {
         try
         {
-            using var process = Process.GetProcessById(pid);
-            if (!process.HasExited)
+            var psi = new ProcessStartInfo
             {
-                process.Kill(entireProcessTree: true);
-            }
-        }
-        catch (ArgumentException)
-        {
+                FileName = "taskkill",
+                Arguments = $"/F /T /PID {pid}",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+            Process.Start(psi);
         }
         catch
         {
             try
             {
-                var psi = new ProcessStartInfo
+                using var process = Process.GetProcessById(pid);
+                if (!process.HasExited)
                 {
-                    FileName = "taskkill",
-                    Arguments = $"/F /T /PID {pid}",
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                };
-                Process.Start(psi);
+                    process.Kill(entireProcessTree: true);
+                }
             }
             catch { }
         }
