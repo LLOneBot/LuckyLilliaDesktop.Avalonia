@@ -1064,9 +1064,12 @@ public class HomeViewModel : ViewModelBase
             _infoPollingCts?.Cancel();
             _pmhqClient.CancelAll();
             _pmhqClient.ClearPort();
+            
+            // 在 ResetState 之前获取 QQ PID
+            var qqPid = _resourceMonitor.QQPid;
             _resourceMonitor.ResetState();
 
-            await _processManager.StopAllAsync(_resourceMonitor.QQPid);
+            await _processManager.StopAllAsync(qqPid);
 
             IsServicesRunning = false;
             BotStatus = ProcessStatus.Stopped;

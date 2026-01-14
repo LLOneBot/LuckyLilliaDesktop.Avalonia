@@ -416,31 +416,35 @@ public class ProcessManager : IProcessManager, IDisposable
     }
 
     /// <summary>
-    /// 使用 taskkill 快速杀死进程树
+    /// 杀死进程树
     /// </summary>
-    private void KillProcessTree(int pid)
+    private static void KillProcessTree(int pid)
     {
         try
         {
-            var psi = new ProcessStartInfo
+            using var process = Process.GetProcessById(pid);
+            if (!process.HasExited)
             {
-                FileName = "taskkill",
-                Arguments = $"/F /T /PID {pid}",
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-            Process.Start(psi);
+                process.Kill(entireProcessTree: true);
+            }
         }
-        catch
+        catch (ArgumentException)
         {
-            // 如果 taskkill 失败，回退到 Process.Kill
+            // 进程不存在
+        }
+        catch (Exception ex)
+        {
+            // 如果 Kill 失败，尝试用 taskkill
             try
             {
-                using var process = Process.GetProcessById(pid);
-                if (!process.HasExited)
+                var psi = new ProcessStartInfo
                 {
-                    process.Kill(entireProcessTree: true);
-                }
+                    FileName = "taskkill",
+                    Arguments = $"/F /T /PID {pid}",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                };
+                Process.Start(psi);
             }
             catch { }
         }
