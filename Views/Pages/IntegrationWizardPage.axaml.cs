@@ -26,6 +26,7 @@ public partial class IntegrationWizardPage : UserControl
         {
             vm.ConfirmInstallCallback = ShowConfirmDialogAsync;
             vm.ShowAlertCallback = ShowAlertDialogAsync;
+            vm.ShowAutoCloseAlertCallback = ShowAutoCloseAlertDialogAsync;
             vm.ThreeChoiceCallback = ShowThreeChoiceDialogAsync;
             vm.OnPageEnter();
         }
@@ -49,6 +50,16 @@ public partial class IntegrationWizardPage : UserControl
         if (topLevel is Window window)
         {
             var dialog = new AlertDialog(message);
+            await dialog.ShowDialog(window);
+        }
+    }
+
+    private async Task ShowAutoCloseAlertDialogAsync(string title, string message, int seconds, Action onDelayElapsed)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is Window window)
+        {
+            var dialog = new AutoCloseAlertDialog(message, seconds) { OnDelayElapsed = onDelayElapsed };
             await dialog.ShowDialog(window);
         }
     }

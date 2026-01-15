@@ -55,6 +55,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
 
     public Func<string, string, Task<bool>>? ConfirmInstallCallback { get; set; }
     public Func<string, string, Task>? ShowAlertCallback { get; set; }
+    public Func<string, string, int, Action, Task>? ShowAutoCloseAlertCallback { get; set; }
     public Func<string, string, Task<int>>? ThreeChoiceCallback { get; set; }
 
     public IntegrationWizardViewModel(
@@ -264,13 +265,10 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     private async Task OnKoishiInstallCompletedAsync()
     {
         var installPath = Path.GetFullPath("bin/koishi");
-        if (ShowAlertCallback != null)
-            await ShowAlertCallback("Koishi 配置完成", 
-                $"安装路径: {installPath}\n\n等待框架启动完成后，请在群里发送 help 测试机器人是否有响应。\n\n3秒后将自动启动 Koishi...");
+        
+        CreateStartBat(installPath, "koi.exe");
 
-        await Task.Delay(3000);
-
-        _ = Task.Run(() =>
+        Action startKoishi = () =>
         {
             try
             {
@@ -290,26 +288,29 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             {
                 _logger.LogError(ex, "启动 Koishi 失败");
             }
-        });
+        };
+        
+        if (ShowAutoCloseAlertCallback != null)
+            await ShowAutoCloseAlertCallback("Koishi 配置完成", 
+                $"安装路径: {installPath}\n\n等待框架启动完成后，请在群里发送 help 测试机器人是否有响应。\n\n3秒后将自动启动 Koishi...", 3, startKoishi);
     }
 
     private async Task OnAstrBotInstallCompletedAsync()
     {
         var installPath = Path.GetFullPath("bin/astrbot");
         
-        // 启动前配置 default.py
         await ConfigureAstrBotDefaultAsync();
-        
-        if (ShowAlertCallback != null)
-            await ShowAlertCallback("AstrBot 配置完成",
-                $"安装路径: {installPath}\n\nAstrBot 已安装完成，群里发送 help 可查看功能\n\n3秒后将自动启动 AstrBot...");
+        CreateStartBat(installPath, "main.py", true);
 
-        await Task.Delay(3000);
-
-        _astrBotInstallService.StartAstrBot();
+        Action startAstrBot = () =>
+        {
+            _astrBotInstallService.StartAstrBot();
+            _ = ConfigureLLBotWebSocketAsync(6199, "/ws");
+        };
         
-        // 配置 LLBot 连接
-        await ConfigureLLBotWebSocketAsync(6199);
+        if (ShowAutoCloseAlertCallback != null)
+            await ShowAutoCloseAlertCallback("AstrBot 配置完成",
+                $"安装路径: {installPath}\n\nAstrBot 已安装完成，启动完成后群里@机器人发送 help 可查看功能\n\n3秒后将自动启动 AstrBot...", 3, startAstrBot);
     }
 
     private async Task ConfigureAstrBotDefaultAsync()
@@ -325,38 +326,31 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         {
             var content = await File.ReadAllTextAsync(defaultPyPath);
             
-            // 检查是否已配置
-            if (content.Contains("\"type\": \"aiocqhttp\""))
+            // 检查 DEFAULT_CONFIG 的 platform 是否已配置（不是空数组）
+            // 注意：不能用 Contains("aiocqhttp") 因为 CONFIG_METADATA_2 模板中也有这个字符串
+            const string emptyPlatform = "\"platform\": [],";
+            if (!content.Contains(emptyPlatform))
             {
-                _logger.LogInformation("AstrBot default.py 已包含 aiocqhttp 配置");
+                _logger.LogInformation("AstrBot default.py platform 已配置");
                 return;
             }
 
-            // 查找 "platform": [] 并替换
-            const string oldPlatform = "\"platform\": []";
-            const string newPlatform = """
-"platform": [
-        {
-            "id": "llbot",
-            "type": "aiocqhttp",
-            "enable": True,
-            "ws_reverse_host": "0.0.0.0",
-            "ws_reverse_port": 6199,
-            "ws_reverse_token": ""
-        }
-    ]
-""";
+            // 替换为包含 llbot 配置的 platform（保持 4 空格缩进）
+            const string newPlatform = 
+                "\"platform\": [\n" +
+                "        {\n" +
+                "            \"id\": \"llbot\",\n" +
+                "            \"type\": \"aiocqhttp\",\n" +
+                "            \"enable\": True,\n" +
+                "            \"ws_reverse_host\": \"0.0.0.0\",\n" +
+                "            \"ws_reverse_port\": 6199,\n" +
+                "            \"ws_reverse_token\": \"\"\n" +
+                "        }\n" +
+                "    ],";
 
-            if (content.Contains(oldPlatform))
-            {
-                content = content.Replace(oldPlatform, newPlatform);
-                await File.WriteAllTextAsync(defaultPyPath, content);
-                _logger.LogInformation("已配置 AstrBot default.py aiocqhttp");
-            }
-            else
-            {
-                _logger.LogWarning("未找到 platform 配置项");
-            }
+            content = content.Replace(emptyPlatform, newPlatform);
+            await File.WriteAllTextAsync(defaultPyPath, content, System.Text.Encoding.UTF8);
+            _logger.LogInformation("已配置 AstrBot default.py aiocqhttp");
         }
         catch (Exception ex)
         {
@@ -416,21 +410,44 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     {
         var installPath = _zhenxunInstallService.ZhenxunPath;
         
-        // 配置 .env.dev
         var superUser = _currentUin ?? "";
         var nbPort = FindAvailablePort(8080);
         await _zhenxunInstallService.ConfigureEnvAsync(superUser, nbPort);
         
-        // 配置 LLBot 反向 WebSocket 连接到 NoneBot2
         await ConfigureLLBotWebSocketAsync(nbPort, "/onebot/v11/ws");
         
-        if (ShowAlertCallback != null)
-            await ShowAlertCallback("真寻Bot 安装完成",
-                $"安装路径: {installPath}\n\n群里@机器人发送 help 查看功能\n\n3秒后将自动启动真寻Bot...");
+        CreateStartBat(installPath, "bot.py", true);
 
-        await Task.Delay(3000);
+        Action startZhenxun = () => _zhenxunInstallService.StartZhenxun();
         
-        _zhenxunInstallService.StartZhenxun();
+        if (ShowAutoCloseAlertCallback != null)
+            await ShowAutoCloseAlertCallback("真寻Bot 安装完成",
+                $"安装路径: {installPath}\n\n群里@机器人发送 help 查看功能\n\n3秒后将自动启动真寻Bot...", 3, startZhenxun);
+    }
+
+    private void CreateStartBat(string installPath, string executable, bool isPython = false)
+    {
+        try
+        {
+            var batPath = Path.Combine(installPath, "start.bat");
+            string content;
+            
+            if (isPython)
+            {
+                content = $"@echo off\r\ncd /d \"%~dp0\"\r\npython {executable}\r\npause\r\n";
+            }
+            else
+            {
+                content = $"@echo off\r\ncd /d \"%~dp0\"\r\nstart \"\" \"{executable}\"\r\n";
+            }
+            
+            File.WriteAllText(batPath, content, System.Text.Encoding.Default);
+            _logger.LogInformation("已创建启动脚本: {Path}", batPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "创建启动脚本失败");
+        }
     }
 
     private void ResetProgress()
