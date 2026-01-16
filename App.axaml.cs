@@ -55,6 +55,8 @@ public partial class App : Application
         services.AddSingleton<IKoishiInstallService, KoishiInstallService>();
         services.AddSingleton<IAstrBotInstallService, AstrBotInstallService>();
         services.AddSingleton<IZhenxunInstallService, ZhenxunInstallService>();
+        services.AddSingleton<IDDBotInstallService, DDBotInstallService>();
+        services.AddSingleton<IYunzaiInstallService, YunzaiInstallService>();
 
         // ViewModels（瞬态）
         services.AddTransient<MainWindowViewModel>();

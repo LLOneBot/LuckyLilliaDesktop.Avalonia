@@ -34,6 +34,7 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
     private Task? _monitorTask;
     private string? _cachedQQVersion;
     private int? _qqPid;
+    private int _tickCount;  // 用于控制 CPU 监控频率
 
     public IObservable<ProcessResourceInfo> ResourceStream => _resourceSubject;
     public IObservable<string> QQVersionStream => _qqVersionSubject;
@@ -114,6 +115,10 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         {
             while (await timer.WaitForNextTickAsync(ct))
             {
+                _tickCount++;
+                // CPU 监控每 5 秒执行一次
+                var shouldMonitorCpu = _tickCount % 5 == 0;
+
                 // 在后台线程执行所有监控操作
                 try
                 {
@@ -130,14 +135,14 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
                 var pmhqStatus = _processManager.GetProcessStatus("PMHQ");
                 if (pmhqStatus == ProcessStatus.Running)
                 {
-                    var pmhqResources = _processManager.GetProcessResources("PMHQ");
+                    var pmhqResources = _processManager.GetProcessResources("PMHQ", shouldMonitorCpu);
                     _resourceSubject.OnNext(pmhqResources);
                 }
 
                 var llbotStatus = _processManager.GetProcessStatus("LLBot");
                 if (llbotStatus == ProcessStatus.Running)
                 {
-                    var llbotResources = _processManager.GetProcessResources("LLBot");
+                    var llbotResources = _processManager.GetProcessResources("LLBot", shouldMonitorCpu);
                     _resourceSubject.OnNext(llbotResources);
                 }
 

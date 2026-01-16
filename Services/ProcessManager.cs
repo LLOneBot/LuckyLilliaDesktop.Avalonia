@@ -24,6 +24,7 @@ public class ProcessManager : IProcessManager, IDisposable
     private readonly ILogger<ProcessManager> _logger;
     private readonly ILogCollector _logCollector;
     private static readonly ConcurrentDictionary<int, string> _instanceNameCache = new();
+    private static readonly ConcurrentDictionary<int, (DateTime Time, TimeSpan CpuTime)> _cpuSampleCache = new();
 
     private Process? _pmhqProcess;
     private Process? _llbotProcess;
@@ -455,7 +456,7 @@ public class ProcessManager : IProcessManager, IDisposable
         };
     }
 
-    public ProcessResourceInfo GetProcessResources(string processName)
+    public ProcessResourceInfo GetProcessResources(string processName, bool includeCpu = true)
     {
         var process = processName.ToLower() switch
         {
@@ -471,7 +472,7 @@ public class ProcessManager : IProcessManager, IDisposable
 
         try
         {
-            var cpuPercent = GetCpuUsage(process);
+            var cpuPercent = includeCpu ? GetCpuUsage(process) : 0;
             var memoryMB = GetMemoryMB(process);
             return new ProcessResourceInfo(processName, cpuPercent, memoryMB);
         }
@@ -653,19 +654,28 @@ public class ProcessManager : IProcessManager, IDisposable
     {
         try
         {
-            var startTime = DateTime.UtcNow;
-            var startCpuUsage = process.TotalProcessorTime;
+            process.Refresh();
+            var now = DateTime.UtcNow;
+            var currentCpuTime = process.TotalProcessorTime;
+            var pid = process.Id;
 
-            Thread.Sleep(100);
+            if (_cpuSampleCache.TryGetValue(pid, out var lastSample))
+            {
+                var elapsedMs = (now - lastSample.Time).TotalMilliseconds;
+                // 至少间隔 50ms 才计算，避免除数过小
+                if (elapsedMs >= 50)
+                {
+                    var cpuUsedMs = (currentCpuTime - lastSample.CpuTime).TotalMilliseconds;
+                    _cpuSampleCache[pid] = (now, currentCpuTime);
+                    return cpuUsedMs / (Environment.ProcessorCount * elapsedMs) * 100;
+                }
+                // 间隔太短，返回上次计算的值（通过不更新缓存实现）
+                return 0;
+            }
 
-            var endTime = DateTime.UtcNow;
-            var endCpuUsage = process.TotalProcessorTime;
-
-            var cpuUsedMs = (endCpuUsage - startCpuUsage).TotalMilliseconds;
-            var totalMsPassed = (endTime - startTime).TotalMilliseconds;
-            var cpuUsageTotal = cpuUsedMs / (Environment.ProcessorCount * totalMsPassed);
-
-            return cpuUsageTotal * 100;
+            // 首次采样，记录并返回 0
+            _cpuSampleCache[pid] = (now, currentCpuTime);
+            return 0;
         }
         catch
         {

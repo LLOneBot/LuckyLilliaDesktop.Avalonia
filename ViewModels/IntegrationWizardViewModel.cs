@@ -20,6 +20,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     private readonly IKoishiInstallService _koishiInstallService;
     private readonly IAstrBotInstallService _astrBotInstallService;
     private readonly IZhenxunInstallService _zhenxunInstallService;
+    private readonly IDDBotInstallService _ddbotInstallService;
+    private readonly IYunzaiInstallService _yunzaiInstallService;
     private readonly ISelfInfoService _selfInfoService;
     private readonly IDisposable _uinSubscription;
 
@@ -49,6 +51,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     public bool KoishiInstalled => _koishiInstallService.IsInstalled;
     public bool AstrBotInstalled => _astrBotInstallService.IsInstalled;
     public bool ZhenxunInstalled => _zhenxunInstallService.IsInstalled;
+    public bool DDBotInstalled => _ddbotInstallService.IsInstalled;
+    public bool YunzaiInstalled => _yunzaiInstallService.IsInstalled;
 
     public ReactiveCommand<string, Unit> SelectFrameworkCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelInstallCommand { get; }
@@ -62,12 +66,16 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         IKoishiInstallService koishiInstallService,
         IAstrBotInstallService astrBotInstallService,
         IZhenxunInstallService zhenxunInstallService,
+        IDDBotInstallService ddbotInstallService,
+        IYunzaiInstallService yunzaiInstallService,
         ISelfInfoService selfInfoService,
         ILogger<IntegrationWizardViewModel> logger)
     {
         _koishiInstallService = koishiInstallService;
         _astrBotInstallService = astrBotInstallService;
         _zhenxunInstallService = zhenxunInstallService;
+        _ddbotInstallService = ddbotInstallService;
+        _yunzaiInstallService = yunzaiInstallService;
         _selfInfoService = selfInfoService;
         _logger = logger;
 
@@ -90,6 +98,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "koishi" => "Koishi",
             "astrbot" => "AstrBot",
             "zhenxun" => "真寻Bot",
+            "ddbot" => "DDBot",
+            "yunzai" => "云崽",
             _ => framework
         };
 
@@ -100,6 +110,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "koishi" => _koishiInstallService.IsInstalled,
             "astrbot" => _astrBotInstallService.IsInstalled,
             "zhenxun" => _zhenxunInstallService.IsInstalled,
+            "ddbot" => _ddbotInstallService.IsInstalled,
+            "yunzai" => _yunzaiInstallService.IsInstalled,
             _ => false
         };
 
@@ -142,6 +154,12 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 break;
             case "zhenxun":
                 _zhenxunInstallService.StartZhenxun();
+                break;
+            case "ddbot":
+                _ddbotInstallService.StartDDBot();
+                break;
+            case "yunzai":
+                _yunzaiInstallService.StartYunzai();
                 break;
         }
     }
@@ -223,6 +241,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 "koishi" => await _koishiInstallService.InstallAsync(forceReinstall, progress, _cts.Token),
                 "astrbot" => await _astrBotInstallService.InstallAsync(progress, _cts.Token),
                 "zhenxun" => await _zhenxunInstallService.InstallAsync(progress, _cts.Token),
+                "ddbot" => await _ddbotInstallService.InstallAsync(progress, _cts.Token),
+                "yunzai" => await _yunzaiInstallService.InstallAsync(progress, _cts.Token),
                 _ => false
             };
 
@@ -232,6 +252,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 this.RaisePropertyChanged(nameof(KoishiInstalled));
                 this.RaisePropertyChanged(nameof(AstrBotInstalled));
                 this.RaisePropertyChanged(nameof(ZhenxunInstalled));
+                this.RaisePropertyChanged(nameof(DDBotInstalled));
+                this.RaisePropertyChanged(nameof(YunzaiInstalled));
                 
                 if (framework == "koishi")
                     await OnKoishiInstallCompletedAsync();
@@ -239,6 +261,10 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                     await OnAstrBotInstallCompletedAsync();
                 else if (framework == "zhenxun")
                     await OnZhenxunInstallCompletedAsync();
+                else if (framework == "ddbot")
+                    await OnDDBotInstallCompletedAsync();
+                else if (framework == "yunzai")
+                    await OnYunzaiInstallCompletedAsync();
             }
         }
         catch (Exception ex)
@@ -423,6 +449,54 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         if (ShowAutoCloseAlertCallback != null)
             await ShowAutoCloseAlertCallback("真寻Bot 安装完成",
                 $"安装路径: {installPath}\n\n群里@机器人发送 help 查看功能\n\n3秒后将自动启动真寻Bot...", 3, startZhenxun);
+    }
+
+    private async Task OnDDBotInstallCompletedAsync()
+    {
+        var installPath = _ddbotInstallService.DDBotPath;
+        
+        // 配置 LLBot WebSocket 客户端连接到 DDBot
+        await ConfigureLLBotWebSocketAsync(15630, "/ws");
+        
+        CreateStartBat(installPath, "DDBOT.exe");
+
+        Action startDDBot = () => _ddbotInstallService.StartDDBot();
+        
+        if (ShowAutoCloseAlertCallback != null)
+            await ShowAutoCloseAlertCallback("DDBot 安装完成",
+                $"安装路径: {installPath}\n\nDDBot 是一个直播/状态推送框架\n\n3秒后将自动启动 DDBot...", 3, startDDBot);
+    }
+
+    private async Task OnYunzaiInstallCompletedAsync()
+    {
+        var installPath = _yunzaiInstallService.YunzaiPath;
+        
+        // 配置 LLBot WebSocket 客户端连接到云崽
+        await ConfigureLLBotWebSocketAsync(2536, "/OneBotv11");
+        
+        CreateYunzaiStartBat(installPath);
+
+        Action startYunzai = () => _yunzaiInstallService.StartYunzai();
+        
+        if (ShowAutoCloseAlertCallback != null)
+            await ShowAutoCloseAlertCallback("云崽安装完成",
+                $"安装路径: {installPath}\n\n云崽是一个原神QQ机器人\n\n3秒后将自动启动云崽...", 3, startYunzai);
+    }
+
+    private void CreateYunzaiStartBat(string installPath)
+    {
+        try
+        {
+            var batPath = Path.Combine(installPath, "start.bat");
+            var nodeExe = Path.GetFullPath(Path.Combine(_yunzaiInstallService.Node24Path, "node.exe"));
+            var content = $"@echo off\r\ncd /d \"%~dp0\"\r\n\"{nodeExe}\" .\r\npause\r\n";
+            File.WriteAllText(batPath, content, System.Text.Encoding.Default);
+            _logger.LogInformation("已创建云崽启动脚本: {Path}", batPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "创建云崽启动脚本失败");
+        }
     }
 
     private void CreateStartBat(string installPath, string executable, bool isPython = false)

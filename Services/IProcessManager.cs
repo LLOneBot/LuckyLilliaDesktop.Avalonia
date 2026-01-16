@@ -16,7 +16,7 @@ public interface IProcessManager
     Task StopAllAsync(int? qqPid = null);
 
     ProcessStatus GetProcessStatus(string processName);
-    ProcessResourceInfo GetProcessResources(string processName);
+    ProcessResourceInfo GetProcessResources(string processName, bool includeCpu = true);
 
     event EventHandler<ProcessStatus>? ProcessStatusChanged;
 }

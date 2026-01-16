@@ -345,7 +345,8 @@ public class ConfigViewModel : ViewModelBase
 
             if (string.IsNullOrEmpty(QQPath))
             {
-                var detectedPath = Utils.QQPathHelper.GetQQPathFromRegistry();
+                // 在后台线程执行注册表操作
+                var detectedPath = await Task.Run(() => Utils.QQPathHelper.GetQQPathFromRegistry());
                 if (!string.IsNullOrEmpty(detectedPath))
                     QQPath = detectedPath;
             }
@@ -354,7 +355,8 @@ public class ConfigViewModel : ViewModelBase
             AutoStartBot = config.AutoStartBot;
             Headless = config.Headless;
             MinimizeToTrayOnStart = config.MinimizeToTrayOnStart;
-            _startupEnabled = Utils.StartupManager.IsStartupEnabled();
+            // 在后台线程执行注册表操作
+            _startupEnabled = await Task.Run(() => Utils.StartupManager.IsStartupEnabled());
             this.RaisePropertyChanged(nameof(StartupEnabled));
             StartupCommandEnabled = config.StartupCommandEnabled;
             StartupCommand = config.StartupCommand;
