@@ -178,6 +178,8 @@ public class LogViewModel : ViewModelBase, IDisposable
 
     private void OnLogBatchReceived(System.Collections.Generic.IList<LogEntry> batch)
     {
+        if (_isUIUpdatesPaused) return;
+        
         foreach (var logEntry in batch)
         {
             LogEntries.Add(new LogEntryViewModel(logEntry));
@@ -198,5 +200,37 @@ public class LogViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _logSubscription.Dispose();
+    }
+
+    private bool _isUIUpdatesPaused;
+
+    public void PauseUIUpdates()
+    {
+        if (_isUIUpdatesPaused) return;
+        _isUIUpdatesPaused = true;
+    }
+
+    public void ResumeUIUpdates()
+    {
+        if (!_isUIUpdatesPaused) return;
+        _isUIUpdatesPaused = false;
+        
+        // 恢复时重新加载最近的日志
+        RefreshRecentLogs();
+    }
+    
+    private void RefreshRecentLogs()
+    {
+        LogEntries.Clear();
+        var recentLogs = _logCollector.GetRecentLogs(500);
+        foreach (var log in recentLogs)
+        {
+            LogEntries.Add(new LogEntryViewModel(log));
+        }
+        
+        if (AutoScroll)
+        {
+            ScrollToBottomRequested?.Invoke();
+        }
     }
 }

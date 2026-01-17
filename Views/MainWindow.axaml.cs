@@ -15,6 +15,7 @@ public partial class MainWindow : Window
     private ILogger<LoginDialog>? _loginDialogLogger;
     private bool _windowPositionLoaded;
     private bool _minimizeToTrayOnStartChecked;
+    private IResourceMonitor? _resourceMonitor;
 
     public MainWindow()
     {
@@ -22,6 +23,34 @@ public partial class MainWindow : Window
         Closing += OnWindowClosing;
         PositionChanged += OnPositionChanged;
         SizeChanged += OnSizeChanged;
+        
+        // 监听窗口可见性变化以优化性能
+        PropertyChanged += OnWindowPropertyChanged;
+    }
+    
+    private void OnWindowPropertyChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property.Name == nameof(IsVisible))
+        {
+            HandleVisibilityChanged((bool?)e.NewValue ?? false);
+        }
+    }
+    
+    private void HandleVisibilityChanged(bool isVisible)
+    {
+        if (DataContext is MainWindowViewModel vm)
+        {
+            if (isVisible)
+            {
+                // 窗口显示时恢复监控
+                vm.ResumeMonitoring();
+            }
+            else
+            {
+                // 窗口隐藏时暂停监控以节省 CPU
+                vm.PauseMonitoring();
+            }
+        }
     }
 
     protected override async void OnOpened(EventArgs e)
@@ -151,6 +180,7 @@ public partial class MainWindow : Window
             _configManager = app?.Services?.GetService(typeof(IConfigManager)) as IConfigManager;
             _loginDialogLogger = app?.Services?.GetService(typeof(ILogger<LoginDialog>)) as ILogger<LoginDialog>;
             var pmhqClient = app?.Services?.GetService(typeof(IPmhqClient)) as IPmhqClient;
+            _resourceMonitor = app?.Services?.GetService(typeof(IResourceMonitor)) as IResourceMonitor;
 
             vm.HomeVM.ConfirmDialog = ShowConfirmDialogAsync;
             vm.HomeVM.ChoiceDialog = ShowChoiceDialogAsync;
@@ -276,6 +306,12 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
+        
+        // 恢复监控
+        if (DataContext is MainWindowViewModel vm)
+        {
+            vm.ResumeMonitoring();
+        }
     }
 }
 

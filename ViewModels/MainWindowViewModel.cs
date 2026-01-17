@@ -18,10 +18,12 @@ public class MainWindowViewModel : ViewModelBase
 {
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IConfigManager _configManager;
+    private readonly IResourceMonitor _resourceMonitor;
 
     private int _selectedIndex;
     private string _title = "LLBot";
     private bool _isDarkTheme = true;
+    private bool _isMonitoringPaused;
 
     public string Title
     {
@@ -60,10 +62,12 @@ public class MainWindowViewModel : ViewModelBase
         IntegrationWizardViewModel integrationWizardViewModel,
         AboutViewModel aboutViewModel,
         IConfigManager configManager,
+        IResourceMonitor resourceMonitor,
         ILogger<MainWindowViewModel> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
+        _resourceMonitor = resourceMonitor ?? throw new ArgumentNullException(nameof(resourceMonitor));
 
         HomeVM = homeViewModel ?? throw new ArgumentNullException(nameof(homeViewModel));
         LogVM = logViewModel ?? throw new ArgumentNullException(nameof(logViewModel));
@@ -137,5 +141,35 @@ public class MainWindowViewModel : ViewModelBase
                 ? ThemeVariant.Dark
                 : ThemeVariant.Light;
         }
+    }
+
+    /// <summary>
+    /// 暂停监控以节省 CPU（窗口隐藏时调用）
+    /// </summary>
+    public void PauseMonitoring()
+    {
+        if (_isMonitoringPaused) return;
+        
+        _isMonitoringPaused = true;
+        _resourceMonitor.PauseMonitoring();
+        HomeVM.PauseUIUpdates();
+        LogVM.PauseUIUpdates();
+        
+        _logger.LogInformation("已暂停监控以节省 CPU");
+    }
+
+    /// <summary>
+    /// 恢复监控（窗口显示时调用）
+    /// </summary>
+    public void ResumeMonitoring()
+    {
+        if (!_isMonitoringPaused) return;
+        
+        _isMonitoringPaused = false;
+        _resourceMonitor.ResumeMonitoring();
+        HomeVM.ResumeUIUpdates();
+        LogVM.ResumeUIUpdates();
+        
+        _logger.LogInformation("已恢复监控");
     }
 }

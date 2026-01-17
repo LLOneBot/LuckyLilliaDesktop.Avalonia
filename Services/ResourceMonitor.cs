@@ -19,6 +19,8 @@ public interface IResourceMonitor
     Task StartMonitoringAsync(CancellationToken ct = default);
     void StopMonitoring();
     void ResetState();
+    void PauseMonitoring();
+    void ResumeMonitoring();
 }
 
 public class ResourceMonitor : IResourceMonitor, IDisposable
@@ -34,7 +36,8 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
     private Task? _monitorTask;
     private string? _cachedQQVersion;
     private int? _qqPid;
-    private int _tickCount;  // 用于控制 CPU 监控频率
+    private int _tickCount;
+    private bool _isPaused;
 
     public IObservable<ProcessResourceInfo> ResourceStream => _resourceSubject;
     public IObservable<string> QQVersionStream => _qqVersionSubject;
@@ -106,6 +109,18 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         _logger.LogDebug("资源监控状态已重置");
     }
 
+    public void PauseMonitoring()
+    {
+        _isPaused = true;
+        _logger.LogDebug("资源监控已暂停");
+    }
+
+    public void ResumeMonitoring()
+    {
+        _isPaused = false;
+        _logger.LogDebug("资源监控已恢复");
+    }
+
 
     private async Task MonitorLoopAsync(CancellationToken ct)
     {
@@ -115,6 +130,12 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         {
             while (await timer.WaitForNextTickAsync(ct))
             {
+                // 如果暂停，跳过本次监控
+                if (_isPaused)
+                {
+                    continue;
+                }
+                
                 _tickCount++;
                 // CPU 监控每 5 秒执行一次
                 var shouldMonitorCpu = _tickCount % 5 == 0;

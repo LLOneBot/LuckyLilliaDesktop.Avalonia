@@ -1188,6 +1188,8 @@ public class HomeViewModel : ViewModelBase
 
     private void OnLogBatchReceived(System.Collections.Generic.IList<LogEntry> batch)
     {
+        if (_isUIUpdatesPaused) return;
+        
         foreach (var logEntry in batch)
         {
             RecentLogs.Add(new LogEntryViewModel(logEntry));
@@ -1212,6 +1214,8 @@ public class HomeViewModel : ViewModelBase
 
     private void OnResourceUpdate(ProcessResourceInfo resource)
     {
+        if (_isUIUpdatesPaused) return;
+        
         switch (resource.ProcessName.ToLower())
         {
             case "pmhq":
@@ -1425,5 +1429,36 @@ public class HomeViewModel : ViewModelBase
     {
         _sseCts?.Cancel();
         _sseCts = null;
+    }
+
+    private bool _isUIUpdatesPaused;
+
+    public void PauseUIUpdates()
+    {
+        if (_isUIUpdatesPaused) return;
+        _isUIUpdatesPaused = true;
+        _logger.LogDebug("HomeViewModel UI 更新已暂停");
+    }
+
+    public void ResumeUIUpdates()
+    {
+        if (!_isUIUpdatesPaused) return;
+        _isUIUpdatesPaused = false;
+        
+        // 恢复时刷新最近日志
+        RefreshRecentLogs();
+        
+        _logger.LogDebug("HomeViewModel UI 更新已恢复");
+    }
+    
+    private void RefreshRecentLogs()
+    {
+        RecentLogs.Clear();
+        var logs = _logCollector.GetRecentLogs(10);
+        foreach (var log in logs)
+        {
+            RecentLogs.Add(new LogEntryViewModel(log));
+        }
+        HasRecentLogs = RecentLogs.Count > 0;
     }
 }
