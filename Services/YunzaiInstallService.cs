@@ -24,11 +24,14 @@ public class YunzaiInstallService : IYunzaiInstallService
 
     private const string YunzaiDir = "bin/yunzai";
     private const string Node24Dir = "bin/node24";
+    private const string RedisDir = "bin/redis";
     private const string NodeVersion = "v24.4.1";
+    private const string RedisVersion = "7.4.7";
 
     public bool IsInstalled => File.Exists(Path.Combine(YunzaiDir, "package.json"));
     public string YunzaiPath => Path.GetFullPath(YunzaiDir);
     public string Node24Path => Path.GetFullPath(Node24Dir);
+    public string RedisPath => Path.GetFullPath(RedisDir);
 
     public YunzaiInstallService(ILogger<YunzaiInstallService> logger, IGitHubHelper gitHubHelper)
     {
@@ -38,13 +41,54 @@ public class YunzaiInstallService : IYunzaiInstallService
 
     public async Task<bool> InstallAsync(IProgress<InstallProgress>? progress = null, CancellationToken ct = default)
     {
-        const int totalSteps = 5;
+        const int totalSteps = 6;
         try
         {
-            // Step 1: 下载 Node.js 24（如果不存在）
+            // Step 1: 下载 Redis（如果不存在）
+            if (!File.Exists(Path.Combine(RedisDir, "redis-server.exe")))
+            {
+                Report(progress, 1, totalSteps, "下载 Redis", "正在下载...");
+                var redisFileName = $"Redis-{RedisVersion}-Windows-x64-msys2.zip";
+                var redisZip = Path.Combine(Path.GetTempPath(), redisFileName);
+
+                string[] redisUrls = [
+                    $"https://gh-proxy.com/https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}",
+                    $"https://ghproxy.net/https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}",
+                    $"https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}"
+                ];
+
+                var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(redisUrls, redisZip,
+                    (downloaded, total) => Report(progress, 1, totalSteps, "下载 Redis",
+                        $"正在下载... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
+                        total > 0 ? (double)downloaded / total * 100 : 0), ct);
+
+                if (!downloadSuccess)
+                {
+                    ReportError(progress, 1, totalSteps, "下载 Redis 失败");
+                    return false;
+                }
+
+                Report(progress, 1, totalSteps, "解压 Redis", "正在解压...");
+                var tempExtract = Path.Combine(Path.GetTempPath(), "redis-extract");
+                await SafeDeleteDirectoryAsync(tempExtract);
+                await Task.Run(() => ZipFile.ExtractToDirectory(redisZip, tempExtract, true), ct);
+                await Task.Run(() => File.Delete(redisZip), ct);
+
+                await SafeDeleteDirectoryAsync(RedisDir);
+                var extractedDir = Path.Combine(tempExtract, $"Redis-{RedisVersion}-Windows-x64-msys2");
+                await Task.Run(() => CopyDirectory(extractedDir, RedisDir), ct);
+                await SafeDeleteDirectoryAsync(tempExtract);
+                _logger.LogInformation("Redis 解压完成");
+            }
+            else
+            {
+                Report(progress, 1, totalSteps, "检查 Redis", "Redis 已存在，跳过下载");
+            }
+
+            // Step 2: 下载 Node.js 24（如果不存在）
             if (!File.Exists(Path.Combine(Node24Dir, "node.exe")))
             {
-                Report(progress, 1, totalSteps, "下载 Node.js 24", "正在下载...");
+                Report(progress, 2, totalSteps, "下载 Node.js 24", "正在下载...");
                 var nodeZip = Path.Combine(Path.GetTempPath(), $"node-{NodeVersion}-win-x64.zip");
 
                 string[] nodeUrls = [
@@ -54,36 +98,36 @@ public class YunzaiInstallService : IYunzaiInstallService
                 ];
 
                 var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(nodeUrls, nodeZip,
-                    (downloaded, total) => Report(progress, 1, totalSteps, "下载 Node.js 24",
+                    (downloaded, total) => Report(progress, 2, totalSteps, "下载 Node.js 24",
                         $"正在下载... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
                         total > 0 ? (double)downloaded / total * 100 : 0), ct);
 
                 if (!downloadSuccess)
                 {
-                    ReportError(progress, 1, totalSteps, "下载 Node.js 24 失败");
+                    ReportError(progress, 2, totalSteps, "下载 Node.js 24 失败");
                     return false;
                 }
 
-                Report(progress, 1, totalSteps, "解压 Node.js 24", "正在解压...");
+                Report(progress, 2, totalSteps, "解压 Node.js 24", "正在解压...");
                 var tempExtract = Path.Combine(Path.GetTempPath(), "node24-extract");
                 await SafeDeleteDirectoryAsync(tempExtract);
                 await Task.Run(() => ZipFile.ExtractToDirectory(nodeZip, tempExtract, true), ct);
-                File.Delete(nodeZip);
+                await Task.Run(() => File.Delete(nodeZip), ct);
 
-                // 移动到目标目录
+                // 复制到目标目录（跨盘符不能用 Move）
                 await SafeDeleteDirectoryAsync(Node24Dir);
                 var extractedDir = Path.Combine(tempExtract, $"node-{NodeVersion}-win-x64");
-                Directory.Move(extractedDir, Node24Dir);
+                await Task.Run(() => CopyDirectory(extractedDir, Node24Dir), ct);
                 await SafeDeleteDirectoryAsync(tempExtract);
                 _logger.LogInformation("Node.js 24 解压完成");
             }
             else
             {
-                Report(progress, 1, totalSteps, "检查 Node.js 24", "Node.js 24 已存在，跳过下载");
+                Report(progress, 2, totalSteps, "检查 Node.js 24", "Node.js 24 已存在，跳过下载");
             }
 
-            // Step 2: 下载云崽源码
-            Report(progress, 2, totalSteps, "下载云崽", "正在下载源码...");
+            // Step 3: 下载云崽源码
+            Report(progress, 3, totalSteps, "下载云崽", "正在下载源码...");
             var yunzaiZip = Path.Combine(Path.GetTempPath(), "yunzai-main.zip");
 
             string[] yunzaiUrls = [
@@ -94,22 +138,22 @@ public class YunzaiInstallService : IYunzaiInstallService
             ];
 
             var downloadYunzai = await _gitHubHelper.DownloadWithFallbackAsync(yunzaiUrls, yunzaiZip,
-                (downloaded, total) => Report(progress, 2, totalSteps, "下载云崽",
+                (downloaded, total) => Report(progress, 3, totalSteps, "下载云崽",
                     $"正在下载源码... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
                     total > 0 ? (double)downloaded / total * 100 : 0), ct);
 
             if (!downloadYunzai)
             {
-                ReportError(progress, 2, totalSteps, "下载云崽失败");
+                ReportError(progress, 3, totalSteps, "下载云崽失败");
                 return false;
             }
 
-            // Step 3: 解压云崽
-            Report(progress, 3, totalSteps, "解压文件", "正在解压云崽...");
+            // Step 4: 解压云崽
+            Report(progress, 4, totalSteps, "解压文件", "正在解压云崽...");
             var tempYunzai = Path.Combine(Path.GetTempPath(), "yunzai-extract");
             await SafeDeleteDirectoryAsync(tempYunzai);
             await Task.Run(() => ZipFile.ExtractToDirectory(yunzaiZip, tempYunzai, true), ct);
-            File.Delete(yunzaiZip);
+            await Task.Run(() => File.Delete(yunzaiZip), ct);
 
             await SafeDeleteDirectoryAsync(YunzaiDir);
             var extractedYunzai = Path.Combine(tempYunzai, "Yunzai-main");
@@ -117,26 +161,26 @@ public class YunzaiInstallService : IYunzaiInstallService
             await SafeDeleteDirectoryAsync(tempYunzai);
             _logger.LogInformation("云崽源码解压完成");
 
-            // Step 4: 安装 pnpm
-            Report(progress, 4, totalSteps, "安装 pnpm", "正在安装 pnpm...");
+            // Step 5: 安装 pnpm
+            Report(progress, 5, totalSteps, "安装 pnpm", "正在安装 pnpm...");
             var nodeExe = Path.GetFullPath(Path.Combine(Node24Dir, "node.exe"));
             var npmCli = Path.GetFullPath(Path.Combine(Node24Dir, "node_modules", "npm", "bin", "npm-cli.js"));
 
             if (!await RunCommandAsync(nodeExe, $"\"{npmCli}\" install -g pnpm --registry=https://registry.npmmirror.com",
-                Node24Path, line => Report(progress, 4, totalSteps, "安装 pnpm", line), ct))
+                Node24Path, line => Report(progress, 5, totalSteps, "安装 pnpm", line), ct))
             {
-                ReportError(progress, 4, totalSteps, "安装 pnpm 失败");
+                ReportError(progress, 5, totalSteps, "安装 pnpm 失败");
                 return false;
             }
 
-            // Step 5: 安装云崽依赖
-            Report(progress, 5, totalSteps, "安装依赖", "正在安装云崽依赖...");
+            // Step 6: 安装云崽依赖
+            Report(progress, 6, totalSteps, "安装依赖", "正在安装云崽依赖...");
             var pnpmCmd = Path.GetFullPath(Path.Combine(Node24Dir, "pnpm.cmd"));
             
             if (!await RunCommandAsync(pnpmCmd, "install --registry=https://registry.npmmirror.com",
-                YunzaiPath, line => Report(progress, 5, totalSteps, "安装依赖", line), ct))
+                YunzaiPath, line => Report(progress, 6, totalSteps, "安装依赖", line), ct))
             {
-                ReportError(progress, 5, totalSteps, "安装依赖失败");
+                ReportError(progress, 6, totalSteps, "安装依赖失败");
                 return false;
             }
 
@@ -161,6 +205,40 @@ public class YunzaiInstallService : IYunzaiInstallService
     {
         try
         {
+            // 先启动 Redis
+            var redisExe = Path.GetFullPath(Path.Combine(RedisDir, "redis-server.exe"));
+            if (File.Exists(redisExe))
+            {
+                var redisProcs = Process.GetProcessesByName("redis-server");
+                if (redisProcs.Length == 0)
+                {
+                    // 确保数据目录存在，解决 RDB 持久化问题
+                    var dataDir = Path.GetFullPath(Path.Combine(RedisDir, "data"));
+                    Directory.CreateDirectory(dataDir);
+                    // Windows 路径需要替换反斜杠为正斜杠给 Redis
+                    var dataDirForRedis = dataDir.Replace("\\", "/");
+                    
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = redisExe,
+                        Arguments = $"--dir \"{dataDirForRedis}\"",
+                        WorkingDirectory = RedisPath,
+                        UseShellExecute = true,
+                        WindowStyle = ProcessWindowStyle.Minimized
+                    });
+                    _logger.LogInformation("Redis 已启动，数据目录: {Dir}", dataDir);
+                    System.Threading.Thread.Sleep(1500);
+                }
+                else
+                {
+                    _logger.LogInformation("Redis 已在运行中");
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Redis 未安装: {Path}", redisExe);
+            }
+
             var yunzaiPath = Path.GetFullPath(YunzaiDir);
             var nodeExe = Path.GetFullPath(Path.Combine(Node24Dir, "node.exe"));
 

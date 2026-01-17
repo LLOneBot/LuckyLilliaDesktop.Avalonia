@@ -23,8 +23,9 @@ public class DDBotInstallService : IDDBotInstallService
 
     private const string DDBotDir = "bin/ddbot";
     private const string DownloadFileName = "DDBOT-WSa-fix_A041-windows-amd64.zip";
+    private const string ExeFileName = "DDBOT-WSa.exe";
 
-    public bool IsInstalled => File.Exists(Path.Combine(DDBotDir, "DDBOT.exe"));
+    public bool IsInstalled => File.Exists(Path.Combine(DDBotDir, ExeFileName));
     public string DDBotPath => Path.GetFullPath(DDBotDir);
 
     public DDBotInstallService(ILogger<DDBotInstallService> logger, IGitHubHelper gitHubHelper)
@@ -90,7 +91,7 @@ public class DDBotInstallService : IDDBotInstallService
         try
         {
             var ddbotPath = Path.GetFullPath(DDBotDir);
-            var exePath = Path.Combine(ddbotPath, "DDBOT.exe");
+            var exePath = Path.Combine(ddbotPath, ExeFileName);
 
             if (!File.Exists(exePath))
             {
@@ -106,7 +107,7 @@ public class DDBotInstallService : IDDBotInstallService
             });
             _logger.LogInformation("DDBot 已启动");
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             _logger.LogError(ex, "启动 DDBot 失败");
         }

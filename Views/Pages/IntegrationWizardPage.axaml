@@ -147,9 +147,8 @@
                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                         Padding="12" Background="Transparent">
                     <StackPanel Orientation="Horizontal" Spacing="16">
-                        <Border Width="48" Height="48" CornerRadius="8" Background="#10B981">
-                            <TextBlock Text="云" FontSize="24" FontWeight="Bold" Foreground="White"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Width="48" Height="48" CornerRadius="8" ClipToBounds="True">
+                            <Image Source="/Assets/Icons/yunzai.png" Stretch="UniformToFill"/>
                         </Border>
                         <StackPanel VerticalAlignment="Center" Spacing="4">
                             <StackPanel Orientation="Horizontal" Spacing="8">

@@ -458,7 +458,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         // 配置 LLBot WebSocket 客户端连接到 DDBot
         await ConfigureLLBotWebSocketAsync(15630, "/ws");
         
-        CreateStartBat(installPath, "DDBOT.exe");
+        CreateStartBat(installPath, "DDBOT-WSa.exe");
 
         Action startDDBot = () => _ddbotInstallService.StartDDBot();
         
