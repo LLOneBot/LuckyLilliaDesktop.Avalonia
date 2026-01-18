@@ -998,12 +998,27 @@ public class HomeViewModel : ViewModelBase
                     }
                 }
 
-                // 等待10秒检查QQ进程是否启动
-                _logger.LogInformation("等待10秒检查QQ进程...");
-                await Task.Delay(10000);
+                // 等待 PMHQ API 可用
+                _logger.LogInformation("等待 PMHQ API 可用，检查 QQ 进程...");
+                var apiReady = false;
+                for (int i = 0; i < 10; i++)
+                {
+                    await Task.Delay(1000);
+                    var qqPid = await _pmhqClient.FetchQQPidAsync();
+                    _logger.LogInformation("第 {Count} 次检查 QQ PID: {Pid}", i + 1, qqPid);
+                    
+                    if (qqPid.HasValue && qqPid.Value > 0)
+                    {
+                        _logger.LogInformation("PMHQ API 已可用，检测到 QQ 进程 PID: {Pid}", qqPid.Value);
+                        apiReady = true;
+                        break;
+                    }
+                }
+                
+                _logger.LogInformation("QQ 进程检测完成，结果: {ApiReady}", apiReady);
 
                 // 检查QQ进程是否存在
-                if (!_resourceMonitor.QQPid.HasValue || _resourceMonitor.QQPid.Value <= 0)
+                if (!apiReady)
                 {
                     _logger.LogWarning("10秒后未检测到QQ进程，可能需要兼容版PMHQ");
                     

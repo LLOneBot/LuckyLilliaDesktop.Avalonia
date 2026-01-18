@@ -114,7 +114,9 @@ public class ProcessManager : IProcessManager, IDisposable
                 startInfo.ArgumentList.Add("--headless");
             }
 
-            _logger.LogInformation("启动 PMHQ: {Path} {Args}", pmhqPath, string.Join(" ", startInfo.ArgumentList));
+            var fullCommand = $"{pmhqPath} {string.Join(" ", startInfo.ArgumentList)}";
+            _logger.LogInformation("启动 PMHQ 完整命令: {Command}", fullCommand);
+            _logger.LogInformation("工作目录: {WorkingDir}", workingDir);
 
             _pmhqProcess = Process.Start(startInfo);
 
@@ -267,7 +269,9 @@ public class ProcessManager : IProcessManager, IDisposable
                 startInfo.ArgumentList.Add($"--pmhq-port={PmhqPort.Value}");
             }
 
-            _logger.LogInformation("启动 LLBot: {Node} {Args}", nodePath, string.Join(" ", startInfo.ArgumentList));
+            var fullCommand = $"{nodePath} {string.Join(" ", startInfo.ArgumentList)}";
+            _logger.LogInformation("启动 LLBot 完整命令: {Command}", fullCommand);
+            _logger.LogInformation("工作目录: {WorkingDir}", workingDir);
 
             _llbotProcess = Process.Start(startInfo);
 

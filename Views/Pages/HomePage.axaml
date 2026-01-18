@@ -24,6 +24,8 @@
                         <TextBlock Text="{Binding UpdateBannerText}" 
                                    Foreground="White" 
                                    FontSize="14"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="500"
                                    VerticalAlignment="Center"/>
                         <Button Content="更新"
                                 Command="{Binding UpdateCommand}"
