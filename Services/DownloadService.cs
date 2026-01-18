@@ -38,6 +38,7 @@ public class AppUpdateResult
 public interface IDownloadService
 {
     Task<bool> DownloadPmhqAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
+    Task<bool> DownloadPmhqAsync(string version, IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
     Task<bool> DownloadLLBotAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
     Task<bool> DownloadNodeAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
     Task<bool> DownloadFFmpegAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default);
@@ -103,7 +104,21 @@ public class DownloadService : IDownloadService
             Constants.NpmPackages.Pmhq,
             Constants.DefaultPaths.PmhqDir,
             progress,
-            ct);
+            ct,
+            skipFiles: null,
+            specificVersion: null);
+    }
+
+    public async Task<bool> DownloadPmhqAsync(string version, IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
+    {
+        _logger.LogInformation("开始下载 PMHQ 版本 {Version}...", version);
+        return await DownloadAndExtractAsync(
+            Constants.NpmPackages.Pmhq,
+            Constants.DefaultPaths.PmhqDir,
+            progress,
+            ct,
+            skipFiles: new[] { "package.json" },
+            specificVersion: version);
     }
 
     public async Task<bool> DownloadLLBotAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
@@ -113,7 +128,9 @@ public class DownloadService : IDownloadService
             Constants.NpmPackages.LLBot,
             Constants.DefaultPaths.LLBotDir,
             progress,
-            ct);
+            ct,
+            skipFiles: null,
+            specificVersion: null);
     }
 
     public async Task<bool> DownloadNodeAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
@@ -124,7 +141,8 @@ public class DownloadService : IDownloadService
             Constants.DefaultPaths.LLBotDir,
             progress,
             ct,
-            skipFiles: new[] { "package.json" });
+            skipFiles: new[] { "package.json" },
+            specificVersion: null);
     }
 
     public async Task<bool> DownloadFFmpegAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
@@ -135,7 +153,8 @@ public class DownloadService : IDownloadService
             Constants.DefaultPaths.LLBotDir,
             progress,
             ct,
-            skipFiles: new[] { "package.json" });
+            skipFiles: new[] { "package.json" },
+            specificVersion: null);
     }
 
     public async Task<bool> DownloadQQAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
@@ -209,7 +228,7 @@ public class DownloadService : IDownloadService
         {
             progress?.Report(new DownloadProgress { Status = "正在获取下载地址..." });
 
-            var packageInfo = await _npmClient.GetPackageInfoAsync(Constants.NpmPackages.App, ct);
+            var packageInfo = await _npmClient.GetPackageInfoAsync(Constants.NpmPackages.App, specificVersion: null, ct);
             if (packageInfo == null || string.IsNullOrEmpty(packageInfo.TarballUrl))
             {
                 return new AppUpdateResult { Success = false, Error = "无法获取下载地址" };
@@ -401,14 +420,15 @@ public class DownloadService : IDownloadService
         string extractDir,
         IProgress<DownloadProgress>? progress,
         CancellationToken ct,
-        string[]? skipFiles = null)
+        string[]? skipFiles = null,
+        string? specificVersion = null)
     {
         try
         {
             _logger.LogInformation("开始下载包: {Package}", packageName);
             progress?.Report(new DownloadProgress { Status = "正在获取下载地址..." });
 
-            var packageInfo = await _npmClient.GetPackageInfoAsync(packageName, ct);
+            var packageInfo = await _npmClient.GetPackageInfoAsync(packageName, specificVersion, ct);
             if (packageInfo == null || string.IsNullOrEmpty(packageInfo.TarballUrl))
             {
                 _logger.LogError("无法获取 {Package} 的下载地址", packageName);

@@ -77,7 +77,7 @@ public class UpdateChecker : IUpdateChecker
     {
         try
         {
-            var packageInfo = await _npmClient.GetPackageInfoAsync(packageName, ct);
+            var packageInfo = await _npmClient.GetPackageInfoAsync(packageName, specificVersion: null, ct);
 
             if (packageInfo == null)
             {

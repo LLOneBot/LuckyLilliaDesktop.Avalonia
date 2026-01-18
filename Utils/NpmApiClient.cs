@@ -33,7 +33,10 @@ public class NpmApiClient
     /// <summary>
     /// 获取 NPM 包信息（版本检查，优先使用官方源）
     /// </summary>
-    public async Task<NpmPackageInfo?> GetPackageInfoAsync(string packageName, CancellationToken ct = default)
+    /// <param name="packageName">包名</param>
+    /// <param name="specificVersion">指定版本号，如果为 null 则获取最新版本</param>
+    /// <param name="ct">取消令牌</param>
+    public async Task<NpmPackageInfo?> GetPackageInfoAsync(string packageName, string? specificVersion = null, CancellationToken ct = default)
     {
         Exception? lastException = null;
 
@@ -55,10 +58,21 @@ public class NpmApiClient
                 var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
-                var version = root.TryGetProperty("dist-tags", out var distTags) &&
+                string version;
+                if (!string.IsNullOrEmpty(specificVersion))
+                {
+                    // 使用指定版本
+                    version = specificVersion;
+                    _logger?.LogDebug("使用指定版本: {Version}", version);
+                }
+                else
+                {
+                    // 获取最新版本
+                    version = root.TryGetProperty("dist-tags", out var distTags) &&
                               distTags.TryGetProperty("latest", out var latestTag)
-                    ? latestTag.GetString() ?? ""
-                    : "";
+                        ? latestTag.GetString() ?? ""
+                        : "";
+                }
 
                 var tarballUrl = "";
                 if (!string.IsNullOrEmpty(version) &&
@@ -68,6 +82,12 @@ public class NpmApiClient
                     dist.TryGetProperty("tarball", out var tarball))
                 {
                     tarballUrl = tarball.GetString() ?? "";
+                }
+
+                if (string.IsNullOrEmpty(tarballUrl))
+                {
+                    _logger?.LogWarning("未找到版本 {Version} 的下载地址", version);
+                    continue;
                 }
 
                 return new NpmPackageInfo
