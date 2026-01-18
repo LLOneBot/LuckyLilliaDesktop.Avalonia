@@ -31,6 +31,11 @@ class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .With(new Win32PlatformOptions
+            {
+                // 使用软件渲染，避免低配机器GPU加速导致高CPU占用
+                RenderingMode = new[] { Win32RenderingMode.Software }
+            })
             .WithInterFont()
             .LogToTrace()
             .UseReactiveUI();
