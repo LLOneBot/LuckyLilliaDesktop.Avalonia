@@ -407,7 +407,13 @@ public class ProcessManager : IProcessManager, IDisposable
     {
         _monitorCts?.Cancel();
 
-        // 先终止 QQ 进程
+        _logger.LogInformation("停止所有进程...");
+
+        // 先停止 LLBot 和 PMHQ
+        await StopLLBotAsync();
+        await StopPmhqAsync();
+
+        // 最后终止 QQ 进程
         if (qqPid.HasValue && qqPid.Value > 0)
         {
             _logger.LogInformation("正在终止 QQ 进程, PID: {Pid}", qqPid.Value);
@@ -415,9 +421,40 @@ public class ProcessManager : IProcessManager, IDisposable
             _logger.LogInformation("QQ 进程已终止");
         }
 
-        // 停止 LLBot 和 PMHQ
-        await StopLLBotAsync();
-        await StopPmhqAsync();
+        _logger.LogInformation("所有进程已停止");
+    }
+
+    /// <summary>
+    /// 快速强制终止所有进程（用于应用退出）
+    /// </summary>
+    public void ForceKillAll(int? qqPid = null)
+    {
+        _logger.LogInformation("强制终止所有进程...");
+
+        // 终止 LLBot
+        if (_llbotProcess != null && !_llbotProcess.HasExited)
+        {
+            var llbotPid = _llbotProcess.Id;
+            _logger.LogInformation("强制终止 LLBot 进程, PID: {Pid}", llbotPid);
+            KillProcessTree(llbotPid);
+        }
+
+        // 终止 PMHQ
+        if (_pmhqProcess != null && !_pmhqProcess.HasExited)
+        {
+            var pmhqPid = _pmhqProcess.Id;
+            _logger.LogInformation("强制终止 PMHQ 进程, PID: {Pid}", pmhqPid);
+            KillProcessTree(pmhqPid);
+        }
+
+        // 终止 QQ
+        if (qqPid.HasValue && qqPid.Value > 0)
+        {
+            _logger.LogInformation("强制终止 QQ 进程, PID: {Pid}", qqPid.Value);
+            KillProcessTree(qqPid.Value);
+        }
+
+        _logger.LogInformation("所有进程已强制终止");
     }
 
     /// <summary>

@@ -46,48 +46,16 @@ public partial class App : Application
     {
         try
         {
-            // 终止 QQ 进程
             var resourceMonitor = Services?.GetService<IResourceMonitor>();
-            var qqPid = resourceMonitor?.QQPid;
-            if (qqPid.HasValue && qqPid.Value > 0)
-            {
-                KillProcessByPid(qqPid.Value, "QQ");
-            }
-
-            // 终止 LLBot 进程
             var processManager = Services?.GetService<IProcessManager>();
-            if (processManager != null)
-            {
-                var field = processManager.GetType().GetField("_llbotProcess",
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (field?.GetValue(processManager) is System.Diagnostics.Process llbotProc && !llbotProc.HasExited)
-                {
-                    KillProcessByPid(llbotProc.Id, "LLBot");
-                }
-            }
+            
+            var qqPid = resourceMonitor?.QQPid;
+            processManager?.ForceKillAll(qqPid);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "清理子进程失败");
         }
-    }
-
-    private static void KillProcessByPid(int pid, string name)
-    {
-        try
-        {
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "taskkill",
-                Arguments = $"/F /T /PID {pid}",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var killProc = System.Diagnostics.Process.Start(psi);
-            killProc?.WaitForExit(2000);
-            Log.Information("{Name} 进程已终止 (PID: {Pid})", name, pid);
-        }
-        catch { }
     }
 
     private void ConfigureServices()
@@ -234,9 +202,11 @@ public partial class App : Application
         {
             var resourceMonitor = Services.GetService<IResourceMonitor>();
             var pmhqClient = Services.GetService<IPmhqClient>();
+            var processManager = Services.GetService<IProcessManager>();
+            
             var qqPid = resourceMonitor?.QQPid;
             
-            // 如果缓存没有 PID，尝试从 API 获取（在新线程中）
+            // 如果缓存没有 PID，尝试从 API 获取
             if (!qqPid.HasValue && pmhqClient?.HasPort == true)
             {
                 try
@@ -252,64 +222,8 @@ public partial class App : Application
             
             Log.Information("QQ PID: {Pid}", qqPid);
             
-            // 终止 QQ 进程
-            if (qqPid.HasValue && qqPid.Value > 0)
-            {
-                Log.Information("正在终止 QQ 进程, PID: {Pid}", qqPid.Value);
-                try
-                {
-                    // 使用 taskkill 强制终止进程树，比 Process.Kill 更快
-                    var psi = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = "taskkill",
-                        Arguments = $"/F /T /PID {qqPid.Value}",
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
-                    using var killProc = System.Diagnostics.Process.Start(psi);
-                    killProc?.WaitForExit(3000);
-                    Log.Information("QQ 进程已终止");
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "终止 QQ 进程失败");
-                }
-            }
-            
-            // 终止 LLBot 进程
-            var processManager = Services.GetService<IProcessManager>();
-            if (processManager != null)
-            {
-                try
-                {
-                    var llbotStatus = processManager.GetProcessStatus("LLBot");
-                    if (llbotStatus == ProcessStatus.Running)
-                    {
-                        var field = processManager.GetType().GetField("_llbotProcess", 
-                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        if (field?.GetValue(processManager) is System.Diagnostics.Process llbotProc && !llbotProc.HasExited)
-                        {
-                            var llbotPid = llbotProc.Id;
-                            Log.Information("正在终止 LLBot 进程, PID: {Pid}", llbotPid);
-                            
-                            var psi = new System.Diagnostics.ProcessStartInfo
-                            {
-                                FileName = "taskkill",
-                                Arguments = $"/F /T /PID {llbotPid}",
-                                UseShellExecute = false,
-                                CreateNoWindow = true
-                            };
-                            using var killProc = System.Diagnostics.Process.Start(psi);
-                            killProc?.WaitForExit(3000);
-                            Log.Information("LLBot 进程已终止");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "终止 LLBot 进程失败");
-                }
-            }
+            // 使用统一的强制终止方法
+            processManager?.ForceKillAll(qqPid);
         }
         catch (Exception ex)
         {

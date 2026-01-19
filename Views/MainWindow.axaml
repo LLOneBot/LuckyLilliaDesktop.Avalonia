@@ -10,8 +10,7 @@
         Title="{Binding Title}"
         Icon="avares://LuckyLilliaDesktop/Assets/Icons/icon.ico"
         Width="900" Height="600"
-        WindowStartupLocation="Manual"
-        Position="50,50"
+        WindowStartupLocation="CenterScreen"
         UseLayoutRounding="True"
         Background="{DynamicResource MainBackground}">
 

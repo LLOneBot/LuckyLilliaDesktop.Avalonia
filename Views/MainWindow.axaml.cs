@@ -86,18 +86,50 @@ public partial class MainWindow : Window
         try
         {
             var config = await _configManager.LoadConfigAsync();
+            var isFirstLaunch = !config.WindowLeft.HasValue && !config.WindowTop.HasValue;
 
-            // 只有位置有效时才恢复（避免负值过大的情况）
-            if (config.WindowLeft.HasValue && config.WindowTop.HasValue
-                && config.WindowLeft.Value > -1000 && config.WindowTop.Value > -1000)
+            if (isFirstLaunch)
             {
-                Position = new PixelPoint((int)config.WindowLeft.Value, (int)config.WindowTop.Value);
+                // 首次启动，根据屏幕大小计算窗口尺寸和位置
+                CalculateInitialWindowBounds();
             }
+            else
+            {
+                // 只有位置有效时才恢复（避免负值过大的情况）
+                if (config.WindowLeft.HasValue && config.WindowTop.HasValue
+                    && config.WindowLeft.Value > -1000 && config.WindowTop.Value > -1000)
+                {
+                    Position = new PixelPoint((int)config.WindowLeft.Value, (int)config.WindowTop.Value);
+                }
 
-            Width = config.WindowWidth > 0 ? config.WindowWidth : 900;
-            Height = config.WindowHeight > 0 ? config.WindowHeight : 600;
+                Width = config.WindowWidth > 0 ? config.WindowWidth : 900;
+                Height = config.WindowHeight > 0 ? config.WindowHeight : 600;
+            }
         }
         catch { }
+    }
+
+    private void CalculateInitialWindowBounds()
+    {
+        var screen = Screens.ScreenFromWindow(this);
+        if (screen == null) return;
+
+        var workingArea = screen.WorkingArea;
+        var screenWidth = workingArea.Width / screen.Scaling;
+        var screenHeight = workingArea.Height / screen.Scaling;
+
+        // 窗口占屏幕的 70%，但不超过 1200x800，不小于 900x600
+        var targetWidth = Math.Max(900, Math.Min(1200, screenWidth * 0.7));
+        var targetHeight = Math.Max(600, Math.Min(800, screenHeight * 0.7));
+
+        Width = targetWidth;
+        Height = targetHeight;
+
+        // 居中显示，留出任务栏空间
+        var left = workingArea.X / screen.Scaling + (screenWidth - targetWidth) / 2;
+        var top = workingArea.Y / screen.Scaling + (screenHeight - targetHeight) / 2;
+
+        Position = new PixelPoint((int)left, (int)top);
     }
 
     private void OnPositionChanged(object? sender, PixelPointEventArgs e)

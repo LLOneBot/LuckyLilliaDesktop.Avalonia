@@ -14,6 +14,7 @@ public interface IProcessManager
     Task StopPmhqAsync();
     Task StopLLBotAsync();
     Task StopAllAsync(int? qqPid = null);
+    void ForceKillAll(int? qqPid = null);
 
     ProcessStatus GetProcessStatus(string processName);
     ProcessResourceInfo GetProcessResources(string processName, bool includeCpu = true);
