@@ -17,10 +17,12 @@ namespace LuckyLilliaDesktop.ViewModels;
 public class ConfigViewModel : ViewModelBase
 {
     private readonly IConfigManager _configManager;
+    private readonly IEmailService _emailService;
     private readonly ILogger<ConfigViewModel> _logger;
 
     private AppConfig _savedConfig = new();
     private bool _savedStartupEnabled;
+    private EmailConfig _savedEmailConfig = new();
 
     private bool _hasUnsavedChanges;
     public bool HasUnsavedChanges
@@ -31,6 +33,15 @@ public class ConfigViewModel : ViewModelBase
 
     private void CheckUnsavedChanges()
     {
+        var emailChanged = EmailEnabled != _savedEmailConfig.Enabled ||
+                          SmtpHost != _savedEmailConfig.Smtp.Host ||
+                          SmtpPort != _savedEmailConfig.Smtp.Port ||
+                          SmtpSecure != _savedEmailConfig.Smtp.Secure ||
+                          SmtpUser != _savedEmailConfig.Smtp.Auth.User ||
+                          SmtpPass != _savedEmailConfig.Smtp.Auth.Pass ||
+                          EmailFrom != _savedEmailConfig.From ||
+                          EmailTo != _savedEmailConfig.To;
+
         HasUnsavedChanges =
             QQPath != _savedConfig.QQPath ||
             PmhqPath != _savedConfig.PmhqPath ||
@@ -44,7 +55,8 @@ public class ConfigViewModel : ViewModelBase
             StartupCommandEnabled != _savedConfig.StartupCommandEnabled ||
             StartupCommand != _savedConfig.StartupCommand ||
             LogSaveEnabled != _savedConfig.LogSaveEnabled ||
-            LogRetentionHours != _savedConfig.LogRetentionSeconds / 3600;
+            LogRetentionHours != _savedConfig.LogRetentionSeconds / 3600 ||
+            emailChanged;
     }
 
     private string _qqPath = string.Empty;
@@ -190,6 +202,63 @@ public class ConfigViewModel : ViewModelBase
         set { this.RaiseAndSetIfChanged(ref _logRetentionHours, value); CheckUnsavedChanges(); }
     }
 
+    private bool _emailEnabled;
+    private string _smtpHost = string.Empty;
+    private int _smtpPort = 587;
+    private bool _smtpSecure = true;
+    private string _smtpUser = string.Empty;
+    private string _smtpPass = string.Empty;
+    private string _emailFrom = string.Empty;
+    private string _emailTo = string.Empty;
+
+    public bool EmailEnabled
+    {
+        get => _emailEnabled;
+        set { this.RaiseAndSetIfChanged(ref _emailEnabled, value); CheckUnsavedChanges(); }
+    }
+
+    public string SmtpHost
+    {
+        get => _smtpHost;
+        set { this.RaiseAndSetIfChanged(ref _smtpHost, value); CheckUnsavedChanges(); }
+    }
+
+    public int SmtpPort
+    {
+        get => _smtpPort;
+        set { this.RaiseAndSetIfChanged(ref _smtpPort, value); CheckUnsavedChanges(); }
+    }
+
+    public bool SmtpSecure
+    {
+        get => _smtpSecure;
+        set { this.RaiseAndSetIfChanged(ref _smtpSecure, value); CheckUnsavedChanges(); }
+    }
+
+    public string SmtpUser
+    {
+        get => _smtpUser;
+        set { this.RaiseAndSetIfChanged(ref _smtpUser, value); CheckUnsavedChanges(); }
+    }
+
+    public string SmtpPass
+    {
+        get => _smtpPass;
+        set { this.RaiseAndSetIfChanged(ref _smtpPass, value); CheckUnsavedChanges(); }
+    }
+
+    public string EmailFrom
+    {
+        get => _emailFrom;
+        set { this.RaiseAndSetIfChanged(ref _emailFrom, value); CheckUnsavedChanges(); }
+    }
+
+    public string EmailTo
+    {
+        get => _emailTo;
+        set { this.RaiseAndSetIfChanged(ref _emailTo, value); CheckUnsavedChanges(); }
+    }
+
     private bool _isSaving;
     public bool IsSaving
     {
@@ -197,17 +266,26 @@ public class ConfigViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _isSaving, value);
     }
 
+    private bool _isSendingTestEmail;
+    public bool IsSendingTestEmail
+    {
+        get => _isSendingTestEmail;
+        set => this.RaiseAndSetIfChanged(ref _isSendingTestEmail, value);
+    }
+
     public ReactiveCommand<Unit, Unit> BrowseQQCommand { get; }
     public ReactiveCommand<Unit, Unit> BrowsePmhqCommand { get; }
     public ReactiveCommand<Unit, Unit> BrowseLLBotCommand { get; }
     public ReactiveCommand<Unit, Unit> BrowseNodeCommand { get; }
     public ReactiveCommand<Unit, Unit> TestCommandCommand { get; }
+    public ReactiveCommand<Unit, Unit> TestEmailCommand { get; }
     public ReactiveCommand<Unit, Unit> SaveConfigCommand { get; }
     public ReactiveCommand<Unit, Unit> LoadConfigCommand { get; }
 
-    public ConfigViewModel(IConfigManager configManager, ILogger<ConfigViewModel> logger)
+    public ConfigViewModel(IConfigManager configManager, IEmailService emailService, ILogger<ConfigViewModel> logger)
     {
         _configManager = configManager;
+        _emailService = emailService;
         _logger = logger;
 
         BrowseQQCommand = ReactiveCommand.CreateFromTask(async () =>
@@ -257,6 +335,7 @@ public class ConfigViewModel : ViewModelBase
             }
         });
 
+        TestEmailCommand = ReactiveCommand.CreateFromTask(TestEmailAsync);
         SaveConfigCommand = ReactiveCommand.CreateFromTask(SaveConfigAsync);
         LoadConfigCommand = ReactiveCommand.CreateFromTask(LoadConfigAsync);
 
@@ -364,6 +443,16 @@ public class ConfigViewModel : ViewModelBase
             LogSaveEnabled = config.LogSaveEnabled;
             LogRetentionHours = config.LogRetentionSeconds / 3600;
 
+            var emailConfig = await _emailService.LoadConfigAsync();
+            EmailEnabled = emailConfig.Enabled;
+            SmtpHost = emailConfig.Smtp.Host;
+            SmtpPort = emailConfig.Smtp.Port;
+            SmtpSecure = emailConfig.Smtp.Secure;
+            SmtpUser = emailConfig.Smtp.Auth.User;
+            SmtpPass = emailConfig.Smtp.Auth.Pass;
+            EmailFrom = emailConfig.From;
+            EmailTo = emailConfig.To;
+
             _savedConfig = new AppConfig
             {
                 QQPath = QQPath,
@@ -380,6 +469,23 @@ public class ConfigViewModel : ViewModelBase
                 LogRetentionSeconds = LogRetentionHours * 3600
             };
             _savedStartupEnabled = _startupEnabled;
+            _savedEmailConfig = new EmailConfig
+            {
+                Enabled = EmailEnabled,
+                Smtp = new SmtpConfig
+                {
+                    Host = SmtpHost,
+                    Port = SmtpPort,
+                    Secure = SmtpSecure,
+                    Auth = new SmtpAuth
+                    {
+                        User = SmtpUser,
+                        Pass = SmtpPass
+                    }
+                },
+                From = EmailFrom,
+                To = EmailTo
+            };
             HasUnsavedChanges = false;
         }
         catch (Exception ex)
@@ -413,7 +519,26 @@ public class ConfigViewModel : ViewModelBase
 
             var success = await _configManager.SaveConfigAsync(config);
 
-            if (success)
+            var emailConfig = new EmailConfig
+            {
+                Enabled = EmailEnabled,
+                Smtp = new SmtpConfig
+                {
+                    Host = SmtpHost,
+                    Port = SmtpPort,
+                    Secure = SmtpSecure,
+                    Auth = new SmtpAuth
+                    {
+                        User = SmtpUser,
+                        Pass = SmtpPass
+                    }
+                },
+                From = EmailFrom,
+                To = EmailTo
+            };
+            var emailSuccess = await _emailService.SaveConfigAsync(emailConfig);
+
+            if (success && emailSuccess)
             {
                 // 保存时处理开机自启注册表
                 if (StartupEnabled != _savedStartupEnabled)
@@ -426,6 +551,7 @@ public class ConfigViewModel : ViewModelBase
 
                 _savedConfig = config;
                 _savedStartupEnabled = StartupEnabled;
+                _savedEmailConfig = emailConfig;
                 HasUnsavedChanges = false;
                 _logger.LogInformation("配置已保存");
             }
@@ -441,6 +567,74 @@ public class ConfigViewModel : ViewModelBase
         finally
         {
             IsSaving = false;
+        }
+    }
+
+    private async Task TestEmailAsync()
+    {
+        try
+        {
+            IsSendingTestEmail = true;
+            _logger.LogInformation("开始发送测试邮件...");
+
+            var emailConfig = new EmailConfig
+            {
+                Enabled = EmailEnabled,
+                Smtp = new SmtpConfig
+                {
+                    Host = SmtpHost,
+                    Port = SmtpPort,
+                    Secure = SmtpSecure,
+                    Auth = new SmtpAuth
+                    {
+                        User = SmtpUser,
+                        Pass = SmtpPass
+                    }
+                },
+                From = EmailFrom,
+                To = EmailTo
+            };
+
+            var success = await _emailService.SendTestEmailAsync(emailConfig);
+
+            if (success)
+            {
+                _logger.LogInformation("测试邮件发送成功");
+                await ShowAlertAsync("测试邮件发送成功", "请检查您的邮箱");
+            }
+            else
+            {
+                _logger.LogError("测试邮件发送失败");
+                await ShowAlertAsync("测试邮件发送失败", "请检查邮件配置是否正确");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "发送测试邮件时出错");
+            await ShowAlertAsync("发送测试邮件失败", ex.Message);
+        }
+        finally
+        {
+            IsSendingTestEmail = false;
+        }
+    }
+
+    private async Task ShowAlertAsync(string title, string message)
+    {
+        try
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                var mainWindow = desktop.MainWindow;
+                if (mainWindow == null) return;
+
+                var dialog = new AlertDialog($"{title}\n\n{message}");
+                await dialog.ShowDialog(mainWindow);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "显示提示对话框失败");
         }
     }
 }

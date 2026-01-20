@@ -75,6 +75,7 @@ public partial class App : Application
 
         // 核心服务（单例）
         services.AddSingleton<IConfigManager, ConfigManager>();
+        services.AddSingleton<IEmailService, EmailService>();
         services.AddSingleton<ILogCollector, LogCollector>();
         services.AddSingleton<IProcessManager, ProcessManager>();
         services.AddSingleton<IResourceMonitor, ResourceMonitor>();

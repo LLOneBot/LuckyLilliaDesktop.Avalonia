@@ -109,6 +109,122 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 邮件通知区域 -->
+                <DockPanel>
+                    <PathIcon DockPanel.Dock="Left"
+                              Data="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"
+                              Width="24" Height="24"
+                              Foreground="{DynamicResource PrimaryBrush}"
+                              Margin="0,0,10,0"/>
+                    <TextBlock Text="邮件通知"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               VerticalAlignment="Center"/>
+                </DockPanel>
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="24">
+                    <StackPanel Spacing="16">
+                        <CheckBox Content="启用掉线邮件通知"
+                                  IsChecked="{Binding EmailEnabled}"
+                                  Foreground="{DynamicResource TextPrimary}"/>
+
+                        <Border Height="1" Background="{DynamicResource BorderColor}"/>
+
+                        <!-- SMTP 服务器 -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="SMTP 服务器" Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBox Text="{Binding SmtpHost}"
+                                     Watermark="例如: smtp.qq.com"
+                                     Width="300"
+                                     HorizontalAlignment="Left"/>
+                        </StackPanel>
+
+                        <!-- SMTP 端口 -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="SMTP 端口" Foreground="{DynamicResource TextSecondary}"/>
+                            <NumericUpDown Value="{Binding SmtpPort}"
+                                           Minimum="1"
+                                           Maximum="65535"
+                                           Width="150"
+                                           HorizontalAlignment="Left"
+                                           ShowButtonSpinner="False"/>
+                        </StackPanel>
+
+                        <!-- SSL/TLS -->
+                        <CheckBox Content="使用 SSL/TLS 加密连接"
+                                  IsChecked="{Binding SmtpSecure}"
+                                  Foreground="{DynamicResource TextPrimary}"/>
+
+                        <Border Height="1" Background="{DynamicResource BorderColor}"/>
+
+                        <!-- SMTP 用户名 -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="SMTP 用户名" Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBox Text="{Binding SmtpUser}"
+                                     Watermark="邮箱账号"
+                                     Width="300"
+                                     HorizontalAlignment="Left"/>
+                        </StackPanel>
+
+                        <!-- SMTP 密码 -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="SMTP 密码/授权码" Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBox Text="{Binding SmtpPass}"
+                                     Watermark="邮箱密码或授权码"
+                                     Width="300"
+                                     HorizontalAlignment="Left"
+                                     PasswordChar="●"/>
+                        </StackPanel>
+
+                        <Border Height="1" Background="{DynamicResource BorderColor}"/>
+
+                        <!-- 发件人 -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="发件人邮箱" Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBox Text="{Binding EmailFrom}"
+                                     Watermark="发送通知的邮箱地址"
+                                     Width="300"
+                                     HorizontalAlignment="Left"/>
+                        </StackPanel>
+
+                        <!-- 收件人 -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="收件人邮箱" Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBox Text="{Binding EmailTo}"
+                                     Watermark="接收通知的邮箱地址"
+                                     Width="300"
+                                     HorizontalAlignment="Left"/>
+                        </StackPanel>
+
+                        <Border Height="1" Background="{DynamicResource BorderColor}"/>
+
+                        <!-- 测试按钮 -->
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        IsVisible="{Binding IsSendingTestEmail}">
+                                <ProgressBar IsIndeterminate="True"
+                                             Width="80"
+                                             Height="4"
+                                             VerticalAlignment="Center"/>
+                                <TextBlock Text="发送中..."
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           VerticalAlignment="Center"
+                                           FontSize="12"/>
+                            </StackPanel>
+                            <Button Content="发送测试邮件"
+                                    Command="{Binding TestEmailCommand}"
+                                    IsEnabled="{Binding !IsSendingTestEmail}"
+                                    HorizontalAlignment="Left"/>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+
                 <!-- 日志设置区域 -->
                 <DockPanel>
                     <PathIcon DockPanel.Dock="Left"
