@@ -279,6 +279,7 @@ public class ConfigViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> BrowseNodeCommand { get; }
     public ReactiveCommand<Unit, Unit> TestCommandCommand { get; }
     public ReactiveCommand<Unit, Unit> TestEmailCommand { get; }
+    public ReactiveCommand<Unit, Unit> OpenEmailGuideCommand { get; }
     public ReactiveCommand<Unit, Unit> SaveConfigCommand { get; }
     public ReactiveCommand<Unit, Unit> LoadConfigCommand { get; }
 
@@ -336,6 +337,22 @@ public class ConfigViewModel : ViewModelBase
         });
 
         TestEmailCommand = ReactiveCommand.CreateFromTask(TestEmailAsync);
+        OpenEmailGuideCommand = ReactiveCommand.Create(() =>
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://luckylillia.com/guide/config_email",
+                    UseShellExecute = true
+                };
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "打开邮件设置向导失败");
+            }
+        });
         SaveConfigCommand = ReactiveCommand.CreateFromTask(SaveConfigAsync);
         LoadConfigCommand = ReactiveCommand.CreateFromTask(LoadConfigAsync);
 

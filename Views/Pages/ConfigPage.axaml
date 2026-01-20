@@ -121,6 +121,11 @@
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimary}"
                                VerticalAlignment="Center"/>
+                    <Button DockPanel.Dock="Right"
+                            Content="设置向导"
+                            Command="{Binding OpenEmailGuideCommand}"
+                            Margin="12,0,0,0"
+                            VerticalAlignment="Center"/>
                 </DockPanel>
                 <Border Background="{DynamicResource CardBackground}"
                         BorderBrush="{DynamicResource BorderColor}"
