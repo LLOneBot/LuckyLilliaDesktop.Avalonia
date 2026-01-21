@@ -263,7 +263,7 @@
                         <PathIcon Data="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"
                                   Width="20" Height="20"
                                   Foreground="{DynamicResource PrimaryBrush}"/>
-                        <TextBlock Text="相关链接"
+                        <TextBlock Text="如果觉得好用，请给 LLBot 点个 Star，这是我们前进的动力"
                                    FontSize="18"
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource TextPrimary}"/>
@@ -293,6 +293,18 @@
                                            FontSize="14"/>
                             </StackPanel>
                         </Button>
+                        <Button Command="{Binding OpenLLBotGitHubCommand}"
+                                Background="Transparent"
+                                Padding="0">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
+                                          Width="16" Height="16"
+                                          Foreground="{DynamicResource PrimaryBrush}"/>
+                                <TextBlock Text="LLBot GitHub"
+                                           Foreground="{DynamicResource PrimaryBrush}"
+                                           FontSize="14"/>
+                            </StackPanel>
+                        </Button>
                         <Button Command="{Binding OpenAppGitHubCommand}"
                                 Background="Transparent"
                                 Padding="0">
@@ -313,18 +325,6 @@
                                           Width="16" Height="16"
                                           Foreground="{DynamicResource PrimaryBrush}"/>
                                 <TextBlock Text="PMHQ GitHub"
-                                           Foreground="{DynamicResource PrimaryBrush}"
-                                           FontSize="14"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Command="{Binding OpenLLBotGitHubCommand}"
-                                Background="Transparent"
-                                Padding="0">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <PathIcon Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
-                                          Width="16" Height="16"
-                                          Foreground="{DynamicResource PrimaryBrush}"/>
-                                <TextBlock Text="LLBot GitHub"
                                            Foreground="{DynamicResource PrimaryBrush}"
                                            FontSize="14"/>
                             </StackPanel>
@@ -354,7 +354,9 @@
                       Width="20" Height="20"
                       Foreground="White"
                       IsVisible="{Binding HasAnyUpdate}"/>
-            <TextBlock Text="{Binding CheckUpdateButtonText}" FontWeight="Medium"/>
+            <TextBlock Text="{Binding CheckUpdateButtonText}" 
+                       FontWeight="Medium"
+                       Foreground="White"/>
         </StackPanel>
     </Button>
 
