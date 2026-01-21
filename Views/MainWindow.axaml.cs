@@ -13,6 +13,7 @@ public partial class MainWindow : Window
 {
     private IConfigManager? _configManager;
     private ILogger<LoginDialog>? _loginDialogLogger;
+    private ILogger<MainWindow>? _logger;
     private bool _windowPositionLoaded;
     private bool _minimizeToTrayOnStartChecked;
     private IResourceMonitor? _resourceMonitor;
@@ -90,23 +91,31 @@ public partial class MainWindow : Window
 
             if (isFirstLaunch)
             {
+                _logger?.LogInformation("首次启动，计算初始窗口位置");
                 // 首次启动，根据屏幕大小计算窗口尺寸和位置
                 CalculateInitialWindowBounds();
             }
             else
             {
+                // 恢复窗口大小（不受 DPI 影响）
+                Width = config.WindowWidth > 0 ? config.WindowWidth : 900;
+                Height = config.WindowHeight > 0 ? config.WindowHeight : 600;
+                
                 // 只有位置有效时才恢复（避免负值过大的情况）
                 if (config.WindowLeft.HasValue && config.WindowTop.HasValue
                     && config.WindowLeft.Value > -1000 && config.WindowTop.Value > -1000)
                 {
                     Position = new PixelPoint((int)config.WindowLeft.Value, (int)config.WindowTop.Value);
                 }
-
-                Width = config.WindowWidth > 0 ? config.WindowWidth : 900;
-                Height = config.WindowHeight > 0 ? config.WindowHeight : 600;
+                
+                _logger?.LogInformation("恢复窗口位置: ({X}, {Y}), 大小: {Width}x{Height}", 
+                    Position.X, Position.Y, Width, Height);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "加载窗口位置失败");
+        }
     }
 
     private void CalculateInitialWindowBounds()
@@ -134,11 +143,13 @@ public partial class MainWindow : Window
 
     private void OnPositionChanged(object? sender, PixelPointEventArgs e)
     {
+        _logger?.LogDebug("窗口位置改变: ({X}, {Y})", e.Point.X, e.Point.Y);
         ScheduleSaveWindowPosition();
     }
 
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
     {
+        _logger?.LogDebug("窗口大小改变: {Width}x{Height}", e.NewSize.Width, e.NewSize.Height);
         ScheduleSaveWindowPosition();
     }
 
@@ -146,17 +157,38 @@ public partial class MainWindow : Window
 
     private void ScheduleSaveWindowPosition()
     {
-        if (_configManager == null || !_windowPositionLoaded) return;
+        if (_configManager == null || !_windowPositionLoaded)
+        {
+            _logger?.LogDebug("跳过保存窗口位置: ConfigManager={ConfigManager}, Loaded={Loaded}", 
+                _configManager != null, _windowPositionLoaded);
+            return;
+        }
 
         // 窗口最小化时不保存位置
-        if (WindowState == WindowState.Minimized) return;
+        if (WindowState == WindowState.Minimized)
+        {
+            _logger?.LogDebug("窗口最小化，跳过保存位置");
+            return;
+        }
 
         // 检查位置是否有效（负值过大说明窗口在屏幕外）
-        if (Position.X < -1000 || Position.Y < -1000) return;
+        if (Position.X < -1000 || Position.Y < -1000)
+        {
+            _logger?.LogDebug("窗口位置无效，跳过保存: ({X}, {Y})", Position.X, Position.Y);
+            return;
+        }
 
         _savePositionCts?.Cancel();
         _savePositionCts = new CancellationTokenSource();
         var token = _savePositionCts.Token;
+
+        // 在 UI 线程上获取窗口属性
+        var left = Position.X;
+        var top = Position.Y;
+        var width = Width;
+        var height = Height;
+
+        _logger?.LogDebug("计划保存窗口位置 (2秒后)");
 
         _ = Task.Run(async () =>
         {
@@ -165,13 +197,22 @@ public partial class MainWindow : Window
                 await Task.Delay(2000, token);
                 if (token.IsCancellationRequested) return;
 
-                await _configManager.SetSettingAsync("window_left", Position.X);
-                await _configManager.SetSettingAsync("window_top", Position.Y);
-                await _configManager.SetSettingAsync("window_width", (int)Width);
-                await _configManager.SetSettingAsync("window_height", (int)Height);
+                await _configManager.SetSettingAsync("window_left", left);
+                await _configManager.SetSettingAsync("window_top", top);
+                await _configManager.SetSettingAsync("window_width", width);
+                await _configManager.SetSettingAsync("window_height", height);
+                
+                _logger?.LogInformation("窗口位置已保存: ({X}, {Y}), 大小: {Width}x{Height}", 
+                    left, top, width, height);
             }
-            catch (OperationCanceledException) { }
-            catch { }
+            catch (OperationCanceledException)
+            {
+                _logger?.LogDebug("保存窗口位置已取消");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "保存窗口位置失败");
+            }
         }, token);
     }
 
@@ -188,10 +229,16 @@ public partial class MainWindow : Window
         {
             await _configManager.SetSettingAsync("window_left", Position.X);
             await _configManager.SetSettingAsync("window_top", Position.Y);
-            await _configManager.SetSettingAsync("window_width", (int)Width);
-            await _configManager.SetSettingAsync("window_height", (int)Height);
+            await _configManager.SetSettingAsync("window_width", Width);
+            await _configManager.SetSettingAsync("window_height", Height);
+            
+            _logger?.LogInformation("窗口位置立即保存: ({X}, {Y}), 大小: {Width}x{Height}", 
+                Position.X, Position.Y, Width, Height);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "立即保存窗口位置失败");
+        }
     }
 
     /// <summary>
@@ -211,6 +258,7 @@ public partial class MainWindow : Window
             var app = Application.Current as App;
             _configManager = app?.Services?.GetService(typeof(IConfigManager)) as IConfigManager;
             _loginDialogLogger = app?.Services?.GetService(typeof(ILogger<LoginDialog>)) as ILogger<LoginDialog>;
+            _logger = app?.Services?.GetService(typeof(ILogger<MainWindow>)) as ILogger<MainWindow>;
             var pmhqClient = app?.Services?.GetService(typeof(IPmhqClient)) as IPmhqClient;
             _resourceMonitor = app?.Services?.GetService(typeof(IResourceMonitor)) as IResourceMonitor;
 
