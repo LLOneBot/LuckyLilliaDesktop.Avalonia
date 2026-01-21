@@ -15,13 +15,15 @@
         Background="Transparent">
 
     <Border CornerRadius="12"
-            Background="#2D2D2D"
+            Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+            BorderThickness="1"
             Padding="24,20">
         <StackPanel Spacing="20">
             <TextBlock x:Name="MessageText"
                        Text="提示信息"
                        FontSize="15"
-                       Foreground="#E0E0E0"
+                       Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
                        TextWrapping="Wrap"
                        TextAlignment="Center"
                        MaxWidth="280"/>
