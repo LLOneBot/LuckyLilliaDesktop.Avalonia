@@ -23,13 +23,23 @@ public class SmtpConfig
     public string Host { get; set; } = string.Empty;
 
     [JsonPropertyName("port")]
-    public int Port { get; set; } = 587;
+    public int? Port { get; set; }
 
     [JsonPropertyName("secure")]
     public bool Secure { get; set; } = true;
 
     [JsonPropertyName("auth")]
     public SmtpAuth Auth { get; set; } = new();
+    
+    [JsonIgnore]
+    public int PortValue => Port ?? 587;
+    
+    [JsonIgnore]
+    public string SecureMode
+    {
+        get => Secure ? "ssl" : "starttls";
+        set => Secure = value == "ssl";
+    }
 }
 
 public class SmtpAuth

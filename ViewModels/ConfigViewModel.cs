@@ -35,8 +35,8 @@ public class ConfigViewModel : ViewModelBase
     {
         var emailChanged = EmailEnabled != _savedEmailConfig.Enabled ||
                           SmtpHost != _savedEmailConfig.Smtp.Host ||
-                          SmtpPort != _savedEmailConfig.Smtp.Port ||
-                          SmtpSecure != _savedEmailConfig.Smtp.Secure ||
+                          SmtpPort != _savedEmailConfig.Smtp.PortValue ||
+                          SmtpSecureMode != _savedEmailConfig.Smtp.SecureMode ||
                           SmtpUser != _savedEmailConfig.Smtp.Auth.User ||
                           SmtpPass != _savedEmailConfig.Smtp.Auth.Pass ||
                           EmailFrom != _savedEmailConfig.From ||
@@ -204,8 +204,8 @@ public class ConfigViewModel : ViewModelBase
 
     private bool _emailEnabled;
     private string _smtpHost = string.Empty;
-    private int _smtpPort = 587;
-    private bool _smtpSecure = true;
+    private int? _smtpPort = 587;
+    private string _smtpSecureMode = "starttls";
     private string _smtpUser = string.Empty;
     private string _smtpPass = string.Empty;
     private string _emailFrom = string.Empty;
@@ -223,16 +223,42 @@ public class ConfigViewModel : ViewModelBase
         set { this.RaiseAndSetIfChanged(ref _smtpHost, value); CheckUnsavedChanges(); }
     }
 
-    public int SmtpPort
+    public int? SmtpPort
     {
         get => _smtpPort;
         set { this.RaiseAndSetIfChanged(ref _smtpPort, value); CheckUnsavedChanges(); }
     }
 
-    public bool SmtpSecure
+    public string SmtpSecureMode
     {
-        get => _smtpSecure;
-        set { this.RaiseAndSetIfChanged(ref _smtpSecure, value); CheckUnsavedChanges(); }
+        get => _smtpSecureMode;
+        set 
+        { 
+            this.RaiseAndSetIfChanged(ref _smtpSecureMode, value); 
+            this.RaisePropertyChanged(nameof(SmtpSecureModeIndex));
+            this.RaisePropertyChanged(nameof(SmtpSecureModeDescription));
+            CheckUnsavedChanges(); 
+        }
+    }
+
+    public int SmtpSecureModeIndex
+    {
+        get => _smtpSecureMode == "ssl" ? 1 : 0;
+        set
+        {
+            var newMode = value == 1 ? "ssl" : "starttls";
+            if (_smtpSecureMode != newMode)
+            {
+                SmtpSecureMode = newMode;
+            }
+        }
+    }
+
+    public string SmtpSecureModeDescription
+    {
+        get => _smtpSecureMode == "ssl" 
+            ? "SSL/TLS 直接加密连接" 
+            : "STARTTLS 升级加密连接";
     }
 
     public string SmtpUser
@@ -463,8 +489,8 @@ public class ConfigViewModel : ViewModelBase
             var emailConfig = await _emailService.LoadConfigAsync();
             EmailEnabled = emailConfig.Enabled;
             SmtpHost = emailConfig.Smtp.Host;
-            SmtpPort = emailConfig.Smtp.Port;
-            SmtpSecure = emailConfig.Smtp.Secure;
+            SmtpPort = emailConfig.Smtp.PortValue;
+            SmtpSecureMode = emailConfig.Smtp.SecureMode;
             SmtpUser = emailConfig.Smtp.Auth.User;
             SmtpPass = emailConfig.Smtp.Auth.Pass;
             EmailFrom = emailConfig.From;
@@ -492,8 +518,8 @@ public class ConfigViewModel : ViewModelBase
                 Smtp = new SmtpConfig
                 {
                     Host = SmtpHost,
-                    Port = SmtpPort,
-                    Secure = SmtpSecure,
+                    Port = SmtpPort ?? 587,
+                    SecureMode = SmtpSecureMode,
                     Auth = new SmtpAuth
                     {
                         User = SmtpUser,
@@ -542,8 +568,8 @@ public class ConfigViewModel : ViewModelBase
                 Smtp = new SmtpConfig
                 {
                     Host = SmtpHost,
-                    Port = SmtpPort,
-                    Secure = SmtpSecure,
+                    Port = SmtpPort ?? 587,
+                    SecureMode = SmtpSecureMode,
                     Auth = new SmtpAuth
                     {
                         User = SmtpUser,
@@ -600,8 +626,8 @@ public class ConfigViewModel : ViewModelBase
                 Smtp = new SmtpConfig
                 {
                     Host = SmtpHost,
-                    Port = SmtpPort,
-                    Secure = SmtpSecure,
+                    Port = SmtpPort ?? 587,
+                    SecureMode = SmtpSecureMode,
                     Auth = new SmtpAuth
                     {
                         User = SmtpUser,

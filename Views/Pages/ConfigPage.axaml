@@ -159,10 +159,19 @@
                                            ShowButtonSpinner="False"/>
                         </StackPanel>
 
-                        <!-- SSL/TLS -->
-                        <CheckBox Content="使用 SSL/TLS 加密连接"
-                                  IsChecked="{Binding SmtpSecure}"
-                                  Foreground="{DynamicResource TextPrimary}"/>
+                        <!-- 加密方式 -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="加密方式" Foreground="{DynamicResource TextSecondary}"/>
+                            <ComboBox SelectedIndex="{Binding SmtpSecureModeIndex}"
+                                      Width="300"
+                                      HorizontalAlignment="Left">
+                                <ComboBoxItem Content="STARTTLS（常用端口 587）"/>
+                                <ComboBoxItem Content="SSL/TLS（常用端口 465）"/>
+                            </ComboBox>
+                            <TextBlock Foreground="{DynamicResource TextSecondary}" FontSize="12">
+                                <Run Text="{Binding SmtpSecureModeDescription}"/>
+                            </TextBlock>
+                        </StackPanel>
 
                         <Border Height="1" Background="{DynamicResource BorderColor}"/>
 

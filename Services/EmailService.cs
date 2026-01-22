@@ -134,14 +134,27 @@ public class EmailService : IEmailService
 
             using var client = new SmtpClient();
             
-            // 根据端口和 Secure 设置选择合适的连接方式
-            var secureSocketOptions = config.Smtp.Port == 465 && config.Smtp.Secure
-                ? SecureSocketOptions.SslOnConnect  // 465 端口使用隐式 SSL
-                : config.Smtp.Secure
-                    ? SecureSocketOptions.StartTls  // 587 端口使用 STARTTLS
-                    : SecureSocketOptions.None;     // 不加密
+            // 与 nodemailer 保持一致的加密逻辑
+            // secure=true 表示使用 SSL/TLS (通常用于 465 端口)
+            // secure=false 表示使用 STARTTLS (通常用于 587 端口) 或不加密
+            SecureSocketOptions secureSocketOptions;
+            if (config.Smtp.Secure)
+            {
+                // secure=true: 使用隐式 SSL (465 端口)
+                secureSocketOptions = SecureSocketOptions.SslOnConnect;
+            }
+            else if (config.Smtp.PortValue == 587)
+            {
+                // secure=false + 587 端口: 使用 STARTTLS
+                secureSocketOptions = SecureSocketOptions.StartTls;
+            }
+            else
+            {
+                // secure=false + 其他端口: 不加密
+                secureSocketOptions = SecureSocketOptions.None;
+            }
 
-            await client.ConnectAsync(config.Smtp.Host, config.Smtp.Port, secureSocketOptions);
+            await client.ConnectAsync(config.Smtp.Host, config.Smtp.PortValue, secureSocketOptions);
             await client.AuthenticateAsync(config.Smtp.Auth.User, config.Smtp.Auth.Pass);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
