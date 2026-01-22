@@ -2,11 +2,12 @@ using LuckyLilliaDesktop.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
-using System.Net;
-using System.Net.Mail;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
 
 namespace LuckyLilliaDesktop.Services;
 
@@ -83,7 +84,7 @@ public class EmailService : IEmailService
     {
         try
         {
-            var subject = "LuckyLillia 邮件通知测试";
+            var subject = "LLBot 邮件通知测试";
             var body = BuildTestEmailBody();
             return await SendEmailAsync(config, subject, body);
         }
@@ -105,7 +106,7 @@ public class EmailService : IEmailService
                 return false;
             }
 
-            var subject = "LuckyLillia 掉线通知";
+            var subject = "LLBot 掉线通知";
             var body = BuildDisconnectEmailBody(uin, nickname);
             return await SendEmailAsync(config, subject, body);
         }
@@ -120,25 +121,31 @@ public class EmailService : IEmailService
     {
         try
         {
-            using var client = new SmtpClient(config.Smtp.Host, config.Smtp.Port)
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress("", config.From));
+            message.To.Add(new MailboxAddress("", config.To));
+            message.Subject = subject;
+
+            var builder = new BodyBuilder
             {
-                EnableSsl = config.Smtp.Secure,
-                Credentials = new NetworkCredential(config.Smtp.Auth.User, config.Smtp.Auth.Pass)
+                HtmlBody = body
             };
+            message.Body = builder.ToMessageBody();
 
-            using var message = new MailMessage
-            {
-                From = new MailAddress(config.From),
-                Subject = subject,
-                Body = body,
-                IsBodyHtml = true,
-                BodyEncoding = Encoding.UTF8,
-                SubjectEncoding = Encoding.UTF8
-            };
+            using var client = new SmtpClient();
+            
+            // 根据端口和 Secure 设置选择合适的连接方式
+            var secureSocketOptions = config.Smtp.Port == 465 && config.Smtp.Secure
+                ? SecureSocketOptions.SslOnConnect  // 465 端口使用隐式 SSL
+                : config.Smtp.Secure
+                    ? SecureSocketOptions.StartTls  // 587 端口使用 STARTTLS
+                    : SecureSocketOptions.None;     // 不加密
 
-            message.To.Add(config.To);
+            await client.ConnectAsync(config.Smtp.Host, config.Smtp.Port, secureSocketOptions);
+            await client.AuthenticateAsync(config.Smtp.Auth.User, config.Smtp.Auth.Pass);
+            await client.SendAsync(message);
+            await client.DisconnectAsync(true);
 
-            await client.SendMailAsync(message);
             _logger.LogInformation("邮件发送成功: {Subject}", subject);
             return true;
         }
@@ -169,20 +176,17 @@ public class EmailService : IEmailService
 <body>
     <div class=""container"">
         <div class=""header"">
-            <h2>🎉 LuckyLillia 邮件通知测试</h2>
+            <h2>🎉 LLBot 邮件通知测试</h2>
         </div>
         <div class=""content"">
             <p>您好！</p>
-            <p>这是一封来自 <strong>LuckyLillia</strong> 的测试邮件。</p>
+            <p>这是一封来自 <strong>LLBot</strong> 的测试邮件。</p>
             <div class=""info"">
                 <p><strong>📧 邮件配置测试成功</strong></p>
                 <p>发送时间: {now}</p>
             </div>
             <p>如果您收到这封邮件，说明邮件通知功能已正常工作。</p>
             <p>当 QQ 掉线时，系统将自动向您发送通知邮件。</p>
-        </div>
-        <div class=""footer"">
-            <p>此邮件由 LuckyLillia 自动发送，请勿回复</p>
         </div>
     </div>
 </body>
@@ -212,7 +216,7 @@ public class EmailService : IEmailService
 <body>
     <div class=""container"">
         <div class=""header"">
-            <h2>⚠️ LuckyLillia 掉线通知</h2>
+            <h2>⚠️ LLBot 掉线通知</h2>
         </div>
         <div class=""content"">
             <div class=""alert"">
@@ -231,7 +235,7 @@ public class EmailService : IEmailService
             </ul>
         </div>
         <div class=""footer"">
-            <p>此邮件由 LuckyLillia 自动发送，请勿回复</p>
+            <p>此邮件由 LLBot 自动发送，请勿回复</p>
         </div>
     </div>
 </body>
