@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace LuckyLilliaDesktop.Services;
@@ -20,7 +21,9 @@ public interface IYunzaiInstallService
 public class YunzaiInstallService : IYunzaiInstallService
 {
     private readonly ILogger<YunzaiInstallService> _logger;
+    private readonly IGitHubArchiveHelper _archiveHelper;
     private readonly IGitHubHelper _gitHubHelper;
+    private readonly IGitHubCLIHelper _gitCLIHelper;
 
     private const string YunzaiDir = "bin/yunzai";
     private const string Node24Dir = "bin/node24";
@@ -33,15 +36,18 @@ public class YunzaiInstallService : IYunzaiInstallService
     public string Node24Path => Path.GetFullPath(Node24Dir);
     public string RedisPath => Path.GetFullPath(RedisDir);
 
-    public YunzaiInstallService(ILogger<YunzaiInstallService> logger, IGitHubHelper gitHubHelper)
+    public YunzaiInstallService(ILogger<YunzaiInstallService> logger, 
+        IGitHubArchiveHelper archiveHelper, IGitHubHelper gitHubHelper, IGitHubCLIHelper gitCLIHelper)
     {
         _logger = logger;
+        _archiveHelper = archiveHelper;
         _gitHubHelper = gitHubHelper;
+        _gitCLIHelper = gitCLIHelper;
     }
 
     public async Task<bool> InstallAsync(IProgress<InstallProgress>? progress = null, CancellationToken ct = default)
     {
-        const int totalSteps = 6;
+        const int totalSteps = 11;
         try
         {
             // Step 1: 下载 Redis（如果不存在）
@@ -71,12 +77,12 @@ public class YunzaiInstallService : IYunzaiInstallService
                 Report(progress, 1, totalSteps, "解压 Redis", "正在解压...");
                 var tempExtract = Path.Combine(Path.GetTempPath(), "redis-extract");
                 await SafeDeleteDirectoryAsync(tempExtract);
-                await Task.Run(() => ZipFile.ExtractToDirectory(redisZip, tempExtract, true), ct);
-                await Task.Run(() => File.Delete(redisZip), ct);
+                await Task.Run(() => ZipFile.ExtractToDirectory(redisZip, tempExtract, true), ct).ConfigureAwait(false);
+                await Task.Run(() => File.Delete(redisZip), ct).ConfigureAwait(false);
 
                 await SafeDeleteDirectoryAsync(RedisDir);
                 var extractedDir = Path.Combine(tempExtract, $"Redis-{RedisVersion}-Windows-x64-msys2");
-                await Task.Run(() => CopyDirectory(extractedDir, RedisDir), ct);
+                await Task.Run(() => CopyDirectory(extractedDir, RedisDir), ct).ConfigureAwait(false);
                 await SafeDeleteDirectoryAsync(tempExtract);
                 _logger.LogInformation("Redis 解压完成");
             }
@@ -111,13 +117,13 @@ public class YunzaiInstallService : IYunzaiInstallService
                 Report(progress, 2, totalSteps, "解压 Node.js 24", "正在解压...");
                 var tempExtract = Path.Combine(Path.GetTempPath(), "node24-extract");
                 await SafeDeleteDirectoryAsync(tempExtract);
-                await Task.Run(() => ZipFile.ExtractToDirectory(nodeZip, tempExtract, true), ct);
-                await Task.Run(() => File.Delete(nodeZip), ct);
+                await Task.Run(() => ZipFile.ExtractToDirectory(nodeZip, tempExtract, true), ct).ConfigureAwait(false);
+                await Task.Run(() => File.Delete(nodeZip), ct).ConfigureAwait(false);
 
                 // 复制到目标目录（跨盘符不能用 Move）
                 await SafeDeleteDirectoryAsync(Node24Dir);
                 var extractedDir = Path.Combine(tempExtract, $"node-{NodeVersion}-win-x64");
-                await Task.Run(() => CopyDirectory(extractedDir, Node24Dir), ct);
+                await Task.Run(() => CopyDirectory(extractedDir, Node24Dir), ct).ConfigureAwait(false);
                 await SafeDeleteDirectoryAsync(tempExtract);
                 _logger.LogInformation("Node.js 24 解压完成");
             }
@@ -128,61 +134,54 @@ public class YunzaiInstallService : IYunzaiInstallService
 
             // Step 3: 下载云崽源码
             Report(progress, 3, totalSteps, "下载云崽", "正在下载源码...");
-            var yunzaiZip = Path.Combine(Path.GetTempPath(), "yunzai-main.zip");
-
-            string[] yunzaiUrls = [
-                "https://gh-proxy.com/https://github.com/TimeRainStarSky/Yunzai/archive/refs/heads/main.zip",
-                "https://ghproxy.net/https://github.com/TimeRainStarSky/Yunzai/archive/refs/heads/main.zip",
-                "https://mirror.ghproxy.com/https://github.com/TimeRainStarSky/Yunzai/archive/refs/heads/main.zip",
-                "https://github.com/TimeRainStarSky/Yunzai/archive/refs/heads/main.zip"
-            ];
-
-            var downloadYunzai = await _gitHubHelper.DownloadWithFallbackAsync(yunzaiUrls, yunzaiZip,
+            if (!await _archiveHelper.DownloadAndExtractAsync("TimeRainStarSky/Yunzai", "main", YunzaiDir,
                 (downloaded, total) => Report(progress, 3, totalSteps, "下载云崽",
-                    $"正在下载源码... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
-                    total > 0 ? (double)downloaded / total * 100 : 0), ct);
-
-            if (!downloadYunzai)
+                    $"正在下载... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
+                    total > 0 ? (double)downloaded / total * 100 : 0), ct))
             {
                 ReportError(progress, 3, totalSteps, "下载云崽失败");
                 return false;
             }
 
-            // Step 4: 解压云崽
-            Report(progress, 4, totalSteps, "解压文件", "正在解压云崽...");
-            var tempYunzai = Path.Combine(Path.GetTempPath(), "yunzai-extract");
-            await SafeDeleteDirectoryAsync(tempYunzai);
-            await Task.Run(() => ZipFile.ExtractToDirectory(yunzaiZip, tempYunzai, true), ct);
-            await Task.Run(() => File.Delete(yunzaiZip), ct);
-
-            await SafeDeleteDirectoryAsync(YunzaiDir);
-            var extractedYunzai = Path.Combine(tempYunzai, "Yunzai-main");
-            await Task.Run(() => CopyDirectory(extractedYunzai, YunzaiDir), ct);
-            await SafeDeleteDirectoryAsync(tempYunzai);
-            _logger.LogInformation("云崽源码解压完成");
-
-            // Step 5: 安装 pnpm
-            Report(progress, 5, totalSteps, "安装 pnpm", "正在安装 pnpm...");
+            // Step 4: 安装 pnpm
+            Report(progress, 4, totalSteps, "安装 pnpm", "正在安装 pnpm...");
             var nodeExe = Path.GetFullPath(Path.Combine(Node24Dir, "node.exe"));
             var npmCli = Path.GetFullPath(Path.Combine(Node24Dir, "node_modules", "npm", "bin", "npm-cli.js"));
 
             if (!await RunCommandAsync(nodeExe, $"\"{npmCli}\" install -g pnpm --registry=https://registry.npmmirror.com",
-                Node24Path, line => Report(progress, 5, totalSteps, "安装 pnpm", line), ct))
+                Node24Path, line => Report(progress, 4, totalSteps, "安装 pnpm", line), ct))
             {
-                ReportError(progress, 5, totalSteps, "安装 pnpm 失败");
+                ReportError(progress, 4, totalSteps, "安装 pnpm 失败");
                 return false;
             }
 
-            // Step 6: 安装云崽依赖
-            Report(progress, 6, totalSteps, "安装依赖", "正在安装云崽依赖...");
+            // Step 5: 安装云崽依赖
+            Report(progress, 5, totalSteps, "安装依赖", "正在安装云崽依赖...");
             var pnpmCmd = Path.GetFullPath(Path.Combine(Node24Dir, "pnpm.cmd"));
             
             if (!await RunCommandAsync(pnpmCmd, "install --registry=https://registry.npmmirror.com",
-                YunzaiPath, line => Report(progress, 6, totalSteps, "安装依赖", line), ct))
+                YunzaiPath, line => Report(progress, 5, totalSteps, "安装依赖", line), ct))
             {
-                ReportError(progress, 6, totalSteps, "安装依赖失败");
+                ReportError(progress, 5, totalSteps, "安装依赖失败");
                 return false;
             }
+
+            var npmCmd = Path.GetFullPath(Path.Combine(Node24Dir, "npm.cmd"));
+
+            // Step 6-7: 安装 TRSS-Plugin
+            if (!await InstallPluginAsync("TRSS-Plugin", "TimeRainStarSky/TRSS-Plugin", "main", 
+                6, totalSteps, progress, npmCmd, ct))
+                return false;
+
+            // Step 8-9: 安装 neko-status-plugin
+            if (!await InstallPluginAsync("neko-status-plugin", "erzaozi/neko-status-plugin", "main",
+                8, totalSteps, progress, npmCmd, ct))
+                return false;
+
+            // Step 10-11: 安装 miao-plugin
+            if (!await InstallPluginAsync("miao-plugin", "yoimiya-kokomi/miao-plugin", "master",
+                10, totalSteps, progress, npmCmd, ct))
+                return false;
 
             Report(progress, totalSteps, totalSteps, "完成", "云崽安装完成", 100, true);
             _logger.LogInformation("云崽安装完成");
@@ -261,6 +260,59 @@ public class YunzaiInstallService : IYunzaiInstallService
         {
             _logger.LogError(ex, "启动云崽失败");
         }
+    }
+
+    private async Task<bool> InstallPluginAsync(string pluginName, string repoPath, string branch,
+        int startStep, int totalSteps, IProgress<InstallProgress>? progress, string npmCmd, CancellationToken ct)
+    {
+        var stepDownload = startStep;
+        var stepInstall = startStep + 1;
+        var pluginDir = Path.Combine(YunzaiDir, "plugins", pluginName);
+
+        // 尝试使用 Git 克隆（优先级：GitHub > ZIP）
+        Report(progress, stepDownload, totalSteps, $"下载 {pluginName}", "正在尝试使用 Git 克隆...");
+        
+        // 尝试从 GitHub 克隆
+        if (_gitCLIHelper.IsGitAvailable())
+        {
+            _logger.LogInformation("尝试从 GitHub 克隆 {PluginName}", pluginName);
+            if (await _gitCLIHelper.CloneFromGitHubAsync(repoPath, pluginDir, branch, ct))
+            {
+                _logger.LogInformation("从 GitHub 克隆 {PluginName} 成功", pluginName);
+                await InstallPluginDependenciesAsync(pluginName, pluginDir, stepInstall, totalSteps, progress, npmCmd, ct);
+                return true;
+            }
+            _logger.LogWarning("从 GitHub 克隆 {PluginName} 失败，尝试下载 ZIP", pluginName);
+        }
+
+        // 回退到下载 ZIP
+        Report(progress, stepDownload, totalSteps, $"下载 {pluginName}", "正在下载 ZIP 包...");
+        if (!await _archiveHelper.DownloadAndExtractAsync(repoPath, branch, pluginDir,
+            (downloaded, total) => Report(progress, stepDownload, totalSteps, $"下载 {pluginName}",
+                $"正在下载... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
+                total > 0 ? (double)downloaded / total * 100 : 0), ct))
+        {
+            ReportError(progress, stepDownload, totalSteps, $"下载 {pluginName} 失败");
+            return false;
+        }
+
+        await InstallPluginDependenciesAsync(pluginName, pluginDir, stepInstall, totalSteps, progress, npmCmd, ct);
+        return true;
+    }
+
+    private async Task<bool> InstallPluginDependenciesAsync(string pluginName, string pluginDir,
+        int step, int totalSteps, IProgress<InstallProgress>? progress, string npmCmd, CancellationToken ct)
+    {
+        Report(progress, step, totalSteps, "安装插件依赖", $"正在安装 {pluginName} 依赖...");
+        
+        if (!await RunCommandAsync(npmCmd, "install --registry=https://registry.npmmirror.com",
+            pluginDir, line => Report(progress, step, totalSteps, "安装插件依赖", line), ct))
+        {
+            ReportError(progress, step, totalSteps, $"安装 {pluginName} 依赖失败");
+            return false;
+        }
+
+        return true;
     }
 
     private async Task<bool> RunCommandAsync(string exe, string args, string workDir,

@@ -5,7 +5,7 @@ using Avalonia.Markup.Xaml;
 using LuckyLilliaDesktop.ViewModels;
 using LuckyLilliaDesktop.Views;
 using LuckyLilliaDesktop.Services;
-using LuckyLilliaDesktop.Models;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using System;
@@ -85,6 +85,8 @@ public partial class App : Application
         services.AddSingleton<IUpdateChecker, UpdateChecker>();
         services.AddSingleton<IUpdateStateService, UpdateStateService>();
         services.AddSingleton<IGitHubHelper, GitHubHelper>();
+        services.AddSingleton<IGitHubArchiveHelper, GitHubArchiveHelper>();
+        services.AddSingleton<IGitHubCLIHelper, GitHubCLIHelper>();
         services.AddSingleton<IPythonHelper, PythonHelper>();
         services.AddSingleton<IKoishiInstallService, KoishiInstallService>();
         services.AddSingleton<IAstrBotInstallService, AstrBotInstallService>();

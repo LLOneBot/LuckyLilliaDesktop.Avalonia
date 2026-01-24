@@ -55,16 +55,16 @@ public class AppConfig
     public string ThemeMode { get; set; } = "dark";
 
     [JsonPropertyName("window_width")]
-    public double WindowWidth { get; set; } = 1200.0;
+    public int WindowWidth { get; set; } = 1200;
 
     [JsonPropertyName("window_height")]
-    public double WindowHeight { get; set; } = 800.0;
+    public int WindowHeight { get; set; } = 800;
 
     [JsonPropertyName("window_left")]
-    public double? WindowLeft { get; set; } = null;
+    public int? WindowLeft { get; set; } = null;
 
     [JsonPropertyName("window_top")]
-    public double? WindowTop { get; set; } = null;
+    public int? WindowTop { get; set; } = null;
 
     // 兼容性属性 - 只读取不写入
     [JsonPropertyName("auto_login")]

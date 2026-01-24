@@ -65,7 +65,7 @@ public class DDBotInstallService : IDDBotInstallService
             Report(progress, 2, totalSteps, "解压文件", "正在解压...");
             await SafeDeleteDirectoryAsync(DDBotDir);
             Directory.CreateDirectory(DDBotDir);
-            await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, DDBotDir, true), ct);
+            await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, DDBotDir, true), ct).ConfigureAwait(false);
             File.Delete(tempZip);
             _logger.LogInformation("DDBot 解压完成");
 

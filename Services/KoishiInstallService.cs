@@ -96,7 +96,7 @@ public partial class KoishiInstallService : IKoishiInstallService
                 if (Directory.Exists(KoishiDir))
                     Directory.Delete(KoishiDir, true);
                 Directory.CreateDirectory(KoishiDir);
-                await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, KoishiDir, true), ct);
+                await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, KoishiDir, true), ct).ConfigureAwait(false);
                 File.Delete(tempZip);
                 Report(progress, 3, totalSteps, "解压文件", "解压完成");
                 _logger.LogInformation("Koishi 解压完成");

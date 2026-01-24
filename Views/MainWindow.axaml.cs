@@ -197,10 +197,10 @@ public partial class MainWindow : Window
                 await Task.Delay(2000, token);
                 if (token.IsCancellationRequested) return;
 
-                await _configManager.SetSettingAsync("window_left", left);
-                await _configManager.SetSettingAsync("window_top", top);
-                await _configManager.SetSettingAsync("window_width", width);
-                await _configManager.SetSettingAsync("window_height", height);
+                await _configManager.SetSettingAsync("window_left", (int)left);
+                await _configManager.SetSettingAsync("window_top", (int)top);
+                await _configManager.SetSettingAsync("window_width", (int)width);
+                await _configManager.SetSettingAsync("window_height", (int)height);
                 
                 _logger?.LogInformation("窗口位置已保存: ({X}, {Y}), 大小: {Width}x{Height}", 
                     left, top, width, height);
@@ -227,10 +227,10 @@ public partial class MainWindow : Window
 
         try
         {
-            await _configManager.SetSettingAsync("window_left", Position.X);
-            await _configManager.SetSettingAsync("window_top", Position.Y);
-            await _configManager.SetSettingAsync("window_width", Width);
-            await _configManager.SetSettingAsync("window_height", Height);
+            await _configManager.SetSettingAsync("window_left", (int)Position.X);
+            await _configManager.SetSettingAsync("window_top", (int)Position.Y);
+            await _configManager.SetSettingAsync("window_width", (int)Width);
+            await _configManager.SetSettingAsync("window_height", (int)Height);
             
             _logger?.LogInformation("窗口位置立即保存: ({X}, {Y}), 大小: {Width}x{Height}", 
                 Position.X, Position.Y, Width, Height);

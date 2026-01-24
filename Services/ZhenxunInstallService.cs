@@ -85,13 +85,13 @@ public class ZhenxunInstallService : IZhenxunInstallService
             Report(progress, 3, totalSteps, "解压文件", "正在解压源码...");
             var tempExtractDir = Path.Combine(Path.GetTempPath(), "zhenxun-extract");
             await SafeDeleteDirectoryAsync(tempExtractDir);
-            await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, tempExtractDir, true), ct);
+            await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, tempExtractDir, true), ct).ConfigureAwait(false);
             File.Delete(tempZip);
             
             var extractedDir = Path.Combine(tempExtractDir, "zhenxun_bot-main");
             await SafeDeleteDirectoryAsync(ZhenxunDir);
             
-            await Task.Run(() => CopyDirectory(extractedDir, ZhenxunDir), ct);
+            await Task.Run(() => CopyDirectory(extractedDir, ZhenxunDir), ct).ConfigureAwait(false);
             await SafeDeleteDirectoryAsync(tempExtractDir);
             _logger.LogInformation("真寻Bot源码解压完成");
 

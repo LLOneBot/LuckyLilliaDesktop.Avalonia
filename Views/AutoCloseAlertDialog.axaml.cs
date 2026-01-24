@@ -46,6 +46,14 @@ public partial class AutoCloseAlertDialog : Window
     private void OnConfirmClick(object? sender, RoutedEventArgs e)
     {
         _timer.Stop();
+        
+        // 用户点击确定时也应该执行回调
+        if (!_actionTriggered)
+        {
+            _actionTriggered = true;
+            OnDelayElapsed?.Invoke();
+        }
+        
         Close();
     }
 
