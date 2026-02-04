@@ -28,6 +28,7 @@ public partial class IntegrationWizardPage : UserControl
             vm.ShowAlertCallback = ShowAlertDialogAsync;
             vm.ShowAutoCloseAlertCallback = ShowAutoCloseAlertDialogAsync;
             vm.ThreeChoiceCallback = ShowThreeChoiceDialogAsync;
+            vm.FourChoiceCallback = ShowFourChoiceDialogAsync;
             vm.OnPageEnter();
         }
     }
@@ -69,10 +70,26 @@ public partial class IntegrationWizardPage : UserControl
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel is Window window)
         {
-            var dialog = new ThreeChoiceDialog(message);
+            // 根据消息内容判断是安装场景还是已安装场景
+            var isInstallScenario = message.Contains("是否下载并自动安装配置");
+            var dialog = isInstallScenario 
+                ? new ThreeChoiceDialog(message, "安装", "查看文档")
+                : new ThreeChoiceDialog(message);
             var result = await dialog.ShowDialog<ThreeChoiceResult>(window);
             return (int)result;
         }
         return 2; // Cancel
+    }
+
+    private async Task<int> ShowFourChoiceDialogAsync(string title, string message)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is Window window)
+        {
+            var dialog = new FourChoiceDialog(message);
+            var result = await dialog.ShowDialog<FourChoiceResult>(window);
+            return (int)result;
+        }
+        return 3; // Cancel
     }
 }

@@ -61,6 +61,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     public Func<string, string, Task>? ShowAlertCallback { get; set; }
     public Func<string, string, int, Action, Task>? ShowAutoCloseAlertCallback { get; set; }
     public Func<string, string, Task<int>>? ThreeChoiceCallback { get; set; }
+    public Func<string, string, Task<int>>? FourChoiceCallback { get; set; }
 
     public IntegrationWizardViewModel(
         IKoishiInstallService koishiInstallService,
@@ -115,12 +116,12 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             _ => false
         };
 
-        if (isInstalled && ThreeChoiceCallback != null)
+        if (isInstalled && FourChoiceCallback != null)
         {
-            // 0=启动, 1=重新安装, 2=取消
-            var choice = await ThreeChoiceCallback(frameworkName, $"{frameworkName} 已安装，请选择操作：");
+            // 0=启动, 1=重新安装, 2=查看文档, 3=取消
+            var choice = await FourChoiceCallback(frameworkName, $"{frameworkName} 已安装，请选择操作：");
             
-            if (choice == 2) return; // 取消
+            if (choice == 3) return; // 取消
             
             if (choice == 0) // 启动
             {
@@ -128,12 +129,28 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 return;
             }
             
+            if (choice == 2) // 查看文档
+            {
+                OpenFrameworkDocs(framework);
+                return;
+            }
+            
             // choice == 1: 重新安装，继续执行下面的安装流程
         }
-        else if (!isInstalled)
+        else if (!isInstalled && ThreeChoiceCallback != null)
         {
-            var confirmed = await ConfirmInstallCallback(frameworkName, $"是否下载并自动安装配置 {frameworkName}？");
-            if (!confirmed) return;
+            // 0=安装, 1=查看文档, 2=取消
+            var choice = await ThreeChoiceCallback(frameworkName, $"是否下载并自动安装配置 {frameworkName}？");
+            
+            if (choice == 2) return; // 取消
+            
+            if (choice == 1) // 查看文档
+            {
+                OpenFrameworkDocs(framework);
+                return;
+            }
+            
+            // choice == 0: 安装，继续执行下面的安装流程
         }
 
         if (framework == "koishi")
@@ -161,6 +178,35 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             case "yunzai":
                 _yunzaiInstallService.StartYunzai();
                 break;
+        }
+    }
+
+    private void OpenFrameworkDocs(string framework)
+    {
+        var url = framework switch
+        {
+            "koishi" => "https://koishi.chat/",
+            "astrbot" => "https://astrbot.app/",
+            "zhenxun" => "https://zhenxun-org.github.io/zhenxun_bot/",
+            "ddbot" => "https://ddbot.songlist.icu/",
+            "yunzai" => "https://yunzai-bot.com/",
+            _ => ""
+        };
+
+        if (!string.IsNullOrEmpty(url))
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "打开文档失败: {Url}", url);
+            }
         }
     }
 
