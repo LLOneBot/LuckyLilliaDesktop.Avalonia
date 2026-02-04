@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:LuckyLilliaDesktop.Controls"
+        x:Class="LuckyLilliaDesktop.Views.LoadingDialog"
+        Title="请稍候"
+        Width="280"
+        Height="120"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+    <Border CornerRadius="12"
+            Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+            BorderThickness="1"
+            Padding="24,20">
+        <StackPanel Spacing="16" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <controls:LoadingSpinner Width="32" Height="32" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="MessageText"
+                       Text="请稍候..."
+                       FontSize="14"
+                       Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                       TextAlignment="Center"/>
+        </StackPanel>
+    </Border>
+</Window>

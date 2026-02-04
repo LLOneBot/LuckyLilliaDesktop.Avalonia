@@ -331,7 +331,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         Action startAstrBot = () =>
         {
             _astrBotInstallService.StartAstrBot();
-            _ = ConfigureLLBotWebSocketAsync(6199, "/ws");
+            _ = ConfigureLLBotWebSocketAsync(6199, "/ws", "AstrBot");
         };
         
         if (ShowAutoCloseAlertCallback != null)
@@ -384,7 +384,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task ConfigureLLBotWebSocketAsync(int wsPort, string path = "")
+    private async Task ConfigureLLBotWebSocketAsync(int wsPort, string path = "", string? frameworkName = null)
     {
         if (string.IsNullOrEmpty(_currentUin)) return;
 
@@ -414,6 +414,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             config.OB11.Connect.Add(new OB11Connection
             {
                 Type = "ws-reverse",
+                Name = frameworkName,
                 Enable = true,
                 Url = wsUrl,
                 Token = "",
@@ -440,7 +441,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         var nbPort = FindAvailablePort(8080);
         await _zhenxunInstallService.ConfigureEnvAsync(superUser, nbPort);
         
-        await ConfigureLLBotWebSocketAsync(nbPort, "/onebot/v11/ws");
+        await ConfigureLLBotWebSocketAsync(nbPort, "/onebot/v11/ws", "真寻Bot");
         
         CreateStartBat(installPath, "bot.py", true);
 
@@ -456,7 +457,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         var installPath = _ddbotInstallService.DDBotPath;
         
         // 配置 LLBot WebSocket 客户端连接到 DDBot
-        await ConfigureLLBotWebSocketAsync(15630, "/ws");
+        await ConfigureLLBotWebSocketAsync(15630, "/ws", "DDBot");
         
         CreateStartBat(installPath, "DDBOT-WSa.exe");
 
@@ -472,7 +473,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         var installPath = _yunzaiInstallService.YunzaiPath;
         
         // 配置 LLBot WebSocket 客户端连接到云崽
-        await ConfigureLLBotWebSocketAsync(2536, "/OneBotv11");
+        await ConfigureLLBotWebSocketAsync(2536, "/OneBotv11", "云崽");
         
         CreateYunzaiStartBat(installPath);
 

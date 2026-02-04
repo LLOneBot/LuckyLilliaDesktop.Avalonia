@@ -200,6 +200,10 @@
                                                 <CheckBox Content="上报离线" IsChecked="{Binding ReportOfflineMessage}" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Bottom"/>
                                                 <CheckBox Content="调试" IsChecked="{Binding Debug}" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Bottom"/>
                                             </StackPanel>
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="备注" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                                <TextBox Text="{Binding Name}" Width="300" Watermark="可选，用于区分不同的连接" HorizontalAlignment="Left"/>
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>

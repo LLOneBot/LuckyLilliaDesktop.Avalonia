@@ -418,10 +418,30 @@ public class ProcessManager : IProcessManager, IDisposable
         {
             _logger.LogInformation("正在终止 QQ 进程, PID: {Pid}", qqPid.Value);
             KillProcessTree(qqPid.Value);
+            
+            // 等待 QQ 进程完全退出
+            await WaitForProcessExitAsync(qqPid.Value);
             _logger.LogInformation("QQ 进程已终止");
         }
 
         _logger.LogInformation("所有进程已停止");
+    }
+
+    private static async Task WaitForProcessExitAsync(int pid, int timeoutMs = 10000)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            try
+            {
+                Process.GetProcessById(pid);
+                await Task.Delay(200);
+            }
+            catch (ArgumentException)
+            {
+                return;
+            }
+        }
     }
 
     /// <summary>

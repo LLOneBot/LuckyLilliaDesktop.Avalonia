@@ -677,6 +677,7 @@ public class OB11ConnectionViewModel : ViewModelBase
     }
 
     private string _type;
+    private string? _name;
     private bool _enable;
     private int _port;
     private string _url = string.Empty;
@@ -696,14 +697,33 @@ public class OB11ConnectionViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _type, value);
     }
 
-    public string TypeName => Type switch
+    public string? Name
     {
-        "ws" => "WebSocket 服务端(正向)",
-        "ws-reverse" => "WebSocket 客户端(反向)",
-        "http" => "HTTP 服务端",
-        "http-post" => "WebHook",
-        _ => Type
-    };
+        get => _name;
+        set 
+        { 
+            this.RaiseAndSetIfChanged(ref _name, value); 
+            this.RaisePropertyChanged(nameof(TypeName));
+            NotifyModified(); 
+        }
+    }
+
+    public string TypeName
+    {
+        get
+        {
+            var baseName = Type switch
+            {
+                "ws" => "WebSocket 服务端(正向)",
+                "ws-reverse" => "WebSocket 客户端(反向)",
+                "http" => "HTTP 服务端",
+                "http-post" => "WebHook",
+                _ => Type
+            };
+            
+            return string.IsNullOrWhiteSpace(Name) ? baseName : $"{baseName} ({Name})";
+        }
+    }
 
     public bool Enable
     {
@@ -802,6 +822,7 @@ public class OB11ConnectionViewModel : ViewModelBase
     public OB11ConnectionViewModel(OB11Connection model)
     {
         _type = model.Type;
+        _name = model.Name;
         _enable = model.Enable;
         _port = model.Port;
         _url = model.Url;
@@ -822,6 +843,7 @@ public class OB11ConnectionViewModel : ViewModelBase
     public OB11Connection ToModel() => new()
     {
         Type = Type,
+        Name = Name,
         Enable = Enable,
         Host = ModeToHost(HostMode, CustomHost),
         Port = Port,

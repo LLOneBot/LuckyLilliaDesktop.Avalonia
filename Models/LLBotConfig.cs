@@ -86,6 +86,9 @@ public class OB11Connection
     [JsonPropertyName("type")]
     public string Type { get; set; } = "ws"; // ws, ws-reverse, http, http-post
 
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
     [JsonPropertyName("enable")]
     public bool Enable { get; set; } = false;
 
