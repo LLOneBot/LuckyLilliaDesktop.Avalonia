@@ -6,8 +6,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Net.Http;
-using System.Net.Http.Json;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -25,6 +23,10 @@ public class ProcessManager : IProcessManager, IDisposable
     private readonly ILogCollector _logCollector;
     private static readonly ConcurrentDictionary<int, string> _instanceNameCache = new();
     private static readonly ConcurrentDictionary<int, (DateTime Time, TimeSpan CpuTime)> _cpuSampleCache = new();
+    private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+
+    // Job Object 句柄，用于自动清理子进程
+    private static IntPtr _jobHandle = IntPtr.Zero;
 
     private Process? _pmhqProcess;
     private Process? _llbotProcess;
@@ -52,6 +54,73 @@ public class ProcessManager : IProcessManager, IDisposable
     {
         _logger = logger;
         _logCollector = logCollector;
+
+        // 初始化 Job Object（仅在 Windows 上）
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            InitializeJobObject();
+        }
+    }
+
+    /// <summary>
+    /// 初始化 Job Object，确保主进程被杀死时自动清理所有子进程
+    /// </summary>
+    private void InitializeJobObject()
+    {
+        try
+        {
+            // 创建 Job Object
+            _jobHandle = CreateJobObject(IntPtr.Zero, null);
+            if (_jobHandle == IntPtr.Zero)
+            {
+                _logger.LogWarning("创建 Job Object 失败");
+                return;
+            }
+
+            // 设置 Job Object 属性：当 Job 关闭时杀死所有进程
+            var info = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+            {
+                BasicLimitInformation = new JOBOBJECT_BASIC_LIMIT_INFORMATION
+                {
+                    LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                }
+            };
+
+            int length = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
+            IntPtr extendedInfoPtr = Marshal.AllocHGlobal(length);
+            try
+            {
+                Marshal.StructureToPtr(info, extendedInfoPtr, false);
+
+                if (!SetInformationJobObject(_jobHandle, JobObjectExtendedLimitInformation, extendedInfoPtr, (uint)length))
+                {
+                    _logger.LogWarning("设置 Job Object 信息失败");
+                    CloseHandle(_jobHandle);
+                    _jobHandle = IntPtr.Zero;
+                    return;
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(extendedInfoPtr);
+            }
+
+            // 将当前进程加入 Job Object
+            var currentProcess = Process.GetCurrentProcess();
+            if (!AssignProcessToJobObject(_jobHandle, currentProcess.Handle))
+            {
+                _logger.LogWarning("将当前进程加入 Job Object 失败");
+                CloseHandle(_jobHandle);
+                _jobHandle = IntPtr.Zero;
+                return;
+            }
+
+            _logger.LogInformation("Job Object 初始化成功，子进程将在主进程退出时自动清理");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "初始化 Job Object 失败");
+        }
     }
 
     public async Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, string autoLoginQQ, bool headless)
@@ -206,8 +275,7 @@ public class ProcessManager : IProcessManager, IDisposable
             config["qq_path"] = absQqPath;
 
             // 写回配置
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            var newJson = JsonSerializer.Serialize(config, options);
+            var newJson = JsonSerializer.Serialize(config, _jsonOptions);
             await File.WriteAllTextAsync(configPath, newJson);
 
             _logger.LogInformation("已更新 PMHQ 配置文件 qq_path: {QQPath}", absQqPath);
@@ -319,19 +387,17 @@ public class ProcessManager : IProcessManager, IDisposable
 
     public async Task StopPmhqAsync()
     {
-        // 如果进程已停止，直接返回
         if (_pmhqStatus == ProcessStatus.Stopped)
             return;
 
         _pmhqStatus = ProcessStatus.Stopping;
         ProcessStatusChanged?.Invoke(this, _pmhqStatus);
 
-        // PMHQ 进程可能已经正常退出（这是预期行为）
-        // 如果进程对象存在且未退出，才需要终止
         if (_pmhqProcess != null)
         {
             _logCollector.DetachProcess("PMHQ");
 
+            var pid = _pmhqProcess.Id;
             var process = _pmhqProcess;
             _pmhqProcess = null;
 
@@ -339,16 +405,7 @@ public class ProcessManager : IProcessManager, IDisposable
             {
                 if (!process.HasExited)
                 {
-                    KillProcessTree(process.Id);
-                    // 等待进程退出
-                    await Task.Run(() =>
-                    {
-                        try
-                        {
-                            process.WaitForExit(2000);
-                        }
-                        catch { }
-                    });
+                    await KillProcessTreeAsync(pid);
                 }
             }
             catch { }
@@ -373,6 +430,7 @@ public class ProcessManager : IProcessManager, IDisposable
 
         _logCollector.DetachProcess("LLBot");
 
+        var pid = _llbotProcess.Id;
         var process = _llbotProcess;
         _llbotProcess = null;
 
@@ -380,16 +438,7 @@ public class ProcessManager : IProcessManager, IDisposable
         {
             if (!process.HasExited)
             {
-                KillProcessTree(process.Id);
-                // 等待进程退出
-                await Task.Run(() =>
-                {
-                    try
-                    {
-                        process.WaitForExit(2000);
-                    }
-                    catch { }
-                });
+                await KillProcessTreeAsync(pid);
             }
         }
         catch { }
@@ -409,7 +458,7 @@ public class ProcessManager : IProcessManager, IDisposable
 
         _logger.LogInformation("停止所有进程...");
 
-        // 先停止 LLBot 和 PMHQ
+        // 先停止 LLBot 和 PMHQ（已包含等待逻辑）
         await StopLLBotAsync();
         await StopPmhqAsync();
 
@@ -417,19 +466,19 @@ public class ProcessManager : IProcessManager, IDisposable
         if (qqPid.HasValue && qqPid.Value > 0)
         {
             _logger.LogInformation("正在终止 QQ 进程, PID: {Pid}", qqPid.Value);
-            KillProcessTree(qqPid.Value);
-            
-            // 等待 QQ 进程完全退出
-            await WaitForProcessExitAsync(qqPid.Value);
+            await KillProcessTreeAsync(qqPid.Value);
             _logger.LogInformation("QQ 进程已终止");
         }
 
         _logger.LogInformation("所有进程已停止");
     }
 
+    /// <summary>
+    /// 等待进程完全退出
+    /// </summary>
     private static async Task WaitForProcessExitAsync(int pid, int timeoutMs = 10000)
     {
-        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var sw = Stopwatch.StartNew();
         while (sw.ElapsedMilliseconds < timeoutMs)
         {
             try
@@ -439,8 +488,53 @@ public class ProcessManager : IProcessManager, IDisposable
             }
             catch (ArgumentException)
             {
+                // 进程已退出
                 return;
             }
+        }
+    }
+
+    /// <summary>
+    /// 异步杀死进程树并等待完全退出
+    /// </summary>
+    private static async Task KillProcessTreeAsync(int pid, int timeoutMs = 10000)
+    {
+        try
+        {
+            // 使用 taskkill 强制终止进程树
+            var psi = new ProcessStartInfo
+            {
+                FileName = "taskkill",
+                Arguments = $"/F /T /PID {pid}",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            
+            using var killProcess = Process.Start(psi);
+            if (killProcess != null)
+            {
+                // 等待 taskkill 命令完成
+                await killProcess.WaitForExitAsync();
+            }
+            
+            // 等待目标进程完全退出
+            await WaitForProcessExitAsync(pid, timeoutMs);
+        }
+        catch
+        {
+            // 如果 taskkill 失败，尝试使用 Process.Kill
+            try
+            {
+                using var process = Process.GetProcessById(pid);
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    await process.WaitForExitAsync();
+                }
+            }
+            catch { }
         }
     }
 
@@ -478,7 +572,7 @@ public class ProcessManager : IProcessManager, IDisposable
     }
 
     /// <summary>
-    /// 杀死进程树
+    /// 同步杀死进程树（用于 ForceKillAll）
     /// </summary>
     private static void KillProcessTree(int pid)
     {
@@ -491,7 +585,8 @@ public class ProcessManager : IProcessManager, IDisposable
                 CreateNoWindow = true,
                 UseShellExecute = false
             };
-            Process.Start(psi);
+            using var killProcess = Process.Start(psi);
+            killProcess?.WaitForExit(5000);
         }
         catch
         {
@@ -651,8 +746,22 @@ public class ProcessManager : IProcessManager, IDisposable
         catch { return 0; }
     }
 
+    #region Windows API
+
     [DllImport("ntdll.dll")]
     private static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, ref PROCESS_BASIC_INFORMATION processInformation, int processInformationLength, out int returnLength);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string? lpName);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetInformationJobObject(IntPtr hJob, int JobObjectInfoClass, IntPtr lpJobObjectInfo, uint cbJobObjectInfoLength);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AssignProcessToJobObject(IntPtr hJob, IntPtr hProcess);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr hObject);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct PROCESS_BASIC_INFORMATION
@@ -664,6 +773,47 @@ public class ProcessManager : IProcessManager, IDisposable
         public IntPtr UniqueProcessId;
         public IntPtr InheritedFromUniqueProcessId;
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+    {
+        public long PerProcessUserTimeLimit;
+        public long PerJobUserTimeLimit;
+        public uint LimitFlags;
+        public UIntPtr MinimumWorkingSetSize;
+        public UIntPtr MaximumWorkingSetSize;
+        public uint ActiveProcessLimit;
+        public UIntPtr Affinity;
+        public uint PriorityClass;
+        public uint SchedulingClass;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IO_COUNTERS
+    {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+    {
+        public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+        public IO_COUNTERS IoInfo;
+        public UIntPtr ProcessMemoryLimit;
+        public UIntPtr JobMemoryLimit;
+        public UIntPtr PeakProcessMemoryUsed;
+        public UIntPtr PeakJobMemoryUsed;
+    }
+
+    private const int JobObjectExtendedLimitInformation = 9;
+    private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
+
+    #endregion
 
     private static int GetParentProcessId(int pid)
     {
@@ -711,7 +861,7 @@ public class ProcessManager : IProcessManager, IDisposable
         return null;
     }
 
-    private double GetCpuUsage(Process process)
+    private static double GetCpuUsage(Process process)
     {
         try
         {
@@ -780,5 +930,14 @@ public class ProcessManager : IProcessManager, IDisposable
 
         _pmhqProcess?.Dispose();
         _llbotProcess?.Dispose();
+
+        // 清理 Job Object
+        if (_jobHandle != IntPtr.Zero)
+        {
+            CloseHandle(_jobHandle);
+            _jobHandle = IntPtr.Zero;
+        }
+
+        GC.SuppressFinalize(this);
     }
 }
