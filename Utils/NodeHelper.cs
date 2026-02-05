@@ -81,7 +81,7 @@ public static class NodeHelper
         return null;
     }
 
-    public static async Task<bool> CheckNodeVersionValidAsync(string nodePath, int minVersion = 22, ILogger? logger = null)
+    public static async Task<bool> CheckNodeVersionValidAsync(string nodePath, int minVersion = 24, ILogger? logger = null)
     {
         var version = await GetNodeVersionAsync(nodePath, logger);
         return version >= minVersion;

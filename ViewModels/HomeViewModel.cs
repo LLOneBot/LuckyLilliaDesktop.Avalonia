@@ -792,15 +792,15 @@ public class HomeViewModel : ViewModelBase
             var systemNode = Utils.NodeHelper.FindNodeInPath();
             if (!string.IsNullOrEmpty(systemNode))
             {
-                if (await Utils.NodeHelper.CheckNodeVersionValidAsync(systemNode, 22, _logger))
+                if (await Utils.NodeHelper.CheckNodeVersionValidAsync(systemNode, 24, _logger))
                 {
-                    _logger.LogInformation("在系统PATH中找到Node.js (版本>=22): {Path}", systemNode);
+                    _logger.LogInformation("在系统PATH中找到Node.js (版本>=24): {Path}", systemNode);
                     config.NodePath = systemNode;
                     nodeExists = true;
                 }
                 else
                 {
-                    _logger.LogWarning("系统PATH中的Node.js版本低于22: {Path}", systemNode);
+                    _logger.LogWarning("系统PATH中的Node.js版本低于24: {Path}", systemNode);
                 }
             }
 
@@ -810,7 +810,7 @@ public class HomeViewModel : ViewModelBase
                 var localNodePath = Utils.Constants.DefaultPaths.NodeExe;
                 if (File.Exists(localNodePath))
                 {
-                    if (await Utils.NodeHelper.CheckNodeVersionValidAsync(localNodePath, 22, _logger))
+                    if (await Utils.NodeHelper.CheckNodeVersionValidAsync(localNodePath, 24, _logger))
                     {
                         _logger.LogInformation("在本地目录找到Node.js: {Path}", localNodePath);
                         config.NodePath = localNodePath;
@@ -818,7 +818,7 @@ public class HomeViewModel : ViewModelBase
                     }
                     else
                     {
-                        _logger.LogWarning("本地Node.js版本低于22: {Path}", localNodePath);
+                        _logger.LogWarning("本地Node.js版本低于24: {Path}", localNodePath);
                     }
                 }
             }
