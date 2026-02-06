@@ -22,6 +22,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     private readonly IZhenxunInstallService _zhenxunInstallService;
     private readonly IDDBotInstallService _ddbotInstallService;
     private readonly IYunzaiInstallService _yunzaiInstallService;
+    private readonly IZeroBotPluginInstallService _zeroBotPluginInstallService;
     private readonly ISelfInfoService _selfInfoService;
     private readonly IDisposable _uinSubscription;
 
@@ -53,6 +54,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     public bool ZhenxunInstalled => _zhenxunInstallService.IsInstalled;
     public bool DDBotInstalled => _ddbotInstallService.IsInstalled;
     public bool YunzaiInstalled => _yunzaiInstallService.IsInstalled;
+    public bool ZeroBotPluginInstalled => _zeroBotPluginInstallService.IsInstalled;
 
     public ReactiveCommand<string, Unit> SelectFrameworkCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelInstallCommand { get; }
@@ -69,6 +71,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         IZhenxunInstallService zhenxunInstallService,
         IDDBotInstallService ddbotInstallService,
         IYunzaiInstallService yunzaiInstallService,
+        IZeroBotPluginInstallService zeroBotPluginInstallService,
         ISelfInfoService selfInfoService,
         ILogger<IntegrationWizardViewModel> logger)
     {
@@ -77,6 +80,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         _zhenxunInstallService = zhenxunInstallService;
         _ddbotInstallService = ddbotInstallService;
         _yunzaiInstallService = yunzaiInstallService;
+        _zeroBotPluginInstallService = zeroBotPluginInstallService;
         _selfInfoService = selfInfoService;
         _logger = logger;
 
@@ -101,6 +105,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "zhenxun" => "真寻Bot",
             "ddbot" => "DDBot",
             "yunzai" => "云崽",
+            "zbp" => "ZeroBot-Plugin",
             _ => framework
         };
 
@@ -113,6 +118,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "zhenxun" => _zhenxunInstallService.IsInstalled,
             "ddbot" => _ddbotInstallService.IsInstalled,
             "yunzai" => _yunzaiInstallService.IsInstalled,
+            "zbp" => _zeroBotPluginInstallService.IsInstalled,
             _ => false
         };
 
@@ -178,6 +184,9 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             case "yunzai":
                 _yunzaiInstallService.StartYunzai();
                 break;
+            case "zbp":
+                _zeroBotPluginInstallService.StartZeroBotPlugin();
+                break;
         }
     }
 
@@ -190,6 +199,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "zhenxun" => "https://zhenxun-org.github.io/zhenxun_bot/",
             "ddbot" => "https://ddbot.songlist.icu/",
             "yunzai" => "https://yunzai-bot.com/",
+            "zbp" => "https://github.com/FloatTech/ZeroBot-Plugin",
             _ => ""
         };
 
@@ -289,6 +299,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 "zhenxun" => await _zhenxunInstallService.InstallAsync(progress, _cts.Token),
                 "ddbot" => await _ddbotInstallService.InstallAsync(progress, _cts.Token),
                 "yunzai" => await _yunzaiInstallService.InstallAsync(progress, _cts.Token),
+                "zbp" => await _zeroBotPluginInstallService.InstallAsync(progress, _cts.Token),
                 _ => false
             };
 
@@ -300,6 +311,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 this.RaisePropertyChanged(nameof(ZhenxunInstalled));
                 this.RaisePropertyChanged(nameof(DDBotInstalled));
                 this.RaisePropertyChanged(nameof(YunzaiInstalled));
+                this.RaisePropertyChanged(nameof(ZeroBotPluginInstalled));
                 
                 if (framework == "koishi")
                     await OnKoishiInstallCompletedAsync();
@@ -311,6 +323,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                     await OnDDBotInstallCompletedAsync();
                 else if (framework == "yunzai")
                     await OnYunzaiInstallCompletedAsync();
+                else if (framework == "zbp")
+                    await OnZeroBotPluginInstallCompletedAsync();
             }
         }
         catch (Exception ex)
@@ -479,6 +493,53 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// 配置 LLBot WebSocket 服务端(正向)连接，供 ZeroBot-Plugin 等框架主动连接
+    /// </summary>
+    private async Task ConfigureLLBotWebSocketServerAsync(int wsPort, string? frameworkName = null)
+    {
+        if (string.IsNullOrEmpty(_currentUin)) return;
+
+        var configPath = Path.Combine("bin", "llbot", "data", $"config_{_currentUin}.json");
+        if (!File.Exists(configPath)) return;
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(configPath);
+            var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+
+            var existingWs = config.OB11.Connect.FirstOrDefault(c =>
+                c.Type == "ws" && c.Port == wsPort && c.Enable);
+
+            if (existingWs != null)
+            {
+                _logger.LogInformation("LLBot 已存在 WebSocket 服务端配置: 端口 {Port}", wsPort);
+                return;
+            }
+
+            config.OB11.Connect.Add(new OB11Connection
+            {
+                Type = "ws",
+                Name = frameworkName,
+                Enable = true,
+                Host = "127.0.0.1",
+                Port = wsPort,
+                Token = "",
+                MessageFormat = "array",
+                ReportSelfMessage = false,
+                HeartInterval = 60000
+            });
+
+            await File.WriteAllTextAsync(configPath,
+                JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+            _logger.LogInformation("已添加 LLBot WebSocket 服务端配置: 端口 {Port}", wsPort);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "配置 LLBot WebSocket 服务端失败");
+        }
+    }
+
     private async Task OnZhenxunInstallCompletedAsync()
     {
         var installPath = _zhenxunInstallService.ZhenxunPath;
@@ -528,6 +589,22 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         if (ShowAutoCloseAlertCallback != null)
             await ShowAutoCloseAlertCallback("云崽安装完成",
                 $"安装路径: {installPath}\n\n云崽是一个原神QQ机器人\n\n3秒后将自动启动云崽...", 3, startYunzai);
+    }
+
+    private async Task OnZeroBotPluginInstallCompletedAsync()
+    {
+        var installPath = _zeroBotPluginInstallService.ZeroBotPluginPath;
+
+        // ZeroBot-Plugin 需要 WebSocket 服务端(正向) 端口 6700
+        await ConfigureLLBotWebSocketServerAsync(6700, "zbp");
+
+        CreateStartBat(installPath, "zbp.exe");
+
+        Action startZbp = () => _zeroBotPluginInstallService.StartZeroBotPlugin();
+
+        if (ShowAutoCloseAlertCallback != null)
+            await ShowAutoCloseAlertCallback("ZeroBot-Plugin 安装完成",
+                $"安装路径: {installPath}\n\nZeroBot-Plugin 是一个基于 ZeroBot 的多功能群管/娱乐插件集\n\n3秒后将自动启动 ZeroBot-Plugin...", 3, startZbp);
     }
 
     private void CreateYunzaiStartBat(string installPath)
