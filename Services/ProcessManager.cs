@@ -326,6 +326,8 @@ public class ProcessManager : IProcessManager, IDisposable
                 StandardErrorEncoding = Encoding.UTF8
             };
 
+            startInfo.Environment["NODE_SKIP_PLATFORM_CHECK"] = "1";
+
             // 添加 Node.js 参数
             startInfo.ArgumentList.Add("--enable-source-maps");
             startInfo.ArgumentList.Add(scriptFileName);
