@@ -89,9 +89,7 @@ public class ZhenxunInstallService : IZhenxunInstallService
             File.Delete(tempZip);
             
             var extractedDir = Path.Combine(tempExtractDir, "zhenxun_bot-main");
-            await SafeDeleteDirectoryAsync(ZhenxunDir);
-            
-            await Task.Run(() => CopyDirectory(extractedDir, ZhenxunDir), ct).ConfigureAwait(false);
+            await Task.Run(() => CopyDirectory(extractedDir, ZhenxunDir, overwrite: true), ct).ConfigureAwait(false);
             await SafeDeleteDirectoryAsync(tempExtractDir);
             _logger.LogInformation("真寻Bot源码解压完成");
 
@@ -217,15 +215,15 @@ PORT={port}
         });
     }
 
-    private static void CopyDirectory(string sourceDir, string destDir)
+    private static void CopyDirectory(string sourceDir, string destDir, bool overwrite = false)
     {
         Directory.CreateDirectory(destDir);
         
         foreach (var file in Directory.GetFiles(sourceDir))
-            File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)));
+            File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)), overwrite);
         
         foreach (var dir in Directory.GetDirectories(sourceDir))
-            CopyDirectory(dir, Path.Combine(destDir, Path.GetFileName(dir)));
+            CopyDirectory(dir, Path.Combine(destDir, Path.GetFileName(dir)), overwrite);
     }
 
     private static async Task SafeDeleteDirectoryAsync(string path)

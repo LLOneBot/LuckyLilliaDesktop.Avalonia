@@ -87,10 +87,7 @@ public class AstrBotInstallService : IAstrBotInstallService
             File.Delete(tempZip);
             
             var extractedDir = Path.Combine(tempExtractDir, "AstrBot-master");
-            if (Directory.Exists(AstrBotDir))
-                Directory.Delete(AstrBotDir, true);
-            
-            await Task.Run(() => CopyDirectory(extractedDir, AstrBotDir), ct).ConfigureAwait(false);
+            await Task.Run(() => CopyDirectory(extractedDir, AstrBotDir, overwrite: true), ct).ConfigureAwait(false);
             Directory.Delete(tempExtractDir, true);
             _logger.LogInformation("AstrBot 源码解压完成");
 
@@ -213,14 +210,14 @@ public class AstrBotInstallService : IAstrBotInstallService
         });
     }
 
-    private static void CopyDirectory(string sourceDir, string destDir)
+    private static void CopyDirectory(string sourceDir, string destDir, bool overwrite = false)
     {
         Directory.CreateDirectory(destDir);
         
         foreach (var file in Directory.GetFiles(sourceDir))
-            File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)));
+            File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)), overwrite);
         
         foreach (var dir in Directory.GetDirectories(sourceDir))
-            CopyDirectory(dir, Path.Combine(destDir, Path.GetFileName(dir)));
+            CopyDirectory(dir, Path.Combine(destDir, Path.GetFileName(dir)), overwrite);
     }
 }

@@ -53,9 +53,8 @@ public class GitHubArchiveHelper : IGitHubArchiveHelper
             await Task.Run(() => ZipFile.ExtractToDirectory(zipFile, tempExtract, true), ct).ConfigureAwait(false);
             await Task.Run(() => File.Delete(zipFile), ct).ConfigureAwait(false);
 
-            await SafeDeleteDirectoryAsync(targetDir);
             var extractedDir = Path.Combine(tempExtract, $"{Path.GetFileName(repoPath)}-{branch}");
-            await Task.Run(() => CopyDirectory(extractedDir, targetDir), ct).ConfigureAwait(false);
+            await Task.Run(() => CopyDirectory(extractedDir, targetDir, overwrite: true), ct).ConfigureAwait(false);
             await SafeDeleteDirectoryAsync(tempExtract);
 
             _logger.LogInformation("成功下载并解压 {RepoPath} 到 {TargetDir}", repoPath, targetDir);
@@ -75,13 +74,13 @@ public class GitHubArchiveHelper : IGitHubArchiveHelper
         }
     }
 
-    private static void CopyDirectory(string sourceDir, string destDir)
+    private static void CopyDirectory(string sourceDir, string destDir, bool overwrite = false)
     {
         Directory.CreateDirectory(destDir);
         foreach (var file in Directory.GetFiles(sourceDir))
-            File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)));
+            File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)), overwrite);
         foreach (var dir in Directory.GetDirectories(sourceDir))
-            CopyDirectory(dir, Path.Combine(destDir, Path.GetFileName(dir)));
+            CopyDirectory(dir, Path.Combine(destDir, Path.GetFileName(dir)), overwrite);
     }
 
     private static async Task SafeDeleteDirectoryAsync(string path)

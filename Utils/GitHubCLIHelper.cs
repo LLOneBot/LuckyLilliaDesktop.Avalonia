@@ -151,11 +151,30 @@ public class GitHubCLIHelper : IGitHubCLIHelper
     {
         try
         {
-            await SafeDeleteDirectoryAsync(targetDir);
+            var fullTargetDir = Path.GetFullPath(targetDir);
+            
+            // 如果目录已存在且是 git 仓库，使用 fetch + reset 覆盖
+            if (Directory.Exists(Path.Combine(fullTargetDir, ".git")))
+            {
+                _logger.LogInformation("目标目录已存在 Git 仓库，使用 fetch + reset 覆盖: {Dir}", targetDir);
+                var fetchArgs = "fetch origin --depth 1";
+                var resetArgs = branch != null 
+                    ? $"reset --hard origin/{branch}" 
+                    : "reset --hard origin/HEAD";
+                
+                if (await RunGitCommandAsync(fetchArgs, fullTargetDir, ct) && 
+                    await RunGitCommandAsync(resetArgs, fullTargetDir, ct))
+                {
+                    _logger.LogInformation("Git fetch + reset 成功: {Dir}", targetDir);
+                    return true;
+                }
+                _logger.LogWarning("Git fetch + reset 失败，回退到重新克隆");
+                await SafeDeleteDirectoryAsync(targetDir);
+            }
 
             var args = branch != null 
-                ? $"clone --depth 1 --branch {branch} \"{url}\" \"{Path.GetFullPath(targetDir)}\"" 
-                : $"clone --depth 1 \"{url}\" \"{Path.GetFullPath(targetDir)}\"";
+                ? $"clone --depth 1 --branch {branch} \"{url}\" \"{fullTargetDir}\"" 
+                : $"clone --depth 1 \"{url}\" \"{fullTargetDir}\"";
 
             _logger.LogInformation("执行 Git 克隆: {Url}", url);
 
@@ -213,6 +232,26 @@ public class GitHubCLIHelper : IGitHubCLIHelper
             _logger.LogError(ex, "Git 克隆异常: {Url}", url);
             return false;
         }
+    }
+
+    private async Task<bool> RunGitCommandAsync(string args, string workDir, CancellationToken ct)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = _gitPath ?? "git",
+            Arguments = args,
+            WorkingDirectory = workDir,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        using var process = Process.Start(psi);
+        if (process == null) return false;
+
+        await process.WaitForExitAsync(ct).ConfigureAwait(false);
+        return process.ExitCode == 0;
     }
 
     private bool CheckSystemGit()

@@ -91,10 +91,8 @@ public partial class KoishiInstallService : IKoishiInstallService
                     return false;
                 }
 
-                // Step 3: 解压
+                // Step 3: 解压（覆盖已有文件）
                 Report(progress, 3, totalSteps, "解压文件", "正在解压...");
-                if (Directory.Exists(KoishiDir))
-                    Directory.Delete(KoishiDir, true);
                 Directory.CreateDirectory(KoishiDir);
                 await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, KoishiDir, true), ct).ConfigureAwait(false);
                 File.Delete(tempZip);

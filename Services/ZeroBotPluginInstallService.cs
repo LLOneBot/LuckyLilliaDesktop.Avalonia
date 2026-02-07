@@ -71,9 +71,8 @@ public class ZeroBotPluginInstallService : IZeroBotPluginInstallService
                 return false;
             }
 
-            // Step 3: 解压
+            // Step 3: 解压（覆盖已有文件）
             Report(progress, 3, totalSteps, "解压文件", "正在解压...");
-            await SafeDeleteDirectoryAsync(ZeroBotDir);
             Directory.CreateDirectory(ZeroBotDir);
             await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, ZeroBotDir, true), ct).ConfigureAwait(false);
             File.Delete(tempZip);
