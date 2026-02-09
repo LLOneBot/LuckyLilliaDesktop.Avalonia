@@ -780,6 +780,13 @@ public class HomeViewModel : ViewModelBase
                     }
                 }
             }
+            else if (!File.Exists(config.QQPath))
+            {
+                ErrorMessage = $"QQ 路径无效: {config.QQPath}，请在系统配置中重新设置";
+                BotStatus = ProcessStatus.Stopped;
+                _logger.LogWarning("QQ 路径无效: {Path}", config.QQPath);
+                return;
+            }
 
             _logger.LogInformation("配置加载完成: PmhqPath={PmhqPath}, NodePath={NodePath}, LLBotPath={LLBotPath}, QQPath={QQPath}",
                 config.PmhqPath, config.NodePath, config.LLBotPath, config.QQPath);
