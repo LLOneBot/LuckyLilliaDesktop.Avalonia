@@ -15,6 +15,7 @@ public interface IProcessManager
     Task StopLLBotAsync();
     Task StopAllAsync(int? qqPid = null);
     void ForceKillAll(int? qqPid = null);
+    bool StartProcessOutsideJob(string fileName, string? workingDirectory = null);
 
     ProcessStatus GetProcessStatus(string processName);
     ProcessResourceInfo GetProcessResources(string processName, bool includeCpu = true);

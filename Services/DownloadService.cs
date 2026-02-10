@@ -2,6 +2,7 @@ using System;
 using System.Formats.Tar;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -234,11 +235,17 @@ public class DownloadService : IDownloadService
                 return new AppUpdateResult { Success = false, Error = "无法获取下载地址" };
             }
 
+            _logger.LogInformation("NPM包: {Package}, 版本: {Version}, 来源: {Registry}",
+                packageInfo.Name, packageInfo.Version, packageInfo.Registry);
+            _logger.LogInformation("原始tarball地址: {Url}", packageInfo.TarballUrl);
+
             var tarballUrls = _npmClient.GetTarballUrls(packageInfo.TarballUrl);
-            _logger.LogInformation("获取到 {Count} 个下载地址", tarballUrls.Length);
+            _logger.LogInformation("获取到 {Count} 个镜像下载地址: {Urls}",
+                tarballUrls.Length, string.Join(" | ", tarballUrls));
 
             var tempDir = Path.Combine(Path.GetTempPath(), $"app_update_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
+            _logger.LogInformation("临时目录: {TempDir}", tempDir);
 
             var tempFile = Path.Combine(tempDir, "update.tgz");
 
@@ -306,7 +313,16 @@ public class DownloadService : IDownloadService
             // 删除临时 tgz 文件
             if (File.Exists(tempFile)) File.Delete(tempFile);
 
-            // 查找 exe 文件
+            // 列出解压后的文件
+            var extractedFiles = Directory.GetFileSystemEntries(tempDir);
+            _logger.LogInformation("解压后 tempDir 内容 ({Count} 项):", extractedFiles.Length);
+            foreach (var entry in extractedFiles)
+            {
+                var info = new FileInfo(entry);
+                _logger.LogInformation("  {Name} ({Size} bytes)", Path.GetFileName(entry),
+                    info.Exists ? info.Length : -1);
+            }
+
             string? newExePath = null;
             foreach (var file in Directory.GetFiles(tempDir, "*.exe"))
             {
@@ -316,22 +332,37 @@ public class DownloadService : IDownloadService
 
             if (string.IsNullOrEmpty(newExePath))
             {
+                // 也搜索子目录，以防 package/ 没被正确展开
+                var deepSearch = Directory.GetFiles(tempDir, "*.exe", SearchOption.AllDirectories);
+                _logger.LogWarning("顶层未找到exe，深度搜索结果: {Files}",
+                    string.Join(", ", deepSearch.Select(Path.GetFileName)));
+                if (deepSearch.Length > 0)
+                    newExePath = deepSearch[0];
+            }
+
+            if (string.IsNullOrEmpty(newExePath))
+            {
                 Directory.Delete(tempDir, true);
                 return new AppUpdateResult { Success = false, Error = "更新包中未找到可执行文件" };
             }
 
-            // 生成更新脚本
-            var currentExe = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+            _logger.LogInformation("找到新版本exe: {Path} ({Size} bytes)",
+                newExePath, new FileInfo(newExePath).Length);
+
+            var currentExe = GetCurrentExePath();
             if (string.IsNullOrEmpty(currentExe))
             {
                 Directory.Delete(tempDir, true);
                 return new AppUpdateResult { Success = false, Error = "无法获取当前程序路径" };
             }
+            _logger.LogInformation("当前程序路径: {CurrentExe}, 新版本路径: {NewExe}", currentExe, newExePath);
 
             var currentPid = Environment.ProcessId;
+            _logger.LogInformation("当前PID: {Pid}, tempDir: {TempDir}", currentPid, tempDir);
+
             var scriptPath = CreateUpdateScript(newExePath, currentExe, currentPid, tempDir);
 
-            _logger.LogInformation("应用更新下载完成，更新脚本: {Script}", scriptPath);
+            _logger.LogInformation("更新脚本已生成: {Script}", scriptPath);
 
             return new AppUpdateResult
             {
@@ -357,22 +388,44 @@ public class DownloadService : IDownloadService
         var currentDir = Path.GetDirectoryName(currentExePath)!;
         var currentExeName = Path.GetFileName(currentExePath);
         var scriptPath = Path.Combine(tempDir, "_update.bat");
+        var logFile = Path.Combine(currentDir, "_update.log");
 
         var scriptContent = $"""
             @echo off
             chcp 65001 >nul
 
-            cd /d "{currentDir}"
+            set "CURRENT_DIR={currentDir}"
+            set "CURRENT_EXE={currentExePath}"
+            set "NEW_EXE={newExePath}"
+            set "CURRENT_EXE_NAME={currentExeName}"
+            set "TEMP_DIR={tempDir}"
+            set "LOG_FILE={logFile}"
+
+            cd /d "%CURRENT_DIR%"
+            echo [%date% %time%] ====== 开始更新 ====== >> "%LOG_FILE%"
+            echo [%date% %time%] PID={currentPid} >> "%LOG_FILE%"
+            echo [%date% %time%] CURRENT_EXE=%CURRENT_EXE% >> "%LOG_FILE%"
+            echo [%date% %time%] NEW_EXE=%NEW_EXE% >> "%LOG_FILE%"
+            echo [%date% %time%] TEMP_DIR=%TEMP_DIR% >> "%LOG_FILE%"
             echo 正在更新应用程序，请稍候...
             echo.
 
-            :: 等待原程序退出
+            if not exist "%NEW_EXE%" (
+                echo [%date% %time%] 错误: 新版本文件不存在 >> "%LOG_FILE%"
+                echo 错误: 新版本文件不存在
+                pause
+                exit /b 1
+            )
+            echo [%date% %time%] 新版本文件存在，大小: >> "%LOG_FILE%"
+            for %%A in ("%NEW_EXE%") do echo [%date% %time%]   %%~zA bytes >> "%LOG_FILE%"
+
             set count=0
             :wait_loop
             tasklist /FI "PID eq {currentPid}" 2>NUL | find /I "{currentPid}" >NUL
             if errorlevel 1 goto do_update
             set /a count=%count%+1
             if %count% geq 20 (
+                echo [%date% %time%] 等待超时，强制终止 >> "%LOG_FILE%"
                 echo 等待超时，尝试强制终止进程...
                 taskkill /F /PID {currentPid} 2>NUL
                 timeout /t 1 /nobreak >nul
@@ -383,37 +436,92 @@ public class DownloadService : IDownloadService
             goto wait_loop
 
             :do_update
-            echo 程序已退出，开始更新...
+            echo [%date% %time%] 程序已退出，开始更新 >> "%LOG_FILE%"
 
             echo 正在备份旧版本...
-            if exist "{currentExePath}.bak" del /f /q "{currentExePath}.bak"
-            if exist "{currentExePath}" move /y "{currentExePath}" "{currentExePath}.bak"
+            if exist "%CURRENT_EXE%.bak" del /f /q "%CURRENT_EXE%.bak"
+            if exist "%CURRENT_EXE%" (
+                move /y "%CURRENT_EXE%" "%CURRENT_EXE%.bak"
+                echo [%date% %time%] 备份完成 >> "%LOG_FILE%"
+            ) else (
+                echo [%date% %time%] 旧版本不存在，跳过备份 >> "%LOG_FILE%"
+            )
 
             echo 正在安装新版本...
-            copy /y "{newExePath}" "{currentExePath}"
+            copy /y "%NEW_EXE%" "%CURRENT_EXE%"
 
             if errorlevel 1 (
+                echo [%date% %time%] copy 失败，errorlevel=%errorlevel% >> "%LOG_FILE%"
                 echo 更新失败，正在恢复旧版本...
-                if exist "{currentExePath}.bak" move /y "{currentExePath}.bak" "{currentExePath}"
+                if exist "%CURRENT_EXE%.bak" move /y "%CURRENT_EXE%.bak" "%CURRENT_EXE%"
                 pause
                 exit /b 1
             )
+
+            echo [%date% %time%] copy 成功 >> "%LOG_FILE%"
+
+            if not exist "%CURRENT_EXE%" (
+                echo [%date% %time%] 错误: copy 后目标文件不存在 >> "%LOG_FILE%"
+                echo 更新失败，文件未写入
+                if exist "%CURRENT_EXE%.bak" move /y "%CURRENT_EXE%.bak" "%CURRENT_EXE%"
+                pause
+                exit /b 1
+            )
+
+            for %%A in ("%CURRENT_EXE%") do echo [%date% %time%] 新文件大小: %%~zA bytes >> "%LOG_FILE%"
 
             echo.
             echo 更新完成！正在启动新版本...
             timeout /t 2 /nobreak >nul
 
-            cd /d "{currentDir}"
-            start "" "{currentExeName}"
+            cd /d "%CURRENT_DIR%"
+            echo [%date% %time%] 启动: %CURRENT_EXE_NAME% >> "%LOG_FILE%"
+            start "" "%CURRENT_EXE_NAME%"
 
-            :: 清理临时文件
-            start /b "" cmd /c "timeout /t 5 /nobreak >nul & rmdir /s /q "{tempDir}" 2>nul"
-            exit
+            if errorlevel 1 (
+                echo [%date% %time%] start 失败，errorlevel=%errorlevel% >> "%LOG_FILE%"
+                pause
+                exit /b 1
+            )
+
+            echo [%date% %time%] 启动命令已执行 >> "%LOG_FILE%"
+            echo [%date% %time%] ====== 更新完成 ====== >> "%LOG_FILE%"
+
+            timeout /t 3 /nobreak >nul
+            (goto) 2>nul & rmdir /s /q "%TEMP_DIR%" 2>nul
             """;
 
-        File.WriteAllText(scriptPath, scriptContent, System.Text.Encoding.UTF8);
+        File.WriteAllText(scriptPath, scriptContent, new System.Text.UTF8Encoding(false));
+        _logger.LogInformation("更新脚本已生成: {Path}, 日志文件: {LogFile}", scriptPath, logFile);
         return scriptPath;
     }
+
+
+    /// <summary>
+    /// 获取当前程序的真实 exe 路径。
+    /// PublishSingleFile 发布后 Environment.ProcessPath 返回正确路径；
+    /// dotnet run 开发环境下返回 dotnet.exe，此时回退到 AppContext.BaseDirectory + AssemblyName。
+    /// </summary>
+    private static string? GetCurrentExePath()
+    {
+        var processPath = Environment.ProcessPath;
+
+        // 检测是否在 dotnet run 环境下（ProcessPath 指向 dotnet.exe）
+        if (!string.IsNullOrEmpty(processPath) &&
+            !Path.GetFileNameWithoutExtension(processPath)
+                 .Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+        {
+            return processPath;
+        }
+
+        // 回退：用 BaseDirectory + 程序集名称拼出 exe 路径
+        var assemblyName = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name;
+        if (string.IsNullOrEmpty(assemblyName)) return null;
+
+        var exePath = Path.Combine(AppContext.BaseDirectory, assemblyName + ".exe");
+        return File.Exists(exePath) ? exePath : null;
+    }
+
 
     private async Task<bool> DownloadAndExtractAsync(
         string packageName,

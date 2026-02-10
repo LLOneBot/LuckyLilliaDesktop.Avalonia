@@ -597,20 +597,31 @@ public class AboutViewModel : ViewModelBase
     {
         if (string.IsNullOrEmpty(_pendingAppUpdateScript)) return;
 
-        _logger.LogInformation("启动应用更新脚本");
+        _logger.LogInformation("启动应用更新脚本: {Script}", _pendingAppUpdateScript);
 
-        var scriptDir = Path.GetDirectoryName(_pendingAppUpdateScript);
-        Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = "cmd",
-            Arguments = $"/c start \"更新\" /D \"{scriptDir}\" \"{_pendingAppUpdateScript}\"",
-            UseShellExecute = true,
-            CreateNoWindow = true
-        });
+            // 必须脱离 Job Object，否则主进程退出时脚本也会被杀掉
+            var workDir = Path.GetDirectoryName(_pendingAppUpdateScript) ?? "";
+            if (!_processManager.StartProcessOutsideJob(_pendingAppUpdateScript, workDir))
+            {
+                _logger.LogError("通过 Job Breakaway 启动更新脚本失败，回退到 ShellExecute");
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = _pendingAppUpdateScript,
+                    UseShellExecute = true,
+                    WorkingDirectory = workDir
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "启动更新脚本失败");
+            return;
+        }
 
         _pendingAppUpdateScript = null;
 
-        // 退出应用
         if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.Shutdown();

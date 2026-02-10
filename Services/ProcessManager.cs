@@ -82,7 +82,7 @@ public class ProcessManager : IProcessManager, IDisposable
             {
                 BasicLimitInformation = new JOBOBJECT_BASIC_LIMIT_INFORMATION
                 {
-                    LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                    LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK
                 }
             };
 
@@ -765,6 +765,48 @@ public class ProcessManager : IProcessManager, IDisposable
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr hObject);
 
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool CreateProcess(
+        string? lpApplicationName,
+        string lpCommandLine,
+        IntPtr lpProcessAttributes,
+        IntPtr lpThreadAttributes,
+        bool bInheritHandles,
+        uint dwCreationFlags,
+        IntPtr lpEnvironment,
+        string? lpCurrentDirectory,
+        ref STARTUPINFO lpStartupInfo,
+        out PROCESS_INFORMATION lpProcessInformation);
+
+    private const uint CREATE_BREAKAWAY_FROM_JOB = 0x01000000;
+    private const uint CREATE_NEW_CONSOLE = 0x00000010;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct STARTUPINFO
+    {
+        public int cb;
+        public string? lpReserved;
+        public string? lpDesktop;
+        public string? lpTitle;
+        public int dwX, dwY, dwXSize, dwYSize;
+        public int dwXCountChars, dwYCountChars;
+        public int dwFillAttribute;
+        public int dwFlags;
+        public short wShowWindow;
+        public short cbReserved2;
+        public IntPtr lpReserved2;
+        public IntPtr hStdInput, hStdOutput, hStdError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PROCESS_INFORMATION
+    {
+        public IntPtr hProcess;
+        public IntPtr hThread;
+        public int dwProcessId;
+        public int dwThreadId;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct PROCESS_BASIC_INFORMATION
     {
@@ -814,6 +856,7 @@ public class ProcessManager : IProcessManager, IDisposable
 
     private const int JobObjectExtendedLimitInformation = 9;
     private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
+    private const uint JOB_OBJECT_LIMIT_BREAKAWAY_OK = 0x0800;
 
     #endregion
 
@@ -923,6 +966,38 @@ public class ProcessManager : IProcessManager, IDisposable
         {
             _logger.LogError(ex, "监控 {Name} 进程时出错", name);
         }
+    }
+
+    /// <summary>
+    /// 启动一个脱离 Job Object 的进程，使其不会随主进程退出而被终止
+    /// </summary>
+    public bool StartProcessOutsideJob(string fileName, string? workingDirectory = null)
+    {
+        var si = new STARTUPINFO { cb = Marshal.SizeOf<STARTUPINFO>() };
+        var cmdLine = $"cmd.exe /c \"{fileName}\"";
+
+        var created = CreateProcess(
+            null,
+            cmdLine,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            false,
+            CREATE_BREAKAWAY_FROM_JOB | CREATE_NEW_CONSOLE,
+            IntPtr.Zero,
+            workingDirectory,
+            ref si,
+            out var pi);
+
+        if (!created)
+        {
+            _logger.LogError("CreateProcess 失败, error={Error}", Marshal.GetLastWin32Error());
+            return false;
+        }
+
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        _logger.LogInformation("已启动脱离 Job 的进程: PID={Pid}, cmd={Cmd}", pi.dwProcessId, cmdLine);
+        return true;
     }
 
     public void Dispose()
