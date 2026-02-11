@@ -11,10 +11,16 @@ public static class NodeHelper
 {
     public static string? FindNodeInPath()
     {
-        var nodeExe = FindExecutableInPath("node.exe");
+        var nodeExe = FindExecutableInPath("node" + PlatformHelper.ExecutableExtension);
         if (nodeExe != null) return nodeExe;
 
-        return FindExecutableInPath("node");
+        // 兼容性：在Windows上也尝试查找不带扩展名的node
+        if (PlatformHelper.IsWindows)
+        {
+            return FindExecutableInPath("node");
+        }
+
+        return null;
     }
 
     private static string? FindExecutableInPath(string executable)

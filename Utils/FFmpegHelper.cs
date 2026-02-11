@@ -18,7 +18,7 @@ public static class FFmpegHelper
         {
             try
             {
-                var ffmpegPath = Path.Combine(path, "ffmpeg.exe");
+                var ffmpegPath = Path.Combine(path, "ffmpeg" + PlatformHelper.ExecutableExtension);
                 if (File.Exists(ffmpegPath))
                 {
                     return ffmpegPath;
@@ -50,7 +50,7 @@ public static class FFmpegHelper
             {
                 try
                 {
-                    var ffprobePath = Path.Combine(path, "ffprobe.exe");
+                    var ffprobePath = Path.Combine(path, "ffprobe" + PlatformHelper.ExecutableExtension);
                     if (File.Exists(ffprobePath))
                     {
                         return true;

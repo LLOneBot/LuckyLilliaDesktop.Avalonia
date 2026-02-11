@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using LuckyLilliaDesktop.Utils;
 
 namespace LuckyLilliaDesktop.Services;
 
@@ -31,8 +32,8 @@ public class PythonHelper : IPythonHelper
     private const string PipMirror = "https://pypi.tuna.tsinghua.edu.cn/simple";
 
     public string PythonDir => "bin/python";
-    public string PythonExe => Path.GetFullPath(Path.Combine(PythonDir, "python.exe"));
-    public bool IsInstalled => File.Exists(Path.Combine(PythonDir, "python.exe"));
+    public string PythonExe => Path.GetFullPath(Path.Combine(PythonDir, "python" + PlatformHelper.ExecutableExtension));
+    public bool IsInstalled => File.Exists(Path.Combine(PythonDir, "python" + PlatformHelper.ExecutableExtension));
 
     public PythonHelper(ILogger<PythonHelper> logger)
     {
@@ -98,7 +99,8 @@ public class PythonHelper : IPythonHelper
 
     public async Task<bool> InstallRequirementsAsync(string venvDir, string requirementsFile, Action<string>? onOutput = null, CancellationToken ct = default)
     {
-        var venvPython = Path.Combine(venvDir, "venv", "Scripts", "python.exe");
+        var scriptsDir = PlatformHelper.IsWindows ? "Scripts" : "bin";
+        var venvPython = Path.Combine(venvDir, "venv", scriptsDir, "python" + PlatformHelper.ExecutableExtension);
 
         if (!File.Exists(venvPython))
         {
@@ -119,7 +121,8 @@ public class PythonHelper : IPythonHelper
 
     public async Task<bool> UvInstallRequirementsAsync(string targetDir, string requirementsFile, Action<string>? onOutput = null, CancellationToken ct = default)
     {
-        var uvExe = Path.Combine(Path.GetFullPath(PythonDir), "Scripts", "uv.exe");
+        var scriptsDir = PlatformHelper.IsWindows ? "Scripts" : "bin";
+        var uvExe = Path.Combine(Path.GetFullPath(PythonDir), scriptsDir, "uv" + PlatformHelper.ExecutableExtension);
         if (!File.Exists(uvExe))
         {
             _logger.LogError("uv 未安装: {Path}", uvExe);
@@ -187,7 +190,7 @@ public class PythonHelper : IPythonHelper
                 }
             }
         }
-        
+
         _logger.LogInformation("依赖安装完成");
         return true;
     }

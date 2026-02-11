@@ -1,4 +1,5 @@
 using LuckyLilliaDesktop.Models;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
@@ -171,10 +172,21 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
 
                 try
                 {
-                    var memStatus = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
-                    if (GlobalMemoryStatusEx(ref memStatus))
+                    // GlobalMemoryStatusEx is Windows-only
+                    if (PlatformHelper.IsWindows)
                     {
-                        var availableMB = memStatus.ullAvailPhys / 1024.0 / 1024.0;
+                        var memStatus = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
+                        if (GlobalMemoryStatusEx(ref memStatus))
+                        {
+                            var availableMB = memStatus.ullAvailPhys / 1024.0 / 1024.0;
+                            _availableMemorySubject.OnNext(availableMB);
+                        }
+                    }
+                    else
+                    {
+                        // On macOS/Linux, use GC.GetGCMemoryInfo as a fallback
+                        var gcInfo = GC.GetGCMemoryInfo();
+                        var availableMB = (gcInfo.TotalAvailableMemoryBytes - gcInfo.MemoryLoadBytes) / 1024.0 / 1024.0;
                         _availableMemorySubject.OnNext(availableMB);
                     }
                 }
@@ -237,8 +249,10 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
             {
                 try
                 {
-                    var commandLine = process.StartInfo.Arguments;
-                    if (commandLine.Contains("llbot.js") || process.ProcessName.Contains("node"))
+                    // On macOS/Linux, accessing StartInfo.Arguments for running processes throws InvalidOperationException
+                    // Instead, just check if it's a node process and report its memory
+                    // The LLBot process manager tracks the actual LLBot node process separately
+                    if (process.ProcessName.Equals("node", StringComparison.OrdinalIgnoreCase))
                     {
                         var nodeMemory = GetWorkingSetMB(process);
                         var nodeResources = new ProcessResourceInfo("Node", 0.0, nodeMemory);

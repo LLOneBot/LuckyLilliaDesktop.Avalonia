@@ -1,0 +1,9 @@
+{
+  "dotnet.server.useOmnisharp": false,
+  "omnisharp.useModernNet": true,
+  "omnisharp.sdkPath": "/opt/homebrew/opt/dotnet@8/libexec",
+  "terminal.integrated.env.osx": {
+    "DOTNET_ROOT": "/opt/homebrew/opt/dotnet@8/libexec",
+    "PATH": "/opt/homebrew/opt/dotnet@8/bin:${env:PATH}"
+  }
+}

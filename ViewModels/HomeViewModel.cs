@@ -706,7 +706,10 @@ public class HomeViewModel : ViewModelBase
             // 如果 QQ 路径为空，尝试自动检测
             if (string.IsNullOrEmpty(config.QQPath))
             {
-                var detectedPath = Utils.QQPathHelper.GetQQPathFromRegistry();
+                var detectedPath = Utils.PlatformHelper.IsWindows
+                    ? Utils.QQPathHelper.GetQQPathFromRegistry()
+                    : Utils.QQPathHelper.GetMacOSQQPath();
+
                 if (!string.IsNullOrEmpty(detectedPath))
                 {
                     config.QQPath = detectedPath;
@@ -714,8 +717,44 @@ public class HomeViewModel : ViewModelBase
                 }
                 else
                 {
-                    // 未检测到 QQ，询问用户
-                    if (ChoiceDialog != null)
+                    // macOS: 直接下载，不弹窗
+                    if (Utils.PlatformHelper.IsMacOS)
+                    {
+                        _logger.LogInformation("macOS 未检测到 QQ，开始自动下载...");
+                        _downloadCts = new CancellationTokenSource();
+                        IsDownloading = true;
+                        DownloadingItem = "QQ";
+
+                        try
+                        {
+                            var progress = new Progress<DownloadProgress>(p =>
+                            {
+                                DownloadProgress = p.Percentage;
+                                DownloadStatus = p.Status;
+                            });
+
+                            var success = await _downloadService.DownloadQQAsync(progress, _downloadCts.Token);
+                            if (success)
+                            {
+                                config.QQPath = Utils.QQPathHelper.GetMacOSQQPath() ?? string.Empty;
+                                _logger.LogInformation("QQ 下载完成: {Path}", config.QQPath);
+                            }
+                            else
+                            {
+                                ErrorMessage = "QQ 下载失败";
+                                BotStatus = ProcessStatus.Stopped;
+                                return;
+                            }
+                        }
+                        finally
+                        {
+                            IsDownloading = false;
+                            DownloadingItem = "";
+                            _downloadCts = null;
+                        }
+                    }
+                    // Windows: 弹窗询问用户
+                    else if (ChoiceDialog != null)
                     {
                         var choice = await ChoiceDialog(
                             "未检测到 QQ",

@@ -162,65 +162,159 @@ public class DownloadService : IDownloadService
     {
         try
         {
-            _logger.LogInformation("开始下载 QQ 安装包...");
-            progress?.Report(new DownloadProgress { Status = "正在下载 QQ 安装包..." });
+            _logger.LogInformation("开始下载 QQ...");
+            progress?.Report(new DownloadProgress { Status = "正在下载 QQ..." });
 
-            var tempFile = Path.Combine(Path.GetTempPath(), "QQ_Setup.exe");
-            _logger.LogInformation("下载地址: {Url}", Constants.QQDownloadUrl);
-            _logger.LogInformation("临时文件: {Path}", tempFile);
-
-            using (var response = await _httpClient.GetAsync(Constants.QQDownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct))
+            if (PlatformHelper.IsMacOS)
             {
-                response.EnsureSuccessStatusCode();
-
-                var totalBytes = response.Content.Headers.ContentLength ?? 0;
-                var downloadedBytes = 0L;
-
-                await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
-
-                var buffer = new byte[65536]; // 64KB chunk 提高下载速度
-                int bytesRead;
-
-                while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
-                {
-                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                    downloadedBytes += bytesRead;
-
-                    progress?.Report(new DownloadProgress
-                    {
-                        Downloaded = downloadedBytes,
-                        Total = totalBytes,
-                        Status = $"正在下载 QQ... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB"
-                    });
-                }
+                return await DownloadQQForMacOSAsync(progress, ct);
             }
-
-            progress?.Report(new DownloadProgress { Status = "正在安装 QQ..." });
-            _logger.LogInformation("QQ 下载完成，开始安装...");
-
-            var process = new System.Diagnostics.Process
+            else if (PlatformHelper.IsWindows)
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = tempFile,
-                    Arguments = "/S",
-                    UseShellExecute = true
-                }
-            };
-            process.Start();
-            await process.WaitForExitAsync(ct);
-
-            try { File.Delete(tempFile); } catch { }
-
-            _logger.LogInformation("QQ 安装完成");
-            return true;
+                return await DownloadQQForWindowsAsync(progress, ct);
+            }
+            else
+            {
+                _logger.LogError("不支持的操作系统");
+                return false;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "下载安装 QQ 失败");
+            _logger.LogError(ex, "下载 QQ 失败");
             return false;
         }
+    }
+
+    private async Task<bool> DownloadQQForMacOSAsync(IProgress<DownloadProgress>? progress, CancellationToken ct)
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), "QQ-macos.zip");
+        _logger.LogInformation("macOS QQ 下载地址: {Url}", Constants.QQDownloadUrl);
+        _logger.LogInformation("临时文件: {Path}", tempFile);
+
+        // 下载 zip 文件
+        using (var response = await _httpClient.GetAsync(Constants.QQDownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct))
+        {
+            response.EnsureSuccessStatusCode();
+
+            var totalBytes = response.Content.Headers.ContentLength ?? 0;
+            var downloadedBytes = 0L;
+
+            await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+            await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
+
+            var buffer = new byte[65536];
+            int bytesRead;
+
+            while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
+            {
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                downloadedBytes += bytesRead;
+
+                progress?.Report(new DownloadProgress
+                {
+                    Downloaded = downloadedBytes,
+                    Total = totalBytes,
+                    Status = $"正在下载 QQ... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB"
+                });
+            }
+        }
+
+        progress?.Report(new DownloadProgress { Status = "正在解压 QQ..." });
+        _logger.LogInformation("QQ 下载完成，开始解压...");
+
+        // 确保目录存在
+        var qqDir = Constants.DefaultPaths.QQDir;
+        if (Directory.Exists(qqDir))
+        {
+            Directory.Delete(qqDir, true);
+        }
+        Directory.CreateDirectory(qqDir);
+
+        // 解压 zip 文件
+        System.IO.Compression.ZipFile.ExtractToDirectory(tempFile, qqDir, true);
+
+        try { File.Delete(tempFile); } catch { }
+
+        // 给 QQ 可执行文件添加执行权限
+        var qqExe = Constants.DefaultPaths.QQExe;
+        if (File.Exists(qqExe))
+        {
+            var chmod = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "chmod",
+                    Arguments = $"+x \"{qqExe}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            chmod.Start();
+            await chmod.WaitForExitAsync(ct);
+
+            _logger.LogInformation("macOS QQ 安装完成");
+            return true;
+        }
+        else
+        {
+            _logger.LogError("QQ 可执行文件不存在: {Path}", qqExe);
+            return false;
+        }
+    }
+
+    private async Task<bool> DownloadQQForWindowsAsync(IProgress<DownloadProgress>? progress, CancellationToken ct)
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), "QQ_Setup.exe");
+        _logger.LogInformation("Windows QQ 下载地址: {Url}", Constants.QQDownloadUrl);
+        _logger.LogInformation("临时文件: {Path}", tempFile);
+
+        using (var response = await _httpClient.GetAsync(Constants.QQDownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct))
+        {
+            response.EnsureSuccessStatusCode();
+
+            var totalBytes = response.Content.Headers.ContentLength ?? 0;
+            var downloadedBytes = 0L;
+
+            await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+            await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
+
+            var buffer = new byte[65536];
+            int bytesRead;
+
+            while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
+            {
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                downloadedBytes += bytesRead;
+
+                progress?.Report(new DownloadProgress
+                {
+                    Downloaded = downloadedBytes,
+                    Total = totalBytes,
+                    Status = $"正在下载 QQ... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB"
+                });
+            }
+        }
+
+        progress?.Report(new DownloadProgress { Status = "正在安装 QQ..." });
+        _logger.LogInformation("QQ 下载完成，开始安装...");
+
+        var process = new System.Diagnostics.Process
+        {
+            StartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = tempFile,
+                Arguments = "/S",
+                UseShellExecute = true
+            }
+        };
+        process.Start();
+        await process.WaitForExitAsync(ct);
+
+        try { File.Delete(tempFile); } catch { }
+
+        _logger.LogInformation("Windows QQ 安装完成");
+        return true;
     }
 
     public async Task<AppUpdateResult> DownloadAppUpdateAsync(IProgress<DownloadProgress>? progress = null, CancellationToken ct = default)
@@ -324,7 +418,8 @@ public class DownloadService : IDownloadService
             }
 
             string? newExePath = null;
-            foreach (var file in Directory.GetFiles(tempDir, "*.exe"))
+            var executablePattern = "*" + PlatformHelper.ExecutableExtension;
+            foreach (var file in Directory.GetFiles(tempDir, executablePattern))
             {
                 newExePath = file;
                 break;
@@ -333,8 +428,8 @@ public class DownloadService : IDownloadService
             if (string.IsNullOrEmpty(newExePath))
             {
                 // 也搜索子目录，以防 package/ 没被正确展开
-                var deepSearch = Directory.GetFiles(tempDir, "*.exe", SearchOption.AllDirectories);
-                _logger.LogWarning("顶层未找到exe，深度搜索结果: {Files}",
+                var deepSearch = Directory.GetFiles(tempDir, executablePattern, SearchOption.AllDirectories);
+                _logger.LogWarning("顶层未找到可执行文件，深度搜索结果: {Files}",
                     string.Join(", ", deepSearch.Select(Path.GetFileName)));
                 if (deepSearch.Length > 0)
                     newExePath = deepSearch[0];
@@ -518,7 +613,7 @@ public class DownloadService : IDownloadService
         var assemblyName = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name;
         if (string.IsNullOrEmpty(assemblyName)) return null;
 
-        var exePath = Path.Combine(AppContext.BaseDirectory, assemblyName + ".exe");
+        var exePath = Path.Combine(AppContext.BaseDirectory, assemblyName + PlatformHelper.ExecutableExtension);
         return File.Exists(exePath) ? exePath : null;
     }
 

@@ -14,14 +14,44 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "publish",
+            "label": "publish-win",
             "command": "dotnet",
             "type": "process",
             "args": [
                 "publish",
                 "${workspaceFolder}/LuckyLilliaDesktop.csproj",
                 "-c",
-                "Release"
+                "Release",
+                "-r",
+                "win-x64"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "publish-osx",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "${workspaceFolder}/LuckyLilliaDesktop.csproj",
+                "-c",
+                "Release",
+                "-r",
+                "osx-x64"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "publish-osx-arm64",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "${workspaceFolder}/LuckyLilliaDesktop.csproj",
+                "-c",
+                "Release",
+                "-r",
+                "osx-arm64"
             ],
             "problemMatcher": "$msCompile"
         }

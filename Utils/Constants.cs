@@ -10,11 +10,11 @@ public static class Constants
     /// </summary>
     public static class NpmPackages
     {
-        public const string Pmhq = "pmhq-dist-win-x64";
+        public static string Pmhq => PlatformHelper.GetPlatformPackageName("pmhq-dist");
         public const string LLBot = "llonebot-dist";
-        public const string Node = "llonebot-node-win-x64";
-        public const string FFmpeg = "llonebot-ffmpeg-win-x64";
-        public const string App = "lucky-lillia-desktop-win-x64";
+        public static string Node => PlatformHelper.GetPlatformPackageName("llonebot-node");
+        public static string FFmpeg => PlatformHelper.GetPlatformPackageName("llonebot-ffmpeg");
+        public static string App => PlatformHelper.GetPlatformPackageName("lucky-lillia-desktop");
     }
 
     /// <summary>
@@ -33,12 +33,18 @@ public static class Constants
     public static class DefaultPaths
     {
         public const string PmhqDir = "bin/pmhq";
-        public const string PmhqExe = "bin/pmhq/pmhq-win-x64.exe";
+        public static string PmhqExe => PlatformHelper.GetExecutablePath("bin/pmhq", $"pmhq-{PlatformHelper.PlatformIdentifier}");
         public const string LLBotDir = "bin/llbot";
         public const string LLBotScript = "bin/llbot/llbot.js";
-        public const string NodeExe = "bin/llbot/node.exe";
-        public const string FFmpegExe = "bin/llbot/ffmpeg.exe";
-        public const string FFprobeExe = "bin/llbot/ffprobe.exe";
+        public static string NodeExe => PlatformHelper.GetExecutablePath("bin/llbot", "node");
+        public static string FFmpegExe => PlatformHelper.GetExecutablePath("bin/llbot", "ffmpeg");
+        public static string FFprobeExe => PlatformHelper.GetExecutablePath("bin/llbot", "ffprobe");
+
+        // QQ 相关路径
+        public const string QQDir = "bin/qq";
+        public static string QQExe => PlatformHelper.IsMacOS
+            ? "bin/qq/QQ.app/Contents/MacOS/QQ"
+            : PlatformHelper.GetExecutablePath("bin/qq", "QQ");
     }
 
     /// <summary>
@@ -66,7 +72,9 @@ public static class Constants
     /// <summary>
     /// QQ 下载地址
     /// </summary>
-    public const string QQDownloadUrl = "https://dldir1v6.qq.com/qqfile/qq/QQNT/c50d6326/QQ9.9.22.40768_x64.exe";
+    public static string QQDownloadUrl => PlatformHelper.IsMacOS
+        ? "https://github.com/LLOneBot/exe/releases/download/0.0.0/QQ-macos.zip"
+        : "https://dldir1v6.qq.com/qqfile/qq/QQNT/c50d6326/QQ9.9.22.40768_x64.exe";
 
     /// <summary>
     /// 超时设置

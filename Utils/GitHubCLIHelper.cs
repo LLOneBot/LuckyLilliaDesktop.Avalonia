@@ -41,7 +41,7 @@ public class GitHubCLIHelper : IGitHubCLIHelper
             return true;
 
         // 检查本地 Git
-        var localGit = Path.GetFullPath(Path.Combine(GitDir, "bin", "git.exe"));
+        var localGit = Path.GetFullPath(Path.Combine(GitDir, "bin", "git" + PlatformHelper.ExecutableExtension));
         if (File.Exists(localGit))
         {
             _gitPath = localGit;
@@ -109,7 +109,7 @@ public class GitHubCLIHelper : IGitHubCLIHelper
                 return false;
             }
 
-            _gitPath = Path.GetFullPath(Path.Combine(GitDir, "bin", "git.exe"));
+            _gitPath = Path.GetFullPath(Path.Combine(GitDir, "bin", "git" + PlatformHelper.ExecutableExtension));
             _logger.LogInformation("PortableGit 安装完成: {Path}", _gitPath);
             return true;
         }

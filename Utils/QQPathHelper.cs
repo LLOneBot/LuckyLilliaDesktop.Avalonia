@@ -7,6 +7,39 @@ namespace LuckyLilliaDesktop.Utils;
 
 public static class QQPathHelper
 {
+    /// <summary>
+    /// 获取默认的QQ路径（跨平台）
+    /// </summary>
+    public static string? GetDefaultQQPath()
+    {
+        if (PlatformHelper.IsWindows)
+        {
+            return GetQQPathFromRegistry();
+        }
+
+        if (PlatformHelper.IsMacOS)
+        {
+            return GetMacOSQQPath();
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 获取macOS上的QQ路径
+    /// </summary>
+    public static string? GetMacOSQQPath()
+    {
+        // 默认安装路径
+        var defaultPath = "bin/qq/QQ.app/Contents/MacOS/QQ";
+        if (File.Exists(defaultPath))
+        {
+            return Path.GetFullPath(defaultPath);
+        }
+
+        return null;
+    }
+
     [SupportedOSPlatform("windows")]
     public static string? GetQQPathFromRegistry()
     {

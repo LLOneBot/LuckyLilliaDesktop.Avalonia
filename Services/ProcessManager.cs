@@ -503,30 +503,52 @@ public class ProcessManager : IProcessManager, IDisposable
     {
         try
         {
-            // 使用 taskkill 强制终止进程树
-            var psi = new ProcessStartInfo
+            if (PlatformHelper.IsWindows)
             {
-                FileName = "taskkill",
-                Arguments = $"/F /T /PID {pid}",
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-            
-            using var killProcess = Process.Start(psi);
-            if (killProcess != null)
-            {
-                // 等待 taskkill 命令完成
-                await killProcess.WaitForExitAsync();
+                // 使用 taskkill 强制终止进程树
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "taskkill",
+                    Arguments = $"/F /T /PID {pid}",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using var killProcess = Process.Start(psi);
+                if (killProcess != null)
+                {
+                    // 等待 taskkill 命令完成
+                    await killProcess.WaitForExitAsync();
+                }
             }
-            
+            else
+            {
+                // 在 macOS/Linux 上使用 kill -TERM
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "kill",
+                    Arguments = $"-TERM {pid}",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using var killProcess = Process.Start(psi);
+                if (killProcess != null)
+                {
+                    await killProcess.WaitForExitAsync();
+                }
+            }
+
             // 等待目标进程完全退出
             await WaitForProcessExitAsync(pid, timeoutMs);
         }
         catch
         {
-            // 如果 taskkill 失败，尝试使用 Process.Kill
+            // 如果命令失败，尝试使用 Process.Kill
             try
             {
                 using var process = Process.GetProcessById(pid);
@@ -580,15 +602,30 @@ public class ProcessManager : IProcessManager, IDisposable
     {
         try
         {
-            var psi = new ProcessStartInfo
+            if (PlatformHelper.IsWindows)
             {
-                FileName = "taskkill",
-                Arguments = $"/F /T /PID {pid}",
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-            using var killProcess = Process.Start(psi);
-            killProcess?.WaitForExit(5000);
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "taskkill",
+                    Arguments = $"/F /T /PID {pid}",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                };
+                using var killProcess = Process.Start(psi);
+                killProcess?.WaitForExit(5000);
+            }
+            else
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "kill",
+                    Arguments = $"-TERM {pid}",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                };
+                using var killProcess = Process.Start(psi);
+                killProcess?.WaitForExit(5000);
+            }
         }
         catch
         {
@@ -664,7 +701,7 @@ public class ProcessManager : IProcessManager, IDisposable
                 }
             }
 
-            if (!string.IsNullOrEmpty(instanceName))
+            if (!string.IsNullOrEmpty(instanceName) && PlatformHelper.IsWindows)
             {
                 using var counter = new PerformanceCounter("Process", "Working Set - Private", instanceName, true);
                 return counter.RawValue / 1024.0 / 1024.0;
@@ -732,7 +769,7 @@ public class ProcessManager : IProcessManager, IDisposable
                     _instanceNameCache[pid] = instanceName;
             }
 
-            if (!string.IsNullOrEmpty(instanceName))
+            if (!string.IsNullOrEmpty(instanceName) && PlatformHelper.IsWindows)
             {
                 using var counter = new PerformanceCounter("Process", "Working Set - Private", instanceName, true);
                 return counter.RawValue / 1024.0 / 1024.0;
@@ -862,6 +899,10 @@ public class ProcessManager : IProcessManager, IDisposable
 
     private static int GetParentProcessId(int pid)
     {
+        // NtQueryInformationProcess is Windows-only
+        if (!PlatformHelper.IsWindows)
+            return 0;
+
         try
         {
             var process = Process.GetProcessById(pid);
@@ -877,6 +918,10 @@ public class ProcessManager : IProcessManager, IDisposable
 
     private static string? FindInstanceName(Process process)
     {
+        // PerformanceCounter is Windows-only
+        if (!PlatformHelper.IsWindows)
+            return null;
+
         try
         {
             var name = process.ProcessName;
@@ -969,10 +1014,16 @@ public class ProcessManager : IProcessManager, IDisposable
     }
 
     /// <summary>
-    /// 启动一个脱离 Job Object 的进程，使其不会随主进程退出而被终止
+    /// 启动一个脱离 Job Object 的进程，使其不会随主进程退出而被终止（仅 Windows）
     /// </summary>
     public bool StartProcessOutsideJob(string fileName, string? workingDirectory = null)
     {
+        if (!PlatformHelper.IsWindows)
+        {
+            _logger.LogWarning("StartProcessOutsideJob 仅支持 Windows 平台");
+            return false;
+        }
+
         var si = new STARTUPINFO { cb = Marshal.SizeOf<STARTUPINFO>() };
         var cmdLine = $"cmd.exe /c \"{fileName}\"";
 

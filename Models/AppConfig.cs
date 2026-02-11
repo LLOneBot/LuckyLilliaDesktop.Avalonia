@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using LuckyLilliaDesktop.Utils;
 
 namespace LuckyLilliaDesktop.Models;
 
@@ -12,13 +13,13 @@ public class AppConfig
     public string QQPath { get; set; } = string.Empty;
 
     [JsonPropertyName("pmhq_path")]
-    public string PmhqPath { get; set; } = "bin/pmhq/pmhq-win-x64.exe";
+    public string PmhqPath { get; set; } = Constants.DefaultPaths.PmhqExe;
 
     [JsonPropertyName("llbot_path")]
     public string LLBotPath { get; set; } = "bin/llbot/llbot.js";
 
     [JsonPropertyName("node_path")]
-    public string NodePath { get; set; } = "bin/llbot/node.exe";
+    public string NodePath { get; set; } = Constants.DefaultPaths.NodeExe;
 
     // 启动选项
     [JsonPropertyName("auto_login_qq")]
