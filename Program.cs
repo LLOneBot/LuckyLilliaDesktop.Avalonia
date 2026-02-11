@@ -12,6 +12,11 @@ class Program
     {
         try
         {
+            // 开机自启时工作目录为 System32，需要切换到 exe 所在目录
+            var exeDir = AppContext.BaseDirectory;
+            if (!string.IsNullOrEmpty(exeDir))
+                Environment.CurrentDirectory = exeDir;
+
             try
             {
                 Console.OutputEncoding = Encoding.UTF8;

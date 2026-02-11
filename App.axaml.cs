@@ -27,6 +27,9 @@ public partial class App : Application
         AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
         Console.CancelKeyPress += OnCancelKeyPress;
         
+        // 旧版用注册表实现开机自启，新版改用 Task Scheduler，启动时自动迁移
+        StartupManager.MigrateFromLegacyRegistry();
+        
         Log.Information("应用初始化完成");
     }
 

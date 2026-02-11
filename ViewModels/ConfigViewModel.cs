@@ -586,10 +586,18 @@ public class ConfigViewModel : ViewModelBase
                 // 保存时处理开机自启注册表
                 if (StartupEnabled != _savedStartupEnabled)
                 {
+                    bool startupResult;
                     if (StartupEnabled)
-                        Utils.StartupManager.EnableStartup();
+                        startupResult = Utils.StartupManager.EnableStartup();
                     else
-                        Utils.StartupManager.DisableStartup();
+                        startupResult = Utils.StartupManager.DisableStartup();
+
+                    if (!startupResult)
+                    {
+                        _logger.LogError("设置开机自启失败，可能是路径无效或权限不足");
+                        _startupEnabled = _savedStartupEnabled;
+                        this.RaisePropertyChanged(nameof(StartupEnabled));
+                    }
                 }
 
                 _savedConfig = config;
