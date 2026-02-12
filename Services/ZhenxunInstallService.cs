@@ -129,42 +129,80 @@ public class ZhenxunInstallService : IZhenxunInstallService
         try
         {
             var zhenxunPath = Path.GetFullPath(ZhenxunDir);
-            var scriptsDir = PlatformHelper.IsWindows ? "Scripts" : "bin";
-            var uvExe = Path.Combine(Path.GetFullPath(_pythonHelper.PythonDir), scriptsDir, PlatformHelper.IsWindows ? "uv.exe" : "uv");
+            var uvExe = Path.GetFullPath(PlatformHelper.IsWindows ? "bin/uv/uv.exe" : "bin/uv/uv");
 
             if (!File.Exists(uvExe))
             {
-                _logger.LogError("uv 未安装");
+                _logger.LogError("uv 未正确安装: {Path}", uvExe);
                 return;
             }
+
+            _logger.LogInformation("准备启动真寻Bot，工作目录: {Path}", zhenxunPath);
+            _logger.LogInformation("使用 uv: {Path}", uvExe);
 
             if (PlatformHelper.IsWindows)
             {
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = $"/k \"\"{uvExe}\" tool run poetry run python bot.py & pause\"",
+                    Arguments = $"/k \"\"{uvExe}\" run bot.py & pause\"",
                     WorkingDirectory = zhenxunPath,
                     UseShellExecute = true
                 });
             }
             else
             {
-                // macOS/Linux
-                var terminalCmd = PlatformHelper.IsMacOS ? "open" : "xterm";
-                var terminalArgs = PlatformHelper.IsMacOS
-                    ? $"-a Terminal \"{zhenxunPath}\" --args \"{uvExe}\" tool run poetry run python bot.py"
-                    : $"-e \"{uvExe} tool run poetry run python bot.py && read -p 'Press enter to exit...'\"";
-
-                Process.Start(new ProcessStartInfo
+                // macOS: 使用 osascript 在 Terminal 中执行命令
+                if (PlatformHelper.IsMacOS)
                 {
-                    FileName = terminalCmd,
-                    Arguments = terminalArgs,
-                    WorkingDirectory = zhenxunPath,
-                    UseShellExecute = true
-                });
+                    var escapedPath = zhenxunPath.Replace("\"", "\\\"");
+                    var escapedUv = uvExe.Replace("\"", "\\\"");
+
+                    // 构建完整的命令
+                    var fullCommand = $"cd '{escapedPath}' && '{escapedUv}' run bot.py";
+                    _logger.LogInformation("Terminal 执行命令: {Command}", fullCommand);
+
+                    var script = $"tell application \\\"Terminal\\\" to do script \\\"{fullCommand}\\\"";
+                    _logger.LogInformation("AppleScript: {Script}", script);
+
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "osascript",
+                        Arguments = $"-e \"{script}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+
+                    var proc = Process.Start(psi);
+                    if (proc != null)
+                    {
+                        proc.WaitForExit();
+                        var output = proc.StandardOutput.ReadToEnd();
+                        var error = proc.StandardError.ReadToEnd();
+
+                        if (!string.IsNullOrEmpty(output))
+                            _logger.LogInformation("osascript 输出: {Output}", output);
+                        if (!string.IsNullOrEmpty(error))
+                            _logger.LogWarning("osascript 错误: {Error}", error);
+
+                        _logger.LogInformation("osascript 退出码: {ExitCode}", proc.ExitCode);
+                    }
+                }
+                else
+                {
+                    // Linux
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "xterm",
+                        Arguments = $"-e \"{uvExe} run bot.py && read -p 'Press enter to exit...'\"",
+                        WorkingDirectory = zhenxunPath,
+                        UseShellExecute = true
+                    });
+                }
             }
-            _logger.LogInformation("真寻Bot已启动");
+            _logger.LogInformation("真寻Bot启动命令已执行");
         }
         catch (Exception ex)
         {

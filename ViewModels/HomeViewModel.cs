@@ -97,15 +97,26 @@ public class HomeViewModel : ViewModelBase
     public double BotMemory
     {
         get => _botMemory;
-        set => this.RaiseAndSetIfChanged(ref _botMemory, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _botMemory, value);
+            this.RaisePropertyChanged(nameof(TotalMemory));
+        }
     }
 
     private double _availableMemory;
     public double AvailableMemory
     {
         get => _availableMemory;
-        set => this.RaiseAndSetIfChanged(ref _availableMemory, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _availableMemory, value);
+            this.RaisePropertyChanged(nameof(TotalMemory));
+        }
     }
+
+    // 总内存 = Bot占用 + QQ占用 + 可用内存
+    public double TotalMemory => BotMemory + QQMemory + AvailableMemory;
 
     // QQ 状态
     private ProcessStatus _qqStatus = ProcessStatus.Stopped;
@@ -140,7 +151,11 @@ public class HomeViewModel : ViewModelBase
     public double QQMemory
     {
         get => _qqMemory;
-        set => this.RaiseAndSetIfChanged(ref _qqMemory, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _qqMemory, value);
+            this.RaisePropertyChanged(nameof(TotalMemory));
+        }
     }
 
     // QQ 版本

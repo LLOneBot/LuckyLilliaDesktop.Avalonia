@@ -141,6 +141,17 @@ public partial class App : Application
                         _trayShowMenuItem = menu.Items[0] as NativeMenuItem;
                     }
                 }
+
+                // macOS: 主动显示并激活窗口
+                if (PlatformHelper.IsMacOS)
+                {
+                    // 临时设置 Topmost 确保窗口出现在最前面
+                    desktop.MainWindow.Topmost = true;
+                    desktop.MainWindow.Show();
+                    desktop.MainWindow.Activate();
+                    // 恢复 Topmost 状态
+                    desktop.MainWindow.Topmost = false;
+                }
             }
 
             Log.Information("框架初始化完成，主窗口已创建");

@@ -121,13 +121,13 @@
                                            FontWeight="Medium"
                                            Foreground="{DynamicResource TextPrimary}">
                                     <TextBlock.Text>
-                                        <MultiBinding StringFormat="内存: {0:F0} / {1:F0} MB">
+                                        <MultiBinding StringFormat="{}{0:F0} MB 已用 / {1:F0} MB 可用">
                                             <Binding Path="BotMemory"/>
                                             <Binding Path="AvailableMemory"/>
                                         </MultiBinding>
                                     </TextBlock.Text>
                                 </TextBlock>
-                                <ProgressBar Value="{Binding BotMemory}" Maximum="{Binding AvailableMemory}" Height="6"
+                                <ProgressBar Value="{Binding BotMemory}" Maximum="{Binding TotalMemory}" Height="6"
                                              Foreground="{DynamicResource SuccessColor}" Background="{DynamicResource BorderColor}"/>
                             </StackPanel>
                         </StackPanel>
@@ -178,13 +178,13 @@
                                            FontWeight="Medium"
                                            Foreground="{DynamicResource TextPrimary}">
                                     <TextBlock.Text>
-                                        <MultiBinding StringFormat="内存: {0:F0} / {1:F0} MB">
+                                        <MultiBinding StringFormat="{}{0:F0} MB 已用 / {1:F0} MB 可用">
                                             <Binding Path="QQMemory"/>
                                             <Binding Path="AvailableMemory"/>
                                         </MultiBinding>
                                     </TextBlock.Text>
                                 </TextBlock>
-                                <ProgressBar Value="{Binding QQMemory}" Maximum="{Binding AvailableMemory}" Height="6"
+                                <ProgressBar Value="{Binding QQMemory}" Maximum="{Binding TotalMemory}" Height="6"
                                              Foreground="{DynamicResource SuccessColor}" Background="{DynamicResource BorderColor}"/>
                             </StackPanel>
                         </StackPanel>
