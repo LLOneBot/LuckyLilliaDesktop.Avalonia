@@ -156,36 +156,91 @@ public class ProcessManager : IProcessManager, IDisposable
                 await UpdatePmhqConfigAsync(workingDir, qqPath);
             }
 
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = pmhqPath,
-                WorkingDirectory = workingDir,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
+            ProcessStartInfo startInfo;
 
-            // 添加端口参数
-            startInfo.ArgumentList.Add($"--port={PmhqPort}");
-
-            // 如果指定了自动登录QQ号，添加 --qq 参数
-            if (!string.IsNullOrEmpty(autoLoginQQ))
+            if (PlatformHelper.IsMacOS)
             {
-                startInfo.ArgumentList.Add($"--qq={autoLoginQQ}");
+                // macOS: 转换为绝对路径
+                var absPmhqPath = Path.GetFullPath(pmhqPath);
+
+                // 先确保 pmhq 有可执行权限
+                try
+                {
+                    var chmodPsi = new ProcessStartInfo
+                    {
+                        FileName = "chmod",
+                        Arguments = $"+x \"{absPmhqPath}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    using var chmodProc = Process.Start(chmodPsi);
+                    chmodProc?.WaitForExit();
+                    _logger.LogInformation("已设置 PMHQ 可执行权限: {Path}", absPmhqPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "设置 PMHQ 可执行权限失败");
+                }
+
+                // 构建参数字符串
+                var args = new List<string> { $"--port={PmhqPort}" };
+                if (!string.IsNullOrEmpty(autoLoginQQ))
+                    args.Add($"--qq={autoLoginQQ}");
+                if (headless)
+                    args.Add("--headless");
+
+                var argsString = string.Join(" ", args);
+
+                // macOS 使用 bash 执行，这样可以正确处理环境变量和 GUI 应用启动
+                // 使用绝对路径避免 "command not found" 错误
+                // 使用 UseShellExecute = true 避免 QQ 继承已关闭的标准流导致 EPIPE 错误
+                startInfo = new ProcessStartInfo
+                {
+                    FileName = "/bin/bash",
+                    Arguments = $"-c \"\\\"{absPmhqPath}\\\" {argsString}\"",
+                    WorkingDirectory = workingDir,
+                    UseShellExecute = true,
+                    CreateNoWindow = false  // macOS 上 UseShellExecute = true 时此选项无效
+                };
+
+                var fullCommand = $"{absPmhqPath} {argsString}";
+                _logger.LogInformation("启动 PMHQ 完整命令: {Command}", fullCommand);
+                _logger.LogInformation("工作目录: {WorkingDir}", workingDir);
             }
-
-            // 如果启用无头模式
-            if (headless)
+            else
             {
-                startInfo.ArgumentList.Add("--headless");
-            }
+                // Windows
+                startInfo = new ProcessStartInfo
+                {
+                    FileName = pmhqPath,
+                    WorkingDirectory = workingDir,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
 
-            var fullCommand = $"{pmhqPath} {string.Join(" ", startInfo.ArgumentList)}";
-            _logger.LogInformation("启动 PMHQ 完整命令: {Command}", fullCommand);
-            _logger.LogInformation("工作目录: {WorkingDir}", workingDir);
+                // 添加端口参数
+                startInfo.ArgumentList.Add($"--port={PmhqPort}");
+
+                // 如果指定了自动登录QQ号，添加 --qq 参数
+                if (!string.IsNullOrEmpty(autoLoginQQ))
+                {
+                    startInfo.ArgumentList.Add($"--qq={autoLoginQQ}");
+                }
+
+                // 如果启用无头模式
+                if (headless)
+                {
+                    startInfo.ArgumentList.Add("--headless");
+                }
+
+                var fullCommand = $"{pmhqPath} {string.Join(" ", startInfo.ArgumentList)}";
+                _logger.LogInformation("启动 PMHQ 完整命令: {Command}", fullCommand);
+                _logger.LogInformation("工作目录: {WorkingDir}", workingDir);
+            }
 
             _pmhqProcess = Process.Start(startInfo);
 
@@ -230,8 +285,12 @@ public class ProcessManager : IProcessManager, IDisposable
                 }
             }
 
-            // 附加日志收集
-            _logCollector.AttachProcess("PMHQ", _pmhqProcess);
+            // macOS 上使用 UseShellExecute = true，无法附加日志收集
+            // Windows 上可以附加日志收集
+            if (PlatformHelper.IsWindows)
+            {
+                _logCollector.AttachProcess("PMHQ", _pmhqProcess);
+            }
 
             _pmhqStatus = ProcessStatus.Running;
             ProcessStatusChanged?.Invoke(this, _pmhqStatus);

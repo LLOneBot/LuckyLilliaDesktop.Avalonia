@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace LuckyLilliaDesktop.Services;
@@ -128,21 +129,41 @@ public class ZhenxunInstallService : IZhenxunInstallService
         try
         {
             var zhenxunPath = Path.GetFullPath(ZhenxunDir);
-            var uvExe = Path.Combine(Path.GetFullPath(_pythonHelper.PythonDir), "Scripts", "uv.exe");
-            
+            var scriptsDir = PlatformHelper.IsWindows ? "Scripts" : "bin";
+            var uvExe = Path.Combine(Path.GetFullPath(_pythonHelper.PythonDir), scriptsDir, PlatformHelper.IsWindows ? "uv.exe" : "uv");
+
             if (!File.Exists(uvExe))
             {
                 _logger.LogError("uv 未安装");
                 return;
             }
 
-            Process.Start(new ProcessStartInfo
+            if (PlatformHelper.IsWindows)
             {
-                FileName = "cmd.exe",
-                Arguments = $"/k \"\"{uvExe}\" tool run poetry run python bot.py & pause\"",
-                WorkingDirectory = zhenxunPath,
-                UseShellExecute = true
-            });
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/k \"\"{uvExe}\" tool run poetry run python bot.py & pause\"",
+                    WorkingDirectory = zhenxunPath,
+                    UseShellExecute = true
+                });
+            }
+            else
+            {
+                // macOS/Linux
+                var terminalCmd = PlatformHelper.IsMacOS ? "open" : "xterm";
+                var terminalArgs = PlatformHelper.IsMacOS
+                    ? $"-a Terminal \"{zhenxunPath}\" --args \"{uvExe}\" tool run poetry run python bot.py"
+                    : $"-e \"{uvExe} tool run poetry run python bot.py && read -p 'Press enter to exit...'\"";
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = terminalCmd,
+                    Arguments = terminalArgs,
+                    WorkingDirectory = zhenxunPath,
+                    UseShellExecute = true
+                });
+            }
             _logger.LogInformation("真寻Bot已启动");
         }
         catch (Exception ex)

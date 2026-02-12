@@ -51,19 +51,48 @@ public class YunzaiInstallService : IYunzaiInstallService
         try
         {
             // Step 1: 下载 Redis（如果不存在）
-            if (!File.Exists(Path.Combine(RedisDir, "redis-server.exe")))
+            var redisExeName = PlatformHelper.IsWindows ? "redis-server.exe" : "redis-server";
+            if (!File.Exists(Path.Combine(RedisDir, redisExeName)))
             {
                 Report(progress, 1, totalSteps, "下载 Redis", "正在下载...");
-                var redisFileName = $"Redis-{RedisVersion}-Windows-x64-msys2.zip";
-                var redisZip = Path.Combine(Path.GetTempPath(), redisFileName);
 
-                string[] redisUrls = [
-                    $"https://gh-proxy.com/https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}",
-                    $"https://ghproxy.net/https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}",
-                    $"https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}"
-                ];
+                string redisFileName;
+                string[] redisUrls;
+                string extractedDirName;
 
-                var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(redisUrls, redisZip,
+                if (PlatformHelper.IsWindows)
+                {
+                    redisFileName = $"Redis-{RedisVersion}-Windows-x64-msys2.zip";
+                    redisUrls = [
+                        $"https://gh-proxy.com/https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}",
+                        $"https://ghproxy.net/https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}",
+                        $"https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}"
+                    ];
+                    extractedDirName = $"Redis-{RedisVersion}-Windows-x64-msys2";
+                }
+                else if (PlatformHelper.IsMacOS)
+                {
+                    // macOS ARM64 或 x64
+                    var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "x86_64";
+                    redisFileName = $"redis-{RedisVersion}-macos-{arch}.tar.gz";
+                    redisUrls = [
+                        $"https://github.com/redis/redis/archive/refs/tags/{RedisVersion}.tar.gz"
+                    ];
+                    extractedDirName = $"redis-{RedisVersion}";
+                }
+                else
+                {
+                    // Linux
+                    redisFileName = $"redis-{RedisVersion}-linux-x64.tar.gz";
+                    redisUrls = [
+                        $"https://github.com/redis/redis/archive/refs/tags/{RedisVersion}.tar.gz"
+                    ];
+                    extractedDirName = $"redis-{RedisVersion}";
+                }
+
+                var redisArchive = Path.Combine(Path.GetTempPath(), redisFileName);
+
+                var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(redisUrls, redisArchive,
                     (downloaded, total) => Report(progress, 1, totalSteps, "下载 Redis",
                         $"正在下载... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
                         total > 0 ? (double)downloaded / total * 100 : 0), ct);
@@ -77,14 +106,61 @@ public class YunzaiInstallService : IYunzaiInstallService
                 Report(progress, 1, totalSteps, "解压 Redis", "正在解压...");
                 var tempExtract = Path.Combine(Path.GetTempPath(), "redis-extract");
                 await SafeDeleteDirectoryAsync(tempExtract);
-                await Task.Run(() => ZipFile.ExtractToDirectory(redisZip, tempExtract, true), ct).ConfigureAwait(false);
-                await Task.Run(() => File.Delete(redisZip), ct).ConfigureAwait(false);
+
+                if (PlatformHelper.IsWindows)
+                {
+                    await Task.Run(() => ZipFile.ExtractToDirectory(redisArchive, tempExtract, true), ct).ConfigureAwait(false);
+                }
+                else
+                {
+                    // macOS/Linux 使用 tar 解压
+                    var tarPsi = new ProcessStartInfo
+                    {
+                        FileName = "tar",
+                        Arguments = $"-xzf \"{redisArchive}\" -C \"{tempExtract}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    using var tarProc = Process.Start(tarPsi);
+                    if (tarProc != null)
+                    {
+                        await tarProc.WaitForExitAsync(ct);
+                    }
+                }
+
+                await Task.Run(() => File.Delete(redisArchive), ct).ConfigureAwait(false);
 
                 await SafeDeleteDirectoryAsync(RedisDir);
-                var extractedDir = Path.Combine(tempExtract, $"Redis-{RedisVersion}-Windows-x64-msys2");
+                var extractedDir = Path.Combine(tempExtract, extractedDirName);
                 await Task.Run(() => CopyDirectory(extractedDir, RedisDir), ct).ConfigureAwait(false);
                 await SafeDeleteDirectoryAsync(tempExtract);
-                _logger.LogInformation("Redis 解压完成");
+
+                // macOS/Linux 需要编译 Redis
+                if (!PlatformHelper.IsWindows)
+                {
+                    Report(progress, 1, totalSteps, "编译 Redis", "正在编译...");
+                    var makePsi = new ProcessStartInfo
+                    {
+                        FileName = "make",
+                        WorkingDirectory = RedisDir,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+                    using var makeProc = Process.Start(makePsi);
+                    if (makeProc != null)
+                    {
+                        await makeProc.WaitForExitAsync(ct);
+                        if (makeProc.ExitCode != 0)
+                        {
+                            ReportError(progress, 1, totalSteps, "编译 Redis 失败");
+                            return false;
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Redis 安装完成");
             }
             else
             {
@@ -92,18 +168,44 @@ public class YunzaiInstallService : IYunzaiInstallService
             }
 
             // Step 2: 下载 Node.js 24（如果不存在）
-            if (!File.Exists(Path.Combine(Node24Dir, "node.exe")))
+            var nodeExeName = PlatformHelper.IsWindows ? "node.exe" : "node";
+            if (!File.Exists(Path.Combine(Node24Dir, nodeExeName)))
             {
                 Report(progress, 2, totalSteps, "下载 Node.js 24", "正在下载...");
-                var nodeZip = Path.Combine(Path.GetTempPath(), $"node-{NodeVersion}-win-x64.zip");
+
+                string nodePlatform;
+                string nodeArchive;
+                string extractedDirName;
+
+                if (PlatformHelper.IsWindows)
+                {
+                    nodePlatform = "win-x64";
+                    nodeArchive = $"node-{NodeVersion}-{nodePlatform}.zip";
+                    extractedDirName = $"node-{NodeVersion}-{nodePlatform}";
+                }
+                else if (PlatformHelper.IsMacOS)
+                {
+                    var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "x64";
+                    nodePlatform = $"darwin-{arch}";
+                    nodeArchive = $"node-{NodeVersion}-{nodePlatform}.tar.gz";
+                    extractedDirName = $"node-{NodeVersion}-{nodePlatform}";
+                }
+                else
+                {
+                    nodePlatform = "linux-x64";
+                    nodeArchive = $"node-{NodeVersion}-{nodePlatform}.tar.xz";
+                    extractedDirName = $"node-{NodeVersion}-{nodePlatform}";
+                }
+
+                var nodeArchivePath = Path.Combine(Path.GetTempPath(), nodeArchive);
 
                 string[] nodeUrls = [
-                    $"https://npmmirror.com/mirrors/node/{NodeVersion}/node-{NodeVersion}-win-x64.zip",
-                    $"https://cdn.npmmirror.com/binaries/node/{NodeVersion}/node-{NodeVersion}-win-x64.zip",
-                    $"https://nodejs.org/dist/{NodeVersion}/node-{NodeVersion}-win-x64.zip"
+                    $"https://npmmirror.com/mirrors/node/{NodeVersion}/{nodeArchive}",
+                    $"https://cdn.npmmirror.com/binaries/node/{NodeVersion}/{nodeArchive}",
+                    $"https://nodejs.org/dist/{NodeVersion}/{nodeArchive}"
                 ];
 
-                var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(nodeUrls, nodeZip,
+                var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(nodeUrls, nodeArchivePath,
                     (downloaded, total) => Report(progress, 2, totalSteps, "下载 Node.js 24",
                         $"正在下载... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
                         total > 0 ? (double)downloaded / total * 100 : 0), ct);
@@ -117,12 +219,49 @@ public class YunzaiInstallService : IYunzaiInstallService
                 Report(progress, 2, totalSteps, "解压 Node.js 24", "正在解压...");
                 var tempExtract = Path.Combine(Path.GetTempPath(), "node24-extract");
                 await SafeDeleteDirectoryAsync(tempExtract);
-                await Task.Run(() => ZipFile.ExtractToDirectory(nodeZip, tempExtract, true), ct).ConfigureAwait(false);
-                await Task.Run(() => File.Delete(nodeZip), ct).ConfigureAwait(false);
+
+                if (PlatformHelper.IsWindows)
+                {
+                    await Task.Run(() => ZipFile.ExtractToDirectory(nodeArchivePath, tempExtract, true), ct).ConfigureAwait(false);
+                }
+                else if (PlatformHelper.IsMacOS)
+                {
+                    // macOS 使用 tar.gz
+                    var tarPsi = new ProcessStartInfo
+                    {
+                        FileName = "tar",
+                        Arguments = $"-xzf \"{nodeArchivePath}\" -C \"{tempExtract}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    using var tarProc = Process.Start(tarPsi);
+                    if (tarProc != null)
+                    {
+                        await tarProc.WaitForExitAsync(ct);
+                    }
+                }
+                else
+                {
+                    // Linux 使用 tar.xz
+                    var tarPsi = new ProcessStartInfo
+                    {
+                        FileName = "tar",
+                        Arguments = $"-xJf \"{nodeArchivePath}\" -C \"{tempExtract}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    using var tarProc = Process.Start(tarPsi);
+                    if (tarProc != null)
+                    {
+                        await tarProc.WaitForExitAsync(ct);
+                    }
+                }
+
+                await Task.Run(() => File.Delete(nodeArchivePath), ct).ConfigureAwait(false);
 
                 // 复制到目标目录（跨盘符不能用 Move）
                 await SafeDeleteDirectoryAsync(Node24Dir);
-                var extractedDir = Path.Combine(tempExtract, $"node-{NodeVersion}-win-x64");
+                var extractedDir = Path.Combine(tempExtract, extractedDirName);
                 await Task.Run(() => CopyDirectory(extractedDir, Node24Dir), ct).ConfigureAwait(false);
                 await SafeDeleteDirectoryAsync(tempExtract);
                 _logger.LogInformation("Node.js 24 解压完成");
@@ -145,8 +284,10 @@ public class YunzaiInstallService : IYunzaiInstallService
 
             // Step 4: 安装 pnpm
             Report(progress, 4, totalSteps, "安装 pnpm", "正在安装 pnpm...");
-            var nodeExe = Path.GetFullPath(Path.Combine(Node24Dir, "node.exe"));
-            var npmCli = Path.GetFullPath(Path.Combine(Node24Dir, "node_modules", "npm", "bin", "npm-cli.js"));
+            var nodeExe = Path.GetFullPath(Path.Combine(Node24Dir, PlatformHelper.IsWindows ? "node.exe" : "bin/node"));
+            var npmCli = PlatformHelper.IsWindows
+                ? Path.GetFullPath(Path.Combine(Node24Dir, "node_modules", "npm", "bin", "npm-cli.js"))
+                : Path.GetFullPath(Path.Combine(Node24Dir, "lib", "node_modules", "npm", "bin", "npm-cli.js"));
 
             if (!await RunCommandAsync(nodeExe, $"\"{npmCli}\" install -g pnpm --registry=https://registry.npmmirror.com",
                 Node24Path, line => Report(progress, 4, totalSteps, "安装 pnpm", line), ct))
@@ -157,8 +298,10 @@ public class YunzaiInstallService : IYunzaiInstallService
 
             // Step 5: 安装云崽依赖
             Report(progress, 5, totalSteps, "安装依赖", "正在安装云崽依赖...");
-            var pnpmCmd = Path.GetFullPath(Path.Combine(Node24Dir, "pnpm.cmd"));
-            
+            var pnpmCmd = PlatformHelper.IsWindows
+                ? Path.GetFullPath(Path.Combine(Node24Dir, "pnpm.cmd"))
+                : Path.GetFullPath(Path.Combine(Node24Dir, "bin", "pnpm"));
+
             if (!await RunCommandAsync(pnpmCmd, "install --registry=https://registry.npmmirror.com",
                 YunzaiPath, line => Report(progress, 5, totalSteps, "安装依赖", line), ct))
             {
@@ -166,7 +309,9 @@ public class YunzaiInstallService : IYunzaiInstallService
                 return false;
             }
 
-            var npmCmd = Path.GetFullPath(Path.Combine(Node24Dir, "npm.cmd"));
+            var npmCmd = PlatformHelper.IsWindows
+                ? Path.GetFullPath(Path.Combine(Node24Dir, "npm.cmd"))
+                : Path.GetFullPath(Path.Combine(Node24Dir, "bin", "npm"));
 
             // Step 6-7: 安装 TRSS-Plugin
             if (!await InstallPluginAsync("TRSS-Plugin", "TimeRainStarSky/TRSS-Plugin", "main", 
@@ -205,7 +350,7 @@ public class YunzaiInstallService : IYunzaiInstallService
         try
         {
             // 先启动 Redis
-            var redisExe = Path.GetFullPath(Path.Combine(RedisDir, "redis-server.exe"));
+            var redisExe = Path.GetFullPath(Path.Combine(RedisDir, PlatformHelper.IsWindows ? "redis-server.exe" : "src/redis-server"));
             if (File.Exists(redisExe))
             {
                 var redisProcs = Process.GetProcessesByName("redis-server");
@@ -214,17 +359,32 @@ public class YunzaiInstallService : IYunzaiInstallService
                     // 确保数据目录存在，解决 RDB 持久化问题
                     var dataDir = Path.GetFullPath(Path.Combine(RedisDir, "data"));
                     Directory.CreateDirectory(dataDir);
-                    // Windows 路径需要替换反斜杠为正斜杠给 Redis
-                    var dataDirForRedis = dataDir.Replace("\\", "/");
-                    
-                    Process.Start(new ProcessStartInfo
+
+                    if (PlatformHelper.IsWindows)
                     {
-                        FileName = redisExe,
-                        Arguments = $"--dir \"{dataDirForRedis}\"",
-                        WorkingDirectory = RedisPath,
-                        UseShellExecute = true,
-                        WindowStyle = ProcessWindowStyle.Minimized
-                    });
+                        // Windows 路径需要替换反斜杠为正斜杠给 Redis
+                        var dataDirForRedis = dataDir.Replace("\\", "/");
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = redisExe,
+                            Arguments = $"--dir \"{dataDirForRedis}\"",
+                            WorkingDirectory = RedisPath,
+                            UseShellExecute = true,
+                            WindowStyle = ProcessWindowStyle.Minimized
+                        });
+                    }
+                    else
+                    {
+                        // macOS/Linux
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = redisExe,
+                            Arguments = $"--dir \"{dataDir}\"",
+                            WorkingDirectory = RedisPath,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        });
+                    }
                     _logger.LogInformation("Redis 已启动，数据目录: {Dir}", dataDir);
                     System.Threading.Thread.Sleep(1500);
                 }
@@ -239,7 +399,7 @@ public class YunzaiInstallService : IYunzaiInstallService
             }
 
             var yunzaiPath = Path.GetFullPath(YunzaiDir);
-            var nodeExe = Path.GetFullPath(Path.Combine(Node24Dir, "node.exe"));
+            var nodeExe = Path.GetFullPath(Path.Combine(Node24Dir, PlatformHelper.IsWindows ? "node.exe" : "bin/node"));
 
             if (!File.Exists(nodeExe))
             {
@@ -247,13 +407,32 @@ public class YunzaiInstallService : IYunzaiInstallService
                 return;
             }
 
-            Process.Start(new ProcessStartInfo
+            if (PlatformHelper.IsWindows)
             {
-                FileName = "cmd.exe",
-                Arguments = $"/k \"\"{nodeExe}\" . & pause\"",
-                WorkingDirectory = yunzaiPath,
-                UseShellExecute = true
-            });
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/k \"\"{nodeExe}\" . & pause\"",
+                    WorkingDirectory = yunzaiPath,
+                    UseShellExecute = true
+                });
+            }
+            else
+            {
+                // macOS/Linux 启动终端
+                var terminalCmd = PlatformHelper.IsMacOS ? "open" : "xterm";
+                var terminalArgs = PlatformHelper.IsMacOS
+                    ? $"-a Terminal \"{yunzaiPath}\" --args \"{nodeExe}\" ."
+                    : $"-e \"{nodeExe} . && read -p 'Press enter to exit...'\"";
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = terminalCmd,
+                    Arguments = terminalArgs,
+                    WorkingDirectory = yunzaiPath,
+                    UseShellExecute = true
+                });
+            }
             _logger.LogInformation("云崽已启动");
         }
         catch (Exception ex)

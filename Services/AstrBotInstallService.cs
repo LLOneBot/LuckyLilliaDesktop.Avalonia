@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace LuckyLilliaDesktop.Services;
@@ -91,39 +92,39 @@ public class AstrBotInstallService : IAstrBotInstallService
             Directory.Delete(tempExtractDir, true);
             _logger.LogInformation("AstrBot 源码解压完成");
 
-            // Step 3.5: 下载 dist.zip 到 data 目录
+            // Step 3.5: 下载 dashboard.zip 到 data 目录
             Report(progress, 3, totalSteps, "下载数据", "正在获取最新版本...");
             var tag = await _gitHubHelper.GetLatestTagAsync("AstrBotDevs", "AstrBot", ct);
             if (string.IsNullOrEmpty(tag))
             {
-                _logger.LogWarning("无法获取 AstrBot 最新版本，跳过 dist.zip 下载");
+                _logger.LogWarning("无法获取 AstrBot 最新版本，跳过 dashboard.zip 下载");
             }
             else
             {
-                Report(progress, 3, totalSteps, "下载数据", $"正在下载 dist.zip ({tag})...");
-                var distZip = Path.Combine(Path.GetTempPath(), "astrbot-dist.zip");
-                var baseUrl = $"https://github.com/AstrBotDevs/AstrBot/releases/download/{tag}/dist.zip";
-                string[] distUrls = [
+                Report(progress, 3, totalSteps, "下载数据", $"正在下载 dashboard.zip ({tag})...");
+                var dashboardZip = Path.Combine(Path.GetTempPath(), "astrbot-dashboard.zip");
+                var baseUrl = $"https://github.com/AstrBotDevs/AstrBot/releases/download/{tag}/AstrBot-{tag}-dashboard.zip";
+                string[] dashboardUrls = [
                     $"https://gh-proxy.com/{baseUrl}",
                     $"https://ghproxy.net/{baseUrl}",
                     $"https://mirror.ghproxy.com/{baseUrl}",
                     baseUrl
                 ];
 
-                if (await _gitHubHelper.DownloadWithFallbackAsync(distUrls, distZip,
+                if (await _gitHubHelper.DownloadWithFallbackAsync(dashboardUrls, dashboardZip,
                     (downloaded, total) => Report(progress, 3, totalSteps, "下载数据",
-                        $"正在下载 dist.zip... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
+                        $"正在下载 dashboard.zip... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
                         total > 0 ? (double)downloaded / total * 100 : 0), ct))
                 {
                     var dataDir = Path.Combine(AstrBotDir, "data");
                     Directory.CreateDirectory(dataDir);
-                    await Task.Run(() => ZipFile.ExtractToDirectory(distZip, dataDir, true), ct).ConfigureAwait(false);
-                    File.Delete(distZip);
-                    _logger.LogInformation("dist.zip 解压到 data 目录完成");
+                    await Task.Run(() => ZipFile.ExtractToDirectory(dashboardZip, dataDir, true), ct).ConfigureAwait(false);
+                    File.Delete(dashboardZip);
+                    _logger.LogInformation("dashboard.zip 解压到 data 目录完成");
                 }
                 else
                 {
-                    _logger.LogWarning("下载 dist.zip 失败，跳过");
+                    _logger.LogWarning("下载 dashboard.zip 失败，跳过");
                 }
             }
 
@@ -160,22 +161,80 @@ public class AstrBotInstallService : IAstrBotInstallService
         try
         {
             var astrBotPath = Path.GetFullPath(AstrBotDir);
-            var venvPython = Path.Combine(astrBotPath, ".venv", "Scripts", "python.exe");
+            var uvExe = Path.GetFullPath(PlatformHelper.IsWindows ? "bin/uv/uv.exe" : "bin/uv/uv");
 
-            if (!File.Exists(venvPython))
+            if (!File.Exists(uvExe))
             {
-                _logger.LogError("AstrBot 未正确安装");
+                _logger.LogError("uv 未正确安装: {Path}", uvExe);
                 return;
             }
 
-            Process.Start(new ProcessStartInfo
+            _logger.LogInformation("准备启动 AstrBot，工作目录: {Path}", astrBotPath);
+            _logger.LogInformation("使用 uv: {Path}", uvExe);
+
+            if (PlatformHelper.IsWindows)
             {
-                FileName = "cmd.exe",
-                Arguments = $"/k \"\"{venvPython}\" main.py & pause\"",
-                WorkingDirectory = astrBotPath,
-                UseShellExecute = true
-            });
-            _logger.LogInformation("AstrBot 已启动");
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/k \"\"{uvExe}\" run main.py & pause\"",
+                    WorkingDirectory = astrBotPath,
+                    UseShellExecute = true
+                });
+            }
+            else
+            {
+                // macOS: 使用 osascript 在 Terminal 中执行命令
+                if (PlatformHelper.IsMacOS)
+                {
+                    var escapedPath = astrBotPath.Replace("\"", "\\\"");
+                    var escapedUv = uvExe.Replace("\"", "\\\"");
+
+                    // 构建完整的命令
+                    var fullCommand = $"cd '{escapedPath}' && '{escapedUv}' run main.py";
+                    _logger.LogInformation("Terminal 执行命令: {Command}", fullCommand);
+
+                    var script = $"tell application \\\"Terminal\\\" to do script \\\"{fullCommand}\\\"";
+                    _logger.LogInformation("AppleScript: {Script}", script);
+
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "osascript",
+                        Arguments = $"-e \"{script}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+
+                    var proc = Process.Start(psi);
+                    if (proc != null)
+                    {
+                        proc.WaitForExit();
+                        var output = proc.StandardOutput.ReadToEnd();
+                        var error = proc.StandardError.ReadToEnd();
+
+                        if (!string.IsNullOrEmpty(output))
+                            _logger.LogInformation("osascript 输出: {Output}", output);
+                        if (!string.IsNullOrEmpty(error))
+                            _logger.LogWarning("osascript 错误: {Error}", error);
+
+                        _logger.LogInformation("osascript 退出码: {ExitCode}", proc.ExitCode);
+                    }
+                }
+                else
+                {
+                    // Linux
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "xterm",
+                        Arguments = $"-e \"{uvExe} run main.py && read -p 'Press enter to exit...'\"",
+                        WorkingDirectory = astrBotPath,
+                        UseShellExecute = true
+                    });
+                }
+            }
+            _logger.LogInformation("AstrBot 启动命令已执行");
         }
         catch (Exception ex)
         {

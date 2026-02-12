@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace LuckyLilliaDesktop.Services;
@@ -37,7 +38,9 @@ public partial class KoishiInstallService : IKoishiInstallService
 
     private const string KoishiDir = "bin/koishi";
 
-    public bool IsInstalled => File.Exists(Path.Combine(KoishiDir, "koi.exe"));
+    private static string GetKoiExeName() => PlatformHelper.IsWindows ? "koi.exe" : "koi";
+
+    public bool IsInstalled => File.Exists(Path.Combine(KoishiDir, GetKoiExeName()));
 
     public KoishiInstallService(ILogger<KoishiInstallService> logger, IConfigManager configManager, IGitHubHelper gitHubHelper)
     {
@@ -71,7 +74,16 @@ public partial class KoishiInstallService : IKoishiInstallService
                 // Step 2: 下载
                 Report(progress, 2, totalSteps, "下载 Koishi", "正在下载...");
                 var tempZip = Path.Combine(Path.GetTempPath(), $"koishi-{tag}.zip");
-                var baseUrl = $"https://github.com/koishijs/koishi-desktop/releases/download/{tag}/koishi-desktop-win-x64-{tag}.zip";
+
+                string platform;
+                if (PlatformHelper.IsWindows)
+                    platform = "win-x64";
+                else if (PlatformHelper.IsMacOS)
+                    platform = "osx-x64";  // Koishi 在 macOS 上只有 x64 版本（ARM64 通过 Rosetta 2 运行）
+                else
+                    platform = "linux-x64";
+
+                var baseUrl = $"https://github.com/koishijs/koishi-desktop/releases/download/{tag}/koishi-desktop-{platform}-{tag}.zip";
                 
                 string[] downloadUrls = [
                     $"https://gh-proxy.com/{baseUrl}",
@@ -115,6 +127,11 @@ public partial class KoishiInstallService : IKoishiInstallService
 
             Report(progress, totalSteps, totalSteps, "完成", "安装完成", 100, true);
             _logger.LogInformation("Koishi 安装配置完成");
+
+            // 安装完成后自动启动 Koishi
+            _logger.LogInformation("正在启动 Koishi...");
+            StartKoishi();
+
             return true;
         }
         catch (OperationCanceledException)
@@ -157,12 +174,12 @@ public partial class KoishiInstallService : IKoishiInstallService
     private async Task UpdateDependenciesAsync(IProgress<InstallProgress>? progress, int step, int totalSteps, CancellationToken ct)
     {
         var instanceDir = Path.GetFullPath(Path.Combine(KoishiDir, "data/instances/default"));
-        var koishiExe = Path.GetFullPath(Path.Combine(KoishiDir, "bin/koishi.exe"));
+        var koishiExe = Path.GetFullPath(Path.Combine(KoishiDir, PlatformHelper.IsWindows ? "bin/koishi.exe" : "bin/koishi"));
         var yarnPath = Path.GetFullPath(Path.Combine(KoishiDir, "bin/yarn.cjs"));
 
         if (!File.Exists(koishiExe) || !File.Exists(yarnPath))
         {
-            _logger.LogWarning("koishi.exe 或 yarn.cjs 不存在，跳过依赖更新");
+            _logger.LogWarning("koishi 或 yarn.cjs 不存在，跳过依赖更新");
             return;
         }
 
@@ -256,7 +273,7 @@ public partial class KoishiInstallService : IKoishiInstallService
         try
         {
             var koishiPath = Path.GetFullPath(KoishiDir);
-            var koiExe = Path.Combine(koishiPath, "koi.exe");
+            var koiExe = Path.Combine(koishiPath, GetKoiExeName());
 
             if (!File.Exists(koiExe))
             {
@@ -264,13 +281,60 @@ public partial class KoishiInstallService : IKoishiInstallService
                 return;
             }
 
-            Process.Start(new ProcessStartInfo
+            if (PlatformHelper.IsWindows)
             {
-                FileName = "cmd.exe",
-                Arguments = $"/k \"\"{koiExe}\" & pause\"",
-                WorkingDirectory = koishiPath,
-                UseShellExecute = true
-            });
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/k \"\"{koiExe}\" & pause\"",
+                    WorkingDirectory = koishiPath,
+                    UseShellExecute = true
+                });
+            }
+            else
+            {
+                // macOS/Linux
+                if (PlatformHelper.IsMacOS)
+                {
+                    // 先给 koi 添加执行权限
+                    try
+                    {
+                        var chmod = Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "chmod",
+                            Arguments = $"+x \"{koiExe}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        });
+                        chmod?.WaitForExit();
+                    }
+                    catch { }
+
+                    // macOS: 使用 osascript 在 Terminal 中执行命令
+                    var escapedPath = koishiPath.Replace("\"", "\\\"");
+                    var escapedExe = koiExe.Replace("\"", "\\\"");
+                    var script = $"tell application \\\"Terminal\\\" to do script \\\"cd '{escapedPath}' && '{escapedExe}' ; read -p 'Press enter to exit...'\\\"";
+
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "osascript",
+                        Arguments = $"-e \"{script}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+                }
+                else
+                {
+                    // Linux
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "xterm",
+                        Arguments = $"-e \"{koiExe} && read -p 'Press enter to exit...'\"",
+                        WorkingDirectory = koishiPath,
+                        UseShellExecute = true
+                    });
+                }
+            }
             _logger.LogInformation("Koishi 已启动");
         }
         catch (Exception ex)

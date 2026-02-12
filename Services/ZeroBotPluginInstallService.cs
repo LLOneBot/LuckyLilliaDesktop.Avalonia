@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace LuckyLilliaDesktop.Services;
@@ -22,10 +23,23 @@ public class ZeroBotPluginInstallService : IZeroBotPluginInstallService
     private readonly IGitHubHelper _gitHubHelper;
 
     private const string ZeroBotDir = "bin/ZeroBot-Plugin";
-    private const string DownloadFileName = "zbp_windows_amd64.zip";
-    private const string ExeFileName = "zbp.exe";
 
-    public bool IsInstalled => File.Exists(Path.Combine(ZeroBotDir, ExeFileName));
+    private static string GetDownloadFileName()
+    {
+        if (PlatformHelper.IsWindows)
+            return "zbp_windows_amd64.zip";
+        if (PlatformHelper.IsMacOS)
+        {
+            var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "amd64";
+            return $"zbp_darwin_{arch}.zip";
+        }
+        // Linux
+        return "zbp_linux_amd64.zip";
+    }
+
+    private static string GetExeFileName() => PlatformHelper.IsWindows ? "zbp.exe" : "zbp";
+
+    public bool IsInstalled => File.Exists(Path.Combine(ZeroBotDir, GetExeFileName()));
     public string ZeroBotPluginPath => Path.GetFullPath(ZeroBotDir);
 
     public ZeroBotPluginInstallService(ILogger<ZeroBotPluginInstallService> logger, IGitHubHelper gitHubHelper)
@@ -51,13 +65,14 @@ public class ZeroBotPluginInstallService : IZeroBotPluginInstallService
 
             // Step 2: 下载
             Report(progress, 2, totalSteps, "下载 ZeroBot-Plugin", "正在下载...");
-            var tempZip = Path.Combine(Path.GetTempPath(), DownloadFileName);
+            var downloadFileName = GetDownloadFileName();
+            var tempZip = Path.Combine(Path.GetTempPath(), downloadFileName);
 
             string[] downloadUrls = [
-                $"https://gh-proxy.com/https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{DownloadFileName}",
-                $"https://ghproxy.net/https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{DownloadFileName}",
-                $"https://mirror.ghproxy.com/https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{DownloadFileName}",
-                $"https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{DownloadFileName}"
+                $"https://gh-proxy.com/https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{downloadFileName}",
+                $"https://ghproxy.net/https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{downloadFileName}",
+                $"https://mirror.ghproxy.com/https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{downloadFileName}",
+                $"https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{downloadFileName}"
             ];
 
             var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(downloadUrls, tempZip,
@@ -99,7 +114,7 @@ public class ZeroBotPluginInstallService : IZeroBotPluginInstallService
         try
         {
             var zbpPath = Path.GetFullPath(ZeroBotDir);
-            var exePath = Path.Combine(zbpPath, ExeFileName);
+            var exePath = Path.Combine(zbpPath, GetExeFileName());
 
             if (!File.Exists(exePath))
             {

@@ -821,10 +821,52 @@ public class HomeViewModel : ViewModelBase
             }
             else if (!File.Exists(config.QQPath))
             {
-                ErrorMessage = $"QQ 路径无效: {config.QQPath}，请在系统配置中重新设置";
-                BotStatus = ProcessStatus.Stopped;
                 _logger.LogWarning("QQ 路径无效: {Path}", config.QQPath);
-                return;
+
+                // macOS: 自动下载 QQ
+                if (Utils.PlatformHelper.IsMacOS)
+                {
+                    _logger.LogInformation("macOS QQ 路径无效，开始自动下载...");
+                    config.QQPath = ""; // 清空无效路径
+                    _downloadCts = new CancellationTokenSource();
+                    IsDownloading = true;
+                    DownloadingItem = "QQ";
+
+                    try
+                    {
+                        var progress = new Progress<DownloadProgress>(p =>
+                        {
+                            DownloadProgress = p.Percentage;
+                            DownloadStatus = p.Status;
+                        });
+
+                        var success = await _downloadService.DownloadQQAsync(progress, _downloadCts.Token);
+                        if (success)
+                        {
+                            config.QQPath = Utils.QQPathHelper.GetMacOSQQPath() ?? string.Empty;
+                            _logger.LogInformation("QQ 下载完成: {Path}", config.QQPath);
+                        }
+                        else
+                        {
+                            ErrorMessage = "QQ 下载失败";
+                            BotStatus = ProcessStatus.Stopped;
+                            return;
+                        }
+                    }
+                    finally
+                    {
+                        IsDownloading = false;
+                        DownloadingItem = "";
+                        _downloadCts = null;
+                    }
+                }
+                else
+                {
+                    // Windows/Linux: 提示用户重新设置
+                    ErrorMessage = $"QQ 路径无效: {config.QQPath}，请在系统配置中重新设置";
+                    BotStatus = ProcessStatus.Stopped;
+                    return;
+                }
             }
 
             _logger.LogInformation("配置加载完成: PmhqPath={PmhqPath}, NodePath={NodePath}, LLBotPath={LLBotPath}, QQPath={QQPath}",

@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
@@ -611,11 +612,34 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            var batPath = Path.Combine(installPath, "start.bat");
-            var nodeExe = Path.GetFullPath(Path.Combine(_yunzaiInstallService.Node24Path, "node.exe"));
-            var content = $"@echo off\r\ncd /d \"%~dp0\"\r\n\"{nodeExe}\" .\r\npause\r\n";
-            File.WriteAllText(batPath, content, System.Text.Encoding.Default);
-            _logger.LogInformation("已创建云崽启动脚本: {Path}", batPath);
+            if (PlatformHelper.IsWindows)
+            {
+                var batPath = Path.Combine(installPath, "start.bat");
+                var nodeExe = Path.GetFullPath(Path.Combine(_yunzaiInstallService.Node24Path, "node.exe"));
+                var content = $"@echo off\r\ncd /d \"%~dp0\"\r\n\"{nodeExe}\" .\r\npause\r\n";
+                File.WriteAllText(batPath, content, System.Text.Encoding.Default);
+                _logger.LogInformation("已创建云崽启动脚本: {Path}", batPath);
+            }
+            else
+            {
+                // macOS/Linux
+                var shPath = Path.Combine(installPath, "start.sh");
+                var nodeExe = Path.GetFullPath(Path.Combine(_yunzaiInstallService.Node24Path, "bin/node"));
+                var content = $"#!/bin/bash\ncd \"$(dirname \"$0\")\"\n\"{nodeExe}\" .\nread -p \"Press enter to exit...\"\n";
+                File.WriteAllText(shPath, content, System.Text.Encoding.UTF8);
+
+                // 添加执行权限
+                var chmod = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "chmod",
+                    Arguments = $"+x \"{shPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                chmod?.WaitForExit();
+
+                _logger.LogInformation("已创建云崽启动脚本: {Path}", shPath);
+            }
         }
         catch (Exception ex)
         {
@@ -627,20 +651,53 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            var batPath = Path.Combine(installPath, "start.bat");
-            string content;
-            
-            if (isPython)
+            if (PlatformHelper.IsWindows)
             {
-                content = $"@echo off\r\ncd /d \"%~dp0\"\r\npython {executable}\r\npause\r\n";
+                var batPath = Path.Combine(installPath, "start.bat");
+                string content;
+
+                if (isPython)
+                {
+                    content = $"@echo off\r\ncd /d \"%~dp0\"\r\npython {executable}\r\npause\r\n";
+                }
+                else
+                {
+                    content = $"@echo off\r\ncd /d \"%~dp0\"\r\nstart \"\" \"{executable}\"\r\n";
+                }
+
+                File.WriteAllText(batPath, content, System.Text.Encoding.Default);
+                _logger.LogInformation("已创建启动脚本: {Path}", batPath);
             }
             else
             {
-                content = $"@echo off\r\ncd /d \"%~dp0\"\r\nstart \"\" \"{executable}\"\r\n";
+                // macOS/Linux
+                var shPath = Path.Combine(installPath, "start.sh");
+                var absExecutable = Path.GetFullPath(Path.Combine(installPath, executable));
+                string content;
+
+                if (isPython)
+                {
+                    content = $"#!/bin/bash\ncd \"$(dirname \"$0\")\"\npython3 {executable}\nread -p \"Press enter to exit...\"\n";
+                }
+                else
+                {
+                    content = $"#!/bin/bash\ncd \"$(dirname \"$0\")\"\n\"{absExecutable}\"\nread -p \"Press enter to exit...\"\n";
+                }
+
+                File.WriteAllText(shPath, content, System.Text.Encoding.UTF8);
+
+                // 添加执行权限
+                var chmod = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "chmod",
+                    Arguments = $"+x \"{shPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                chmod?.WaitForExit();
+
+                _logger.LogInformation("已创建启动脚本: {Path}", shPath);
             }
-            
-            File.WriteAllText(batPath, content, System.Text.Encoding.Default);
-            _logger.LogInformation("已创建启动脚本: {Path}", batPath);
         }
         catch (Exception ex)
         {

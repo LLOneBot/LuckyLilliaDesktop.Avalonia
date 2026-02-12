@@ -189,35 +189,74 @@ public class DownloadService : IDownloadService
     private async Task<bool> DownloadQQForMacOSAsync(IProgress<DownloadProgress>? progress, CancellationToken ct)
     {
         var tempFile = Path.Combine(Path.GetTempPath(), "QQ-macos.zip");
-        _logger.LogInformation("macOS QQ 下载地址: {Url}", Constants.QQDownloadUrl);
+        _logger.LogInformation("macOS QQ 原始下载地址: {Url}", Constants.QQDownloadUrl);
         _logger.LogInformation("临时文件: {Path}", tempFile);
 
-        // 下载 zip 文件
-        using (var response = await _httpClient.GetAsync(Constants.QQDownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct))
+        // 构建 GitHub 代理 URLs
+        var downloadUrls = new[]
         {
-            response.EnsureSuccessStatusCode();
+            $"https://gh-proxy.com/{Constants.QQDownloadUrl}",
+            $"https://ghproxy.net/{Constants.QQDownloadUrl}",
+            $"https://mirror.ghproxy.com/{Constants.QQDownloadUrl}",
+            Constants.QQDownloadUrl  // 直连作为最后的备选
+        };
 
-            var totalBytes = response.Content.Headers.ContentLength ?? 0;
-            var downloadedBytes = 0L;
+        _logger.LogInformation("获取到 {Count} 个下载地址（包括代理）", downloadUrls.Length);
 
-            await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-            await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
-
-            var buffer = new byte[65536];
-            int bytesRead;
-
-            while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
+        // 依次尝试各个下载地址
+        Exception? lastException = null;
+        foreach (var url in downloadUrls)
+        {
+            try
             {
-                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                downloadedBytes += bytesRead;
+                _logger.LogInformation("尝试下载 QQ: {Url}", url);
+                progress?.Report(new DownloadProgress { Status = "正在下载 QQ..." });
 
-                progress?.Report(new DownloadProgress
+                using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    Downloaded = downloadedBytes,
-                    Total = totalBytes,
-                    Status = $"正在下载 QQ... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB"
-                });
+                    _logger.LogWarning("下载失败: {StatusCode} from {Url}", response.StatusCode, url);
+                    continue;
+                }
+
+                var totalBytes = response.Content.Headers.ContentLength ?? 0;
+                var downloadedBytes = 0L;
+
+                await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+                await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
+
+                var buffer = new byte[65536];
+                int bytesRead;
+
+                while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                    downloadedBytes += bytesRead;
+
+                    progress?.Report(new DownloadProgress
+                    {
+                        Downloaded = downloadedBytes,
+                        Total = totalBytes,
+                        Status = $"正在下载 QQ... {downloadedBytes / 1024 / 1024:F1} MB / {totalBytes / 1024 / 1024:F1} MB"
+                    });
+                }
+
+                _logger.LogInformation("下载成功: {Url}", url);
+                lastException = null;
+                break;
             }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                lastException = ex;
+                _logger.LogWarning(ex, "从 {Url} 下载失败，尝试下一个镜像源", url);
+            }
+        }
+
+        if (lastException != null)
+        {
+            _logger.LogError(lastException, "所有下载源都无法下载 macOS QQ");
+            return false;
         }
 
         progress?.Report(new DownloadProgress { Status = "正在解压 QQ..." });

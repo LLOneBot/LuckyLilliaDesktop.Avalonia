@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace LuckyLilliaDesktop.Services;
@@ -22,10 +23,23 @@ public class DDBotInstallService : IDDBotInstallService
     private readonly IGitHubHelper _gitHubHelper;
 
     private const string DDBotDir = "bin/ddbot";
-    private const string DownloadFileName = "DDBOT-WSa-fix_A041-windows-amd64.zip";
-    private const string ExeFileName = "DDBOT-WSa.exe";
 
-    public bool IsInstalled => File.Exists(Path.Combine(DDBotDir, ExeFileName));
+    private static string GetDownloadFileName()
+    {
+        if (PlatformHelper.IsWindows)
+            return "DDBOT-WSa-fix_A041-windows-amd64.zip";
+        if (PlatformHelper.IsMacOS)
+        {
+            var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "amd64";
+            return $"DDBOT-WSa-fix_A041-darwin-{arch}.zip";
+        }
+        // Linux
+        return "DDBOT-WSa-fix_A041-linux-amd64.zip";
+    }
+
+    private static string GetExeFileName() => PlatformHelper.IsWindows ? "DDBOT-WSa.exe" : "DDBOT-WSa";
+
+    public bool IsInstalled => File.Exists(Path.Combine(DDBotDir, GetExeFileName()));
     public string DDBotPath => Path.GetFullPath(DDBotDir);
 
     public DDBotInstallService(ILogger<DDBotInstallService> logger, IGitHubHelper gitHubHelper)
@@ -41,13 +55,14 @@ public class DDBotInstallService : IDDBotInstallService
         {
             // Step 1: 下载 DDBOT-WSa
             Report(progress, 1, totalSteps, "下载 DDBot", "正在下载...");
-            var tempZip = Path.Combine(Path.GetTempPath(), DownloadFileName);
+            var downloadFileName = GetDownloadFileName();
+            var tempZip = Path.Combine(Path.GetTempPath(), downloadFileName);
 
             string[] downloadUrls = [
-                $"https://gh-proxy.com/https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{DownloadFileName}",
-                $"https://ghproxy.net/https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{DownloadFileName}",
-                $"https://mirror.ghproxy.com/https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{DownloadFileName}",
-                $"https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{DownloadFileName}"
+                $"https://gh-proxy.com/https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{downloadFileName}",
+                $"https://ghproxy.net/https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{downloadFileName}",
+                $"https://mirror.ghproxy.com/https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{downloadFileName}",
+                $"https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{downloadFileName}"
             ];
 
             var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(downloadUrls, tempZip,
@@ -90,7 +105,7 @@ public class DDBotInstallService : IDDBotInstallService
         try
         {
             var ddbotPath = Path.GetFullPath(DDBotDir);
-            var exePath = Path.Combine(ddbotPath, ExeFileName);
+            var exePath = Path.Combine(ddbotPath, GetExeFileName());
 
             if (!File.Exists(exePath))
             {
