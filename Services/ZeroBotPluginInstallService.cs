@@ -68,12 +68,7 @@ public class ZeroBotPluginInstallService : IZeroBotPluginInstallService
             var downloadFileName = GetDownloadFileName();
             var tempZip = Path.Combine(Path.GetTempPath(), downloadFileName);
 
-            string[] downloadUrls = [
-                $"https://gh-proxy.com/https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{downloadFileName}",
-                $"https://ghproxy.net/https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{downloadFileName}",
-                $"https://mirror.ghproxy.com/https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{downloadFileName}",
-                $"https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{downloadFileName}"
-            ];
+            var downloadUrls = _gitHubHelper.GetGitHubUrlsWithProxy($"https://github.com/FloatTech/ZeroBot-Plugin/releases/download/{tag}/{downloadFileName}");
 
             var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(downloadUrls, tempZip,
                 (downloaded, total) => Report(progress, 2, totalSteps, "下载 ZeroBot-Plugin",

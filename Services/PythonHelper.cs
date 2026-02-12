@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -31,6 +32,12 @@ public class PythonHelper : IPythonHelper
     private const string PythonDownloadUrl = "https://registry.npmmirror.com/-/binary/python/3.11.9/python-3.11.9-embed-amd64.zip";
     private const string GetPipUrl = "https://bootstrap.pypa.io/get-pip.py";
     private const string PipMirror = "https://pypi.tuna.tsinghua.edu.cn/simple";
+
+    private static readonly string[] GhProxies = [
+        "https://gh-proxy.com/",
+        "https://ghproxy.net/",
+        "https://mirror.ghproxy.com/"
+    ];
 
     public string PythonDir => "bin/python";
     public string PythonExe => Path.GetFullPath(Path.Combine(PythonDir, "python" + PlatformHelper.ExecutableExtension));
@@ -105,12 +112,7 @@ public class PythonHelper : IPythonHelper
             var uvUrl = $"https://github.com/astral-sh/uv/releases/latest/download/{uvFileName}";
 
             // 使用 GitHub 代理
-            string[] uvDownloadUrls = [
-                $"https://gh-proxy.com/{uvUrl}",
-                $"https://ghproxy.net/{uvUrl}",
-                $"https://mirror.ghproxy.com/{uvUrl}",
-                uvUrl
-            ];
+            string[] uvDownloadUrls = GetGitHubUrlsWithProxy(uvUrl);
 
             var tempTarGz = Path.Combine(Path.GetTempPath(), "uv.tar.gz");
             bool downloadSuccess = false;
@@ -135,6 +137,15 @@ public class PythonHelper : IPythonHelper
                     downloadSuccess = true;
                     _logger.LogInformation("uv 下载成功");
                     break;
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("下载 uv 被取消");
+                    throw;
+                }
+                catch (HttpRequestException ex)
+                {
+                    _logger.LogWarning(ex, "从 {Url} 下载 uv 网络错误", url);
                 }
                 catch (Exception ex)
                 {
@@ -507,10 +518,34 @@ public class PythonHelper : IPythonHelper
             }
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("下载被取消: {Url}", url);
+            throw;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "下载网络错误: {Url}", url);
+            return false;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "下载文件失败: {Url}", url);
             return false;
         }
+    }
+
+    private static string[] GetGitHubUrlsWithProxy(string githubUrl)
+    {
+        if (!githubUrl.StartsWith("https://github.com"))
+            return [githubUrl];
+
+        var urls = new List<string>();
+        foreach (var proxy in GhProxies)
+        {
+            urls.Add($"{proxy}{githubUrl}");
+        }
+        urls.Add(githubUrl); // 最后添加原始 URL
+        return urls.ToArray();
     }
 }

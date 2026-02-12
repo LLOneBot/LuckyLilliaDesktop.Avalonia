@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
@@ -11,11 +12,12 @@ namespace LuckyLilliaDesktop.Services;
 public interface IGitHubHelper
 {
     Task<string?> GetLatestTagAsync(string owner, string repo, CancellationToken ct = default);
-    Task<bool> DownloadFileAsync(string url, string destPath, 
+    Task<bool> DownloadFileAsync(string url, string destPath,
         Action<long, long>? onProgress = null, CancellationToken ct = default);
     Task<bool> DownloadWithFallbackAsync(string[] urls, string destPath,
         Action<long, long>? onProgress = null, CancellationToken ct = default);
     string GetProxiedUrl(string originalUrl);
+    string[] GetGitHubUrlsWithProxy(string githubUrl);
 }
 
 public class GitHubHelper : IGitHubHelper, IDisposable
@@ -75,16 +77,55 @@ public class GitHubHelper : IGitHubHelper, IDisposable
         return originalUrl;
     }
 
+    public string[] GetGitHubUrlsWithProxy(string githubUrl)
+    {
+        if (!githubUrl.StartsWith("https://github.com"))
+            return [githubUrl];
+
+        var urls = new List<string>();
+        foreach (var proxy in GhProxies)
+        {
+            urls.Add($"{proxy}{githubUrl}");
+        }
+        urls.Add(githubUrl); // 最后添加原始 URL
+        return urls.ToArray();
+    }
+
     public async Task<bool> DownloadWithFallbackAsync(string[] urls, string destPath,
         Action<long, long>? onProgress = null, CancellationToken ct = default)
     {
+        Exception? lastException = null;
+
         foreach (var url in urls)
         {
-            _logger.LogInformation("尝试下载: {Url}", url);
-            if (await DownloadFileAsync(url, destPath, onProgress, ct))
-                return true;
-            _logger.LogWarning("下载失败，尝试下一个地址");
+            try
+            {
+                _logger.LogInformation("尝试下载: {Url}", url);
+                if (await DownloadFileAsync(url, destPath, onProgress, ct))
+                    return true;
+                _logger.LogWarning("下载失败，尝试下一个地址");
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("下载被取消");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                _logger.LogWarning(ex, "下载出错，尝试下一个地址");
+            }
         }
+
+        if (lastException != null)
+        {
+            _logger.LogError(lastException, "所有下载地址都失败");
+        }
+        else
+        {
+            _logger.LogError("所有下载地址都失败");
+        }
+
         return false;
     }
 
@@ -126,11 +167,19 @@ public class GitHubHelper : IGitHubHelper, IDisposable
             }
             catch (OperationCanceledException)
             {
+                // 用户取消或超时，不重试
+                _logger.LogInformation("下载已取消");
                 throw;
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(ex, "下载网络错误 (尝试 {Retry}/{Max}): {Url}", retry + 1, maxRetries, url);
+                if (retry == maxRetries - 1) throw;
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "下载失败 (尝试 {Retry}/{Max}): {Url}", retry + 1, maxRetries, url);
+                if (retry == maxRetries - 1) throw;
             }
         }
 

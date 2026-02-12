@@ -63,11 +63,7 @@ public class YunzaiInstallService : IYunzaiInstallService
                 if (PlatformHelper.IsWindows)
                 {
                     redisFileName = $"Redis-{RedisVersion}-Windows-x64-msys2.zip";
-                    redisUrls = [
-                        $"https://gh-proxy.com/https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}",
-                        $"https://ghproxy.net/https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}",
-                        $"https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}"
-                    ];
+                    redisUrls = _gitHubHelper.GetGitHubUrlsWithProxy($"https://github.com/redis-windows/redis-windows/releases/download/{RedisVersion}/{redisFileName}");
                     extractedDirName = $"Redis-{RedisVersion}-Windows-x64-msys2";
                 }
                 else if (PlatformHelper.IsMacOS)
@@ -75,18 +71,14 @@ public class YunzaiInstallService : IYunzaiInstallService
                     // macOS ARM64 或 x64
                     var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "x86_64";
                     redisFileName = $"redis-{RedisVersion}-macos-{arch}.tar.gz";
-                    redisUrls = [
-                        $"https://github.com/redis/redis/archive/refs/tags/{RedisVersion}.tar.gz"
-                    ];
+                    redisUrls = _gitHubHelper.GetGitHubUrlsWithProxy($"https://github.com/redis/redis/archive/refs/tags/{RedisVersion}.tar.gz");
                     extractedDirName = $"redis-{RedisVersion}";
                 }
                 else
                 {
                     // Linux
                     redisFileName = $"redis-{RedisVersion}-linux-x64.tar.gz";
-                    redisUrls = [
-                        $"https://github.com/redis/redis/archive/refs/tags/{RedisVersion}.tar.gz"
-                    ];
+                    redisUrls = _gitHubHelper.GetGitHubUrlsWithProxy($"https://github.com/redis/redis/archive/refs/tags/{RedisVersion}.tar.gz");
                     extractedDirName = $"redis-{RedisVersion}";
                 }
 

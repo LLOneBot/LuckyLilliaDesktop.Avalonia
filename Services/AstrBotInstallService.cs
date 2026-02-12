@@ -60,13 +60,8 @@ public class AstrBotInstallService : IAstrBotInstallService
             // Step 2: 下载 AstrBot 源码
             Report(progress, 2, totalSteps, "下载 AstrBot", "正在下载源码...");
             var tempZip = Path.Combine(Path.GetTempPath(), "astrbot-master.zip");
-            
-            string[] downloadUrls = [
-                "https://gh-proxy.com/https://github.com/AstrBotDevs/AstrBot/archive/refs/heads/master.zip",
-                "https://ghproxy.net/https://github.com/AstrBotDevs/AstrBot/archive/refs/heads/master.zip",
-                "https://mirror.ghproxy.com/https://github.com/AstrBotDevs/AstrBot/archive/refs/heads/master.zip",
-                "https://github.com/AstrBotDevs/AstrBot/archive/refs/heads/master.zip"
-            ];
+
+            var downloadUrls = _gitHubHelper.GetGitHubUrlsWithProxy("https://github.com/AstrBotDevs/AstrBot/archive/refs/heads/master.zip");
 
             var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(downloadUrls, tempZip,
                 (downloaded, total) => Report(progress, 2, totalSteps, "下载 AstrBot",
@@ -104,12 +99,7 @@ public class AstrBotInstallService : IAstrBotInstallService
                 Report(progress, 3, totalSteps, "下载数据", $"正在下载 dashboard.zip ({tag})...");
                 var dashboardZip = Path.Combine(Path.GetTempPath(), "astrbot-dashboard.zip");
                 var baseUrl = $"https://github.com/AstrBotDevs/AstrBot/releases/download/{tag}/AstrBot-{tag}-dashboard.zip";
-                string[] dashboardUrls = [
-                    $"https://gh-proxy.com/{baseUrl}",
-                    $"https://ghproxy.net/{baseUrl}",
-                    $"https://mirror.ghproxy.com/{baseUrl}",
-                    baseUrl
-                ];
+                var dashboardUrls = _gitHubHelper.GetGitHubUrlsWithProxy(baseUrl);
 
                 if (await _gitHubHelper.DownloadWithFallbackAsync(dashboardUrls, dashboardZip,
                     (downloaded, total) => Report(progress, 3, totalSteps, "下载数据",

@@ -58,12 +58,7 @@ public class DDBotInstallService : IDDBotInstallService
             var downloadFileName = GetDownloadFileName();
             var tempZip = Path.Combine(Path.GetTempPath(), downloadFileName);
 
-            string[] downloadUrls = [
-                $"https://gh-proxy.com/https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{downloadFileName}",
-                $"https://ghproxy.net/https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{downloadFileName}",
-                $"https://mirror.ghproxy.com/https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{downloadFileName}",
-                $"https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{downloadFileName}"
-            ];
+            var downloadUrls = _gitHubHelper.GetGitHubUrlsWithProxy($"https://github.com/cnxysoft/DDBOT-WSa/releases/download/fix_A041/{downloadFileName}");
 
             var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(downloadUrls, tempZip,
                 (downloaded, total) => Report(progress, 1, totalSteps, "下载 DDBot",

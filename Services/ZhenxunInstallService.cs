@@ -63,13 +63,8 @@ public class ZhenxunInstallService : IZhenxunInstallService
             // Step 2: 下载 zhenxun_bot 源码
             Report(progress, 2, totalSteps, "下载真寻Bot", "正在下载源码...");
             var tempZip = Path.Combine(Path.GetTempPath(), "zhenxun-main.zip");
-            
-            string[] downloadUrls = [
-                "https://gh-proxy.com/https://github.com/zhenxun-org/zhenxun_bot/archive/refs/heads/main.zip",
-                "https://ghproxy.net/https://github.com/zhenxun-org/zhenxun_bot/archive/refs/heads/main.zip",
-                "https://mirror.ghproxy.com/https://github.com/zhenxun-org/zhenxun_bot/archive/refs/heads/main.zip",
-                "https://github.com/zhenxun-org/zhenxun_bot/archive/refs/heads/main.zip"
-            ];
+
+            var downloadUrls = _gitHubHelper.GetGitHubUrlsWithProxy("https://github.com/zhenxun-org/zhenxun_bot/archive/refs/heads/main.zip");
 
             var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(downloadUrls, tempZip,
                 (downloaded, total) => Report(progress, 2, totalSteps, "下载真寻Bot",

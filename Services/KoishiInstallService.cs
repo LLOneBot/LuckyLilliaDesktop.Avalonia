@@ -84,14 +84,9 @@ public partial class KoishiInstallService : IKoishiInstallService
                     platform = "linux-x64";
 
                 var baseUrl = $"https://github.com/koishijs/koishi-desktop/releases/download/{tag}/koishi-desktop-{platform}-{tag}.zip";
-                
-                string[] downloadUrls = [
-                    $"https://gh-proxy.com/{baseUrl}",
-                    $"https://ghproxy.net/{baseUrl}",
-                    $"https://mirror.ghproxy.com/{baseUrl}",
-                    baseUrl
-                ];
-                
+
+                var downloadUrls = _gitHubHelper.GetGitHubUrlsWithProxy(baseUrl);
+
                 var downloadSuccess = await _gitHubHelper.DownloadWithFallbackAsync(downloadUrls, tempZip,
                     (downloaded, total) => Report(progress, 2, totalSteps, "下载 Koishi",
                         $"正在下载... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",

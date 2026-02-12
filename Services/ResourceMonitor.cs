@@ -3,6 +3,7 @@ using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
+using System.Net.Http;
 using System.Reactive.Subjects;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -192,8 +193,8 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
                 }
                 catch { }
 
-                await TryFetchQQPidAsync();
-                await TryFetchQQVersionAsync();
+                await TryFetchQQPidAsync(ct);
+                await TryFetchQQVersionAsync(ct);
                 await MonitorQQProcessAsync();
             }
         }
@@ -204,14 +205,14 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
         }
     }
 
-    private async Task TryFetchQQPidAsync()
+    private async Task TryFetchQQPidAsync(CancellationToken ct = default)
     {
         if (!_pmhqClient.HasPort || _qqPid.HasValue)
             return;
 
         try
         {
-            var pid = await _pmhqClient.FetchQQPidAsync();
+            var pid = await _pmhqClient.FetchQQPidAsync(ct);
             if (pid.HasValue && pid.Value > 0)
             {
                 _qqPid = pid.Value;
@@ -219,17 +220,28 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
                 _qqPidSubject.OnNext(pid.Value);
             }
         }
-        catch { }
+        catch (OperationCanceledException)
+        {
+            // 监控被取消，正常情况，不记录
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogDebug(ex, "获取 QQ PID 网络错误");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "获取 QQ PID 失败");
+        }
     }
 
-    private async Task TryFetchQQVersionAsync()
+    private async Task TryFetchQQVersionAsync(CancellationToken ct = default)
     {
         if (!_pmhqClient.HasPort || !string.IsNullOrEmpty(_cachedQQVersion) || !_qqPid.HasValue)
             return;
 
         try
         {
-            var deviceInfo = await _pmhqClient.FetchDeviceInfoAsync();
+            var deviceInfo = await _pmhqClient.FetchDeviceInfoAsync(ct);
             if (deviceInfo != null && !string.IsNullOrEmpty(deviceInfo.BuildVer))
             {
                 _cachedQQVersion = deviceInfo.BuildVer;
@@ -237,7 +249,18 @@ public class ResourceMonitor : IResourceMonitor, IDisposable
                 _qqVersionSubject.OnNext(_cachedQQVersion);
             }
         }
-        catch { }
+        catch (OperationCanceledException)
+        {
+            // 监控被取消，正常情况，不记录
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogDebug(ex, "获取 QQ 版本网络错误");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "获取 QQ 版本失败");
+        }
     }
 
     private async Task MonitorNodeProcessAsync()
