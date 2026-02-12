@@ -31,7 +31,7 @@ public class DDBotInstallService : IDDBotInstallService
         if (PlatformHelper.IsMacOS)
         {
             var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "amd64";
-            return $"DDBOT-WSa-fix_A041-darwin-{arch}.zip";
+            return $"DDBOT-WSa-fix_A041-darwin-{arch}.tar.gz";
         }
         // Linux
         return "DDBOT-WSa-fix_A041-linux-amd64.zip";
@@ -79,7 +79,48 @@ public class DDBotInstallService : IDDBotInstallService
             // Step 2: 解压（覆盖已有文件）
             Report(progress, 2, totalSteps, "解压文件", "正在解压...");
             Directory.CreateDirectory(DDBotDir);
-            await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, DDBotDir, true), ct).ConfigureAwait(false);
+
+            if (PlatformHelper.IsMacOS)
+            {
+                // macOS 使用 tar.gz，需要用 tar 命令解压
+                var tarPsi = new ProcessStartInfo
+                {
+                    FileName = "tar",
+                    Arguments = $"-xzf \"{tempZip}\" -C \"{DDBotDir}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var tarProc = Process.Start(tarPsi);
+                await tarProc!.WaitForExitAsync(ct);
+
+                if (tarProc.ExitCode != 0)
+                {
+                    _logger.LogError("解压 DDBot 失败");
+                    ReportError(progress, 2, totalSteps, "解压 DDBot 失败");
+                    return false;
+                }
+
+                // 给可执行文件添加权限
+                var exePath = Path.Combine(DDBotDir, GetExeFileName());
+                if (File.Exists(exePath))
+                {
+                    var chmodPsi = new ProcessStartInfo
+                    {
+                        FileName = "chmod",
+                        Arguments = $"+x \"{exePath}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    using var chmodProc = Process.Start(chmodPsi);
+                    await chmodProc!.WaitForExitAsync(ct);
+                }
+            }
+            else
+            {
+                // Windows/Linux 使用 zip
+                await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, DDBotDir, true), ct).ConfigureAwait(false);
+            }
+
             File.Delete(tempZip);
             _logger.LogInformation("DDBot 解压完成");
 
@@ -113,13 +154,55 @@ public class DDBotInstallService : IDDBotInstallService
                 return;
             }
 
-            Process.Start(new ProcessStartInfo
+            _logger.LogInformation("准备启动 DDBot，工作目录: {Path}", ddbotPath);
+            _logger.LogInformation("可执行文件: {Path}", exePath);
+
+            if (PlatformHelper.IsWindows)
             {
-                FileName = exePath,
-                WorkingDirectory = ddbotPath,
-                UseShellExecute = true
-            });
-            _logger.LogInformation("DDBot 已启动");
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/k \"\"{exePath}\" & pause\"",
+                    WorkingDirectory = ddbotPath,
+                    UseShellExecute = true
+                });
+            }
+            else
+            {
+                // macOS/Linux: 在新终端窗口中启动
+                if (PlatformHelper.IsMacOS)
+                {
+                    // macOS: 使用 osascript 在 Terminal 中执行命令
+                    var escapedPath = ddbotPath.Replace("\"", "\\\"");
+                    var escapedExe = exePath.Replace("\"", "\\\"");
+
+                    var fullCommand = $"cd '{escapedPath}' && '{escapedExe}'";
+                    _logger.LogInformation("Terminal 执行命令: {Command}", fullCommand);
+
+                    var script = $"tell application \\\"Terminal\\\" to do script \\\"{fullCommand}\\\"";
+                    _logger.LogInformation("AppleScript: {Script}", script);
+
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "osascript",
+                        Arguments = $"-e \"{script}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+                }
+                else
+                {
+                    // Linux
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "xterm",
+                        Arguments = $"-e \"{exePath} && read -p 'Press enter to exit...'\"",
+                        WorkingDirectory = ddbotPath,
+                        UseShellExecute = true
+                    });
+                }
+            }
+            _logger.LogInformation("DDBot 启动命令已执行");
         }
         catch (Exception ex)
         {
