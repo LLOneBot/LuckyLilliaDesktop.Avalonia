@@ -343,12 +343,7 @@ public class PythonHelper : IPythonHelper
             if (poetryInstallExitCode != 0)
                 _logger.LogWarning("Poetry 可能已安装，继续执行");
 
-            // 配置 Poetry 使用本地 Python
-            var pythonExe = Path.GetFullPath(PythonExe);
-            onOutput?.Invoke("配置 Poetry Python 路径...");
-            await RunUvCommandAsync(uvCommand, $"tool run poetry env use \"{pythonExe}\"", targetDir, onOutput, ct);
-
-            // 先执行 poetry lock
+            // 先执行 poetry lock 更新锁文件
             onOutput?.Invoke("更新 Poetry lock 文件...");
             await RunUvCommandAsync(uvCommand, "tool run poetry lock", targetDir, onOutput, ct);
 

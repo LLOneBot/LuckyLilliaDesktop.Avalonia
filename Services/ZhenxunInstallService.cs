@@ -145,7 +145,7 @@ public class ZhenxunInstallService : IZhenxunInstallService
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = $"/k \"\"{uvExe}\" run bot.py & pause\"",
+                    Arguments = $"/k \"\"{uvExe}\" tool run poetry run python bot.py & pause\"",
                     WorkingDirectory = zhenxunPath,
                     UseShellExecute = true
                 });
@@ -158,8 +158,8 @@ public class ZhenxunInstallService : IZhenxunInstallService
                     var escapedPath = zhenxunPath.Replace("\"", "\\\"");
                     var escapedUv = uvExe.Replace("\"", "\\\"");
 
-                    // 构建完整的命令
-                    var fullCommand = $"cd '{escapedPath}' && '{escapedUv}' run bot.py";
+                    // 构建完整的命令 - 使用 poetry run 来运行
+                    var fullCommand = $"cd '{escapedPath}' && '{escapedUv}' tool run poetry run python bot.py";
                     _logger.LogInformation("Terminal 执行命令: {Command}", fullCommand);
 
                     var script = $"tell application \\\"Terminal\\\" to do script \\\"{fullCommand}\\\"";
@@ -196,7 +196,7 @@ public class ZhenxunInstallService : IZhenxunInstallService
                     Process.Start(new ProcessStartInfo
                     {
                         FileName = "xterm",
-                        Arguments = $"-e \"{uvExe} run bot.py && read -p 'Press enter to exit...'\"",
+                        Arguments = $"-e \"{uvExe} tool run poetry run python bot.py && read -p 'Press enter to exit...'\"",
                         WorkingDirectory = zhenxunPath,
                         UseShellExecute = true
                     });
