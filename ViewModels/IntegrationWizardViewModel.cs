@@ -461,13 +461,24 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 ? $"ws://127.0.0.1:{wsPort}" 
                 : $"ws://127.0.0.1:{wsPort}{path}";
             
-            // 检查是否已存在启用的 ws-reverse 连接到该端口
-            var existingWs = config.OB11.Connect.FirstOrDefault(c => 
-                c.Type == "ws-reverse" && c.Url == wsUrl && c.Enable);
-            
+            // 检查是否已存在 ws-reverse 连接到该 URL（无论启用状态）
+            var existingWs = config.OB11.Connect.FirstOrDefault(c =>
+                c.Type == "ws-reverse" && c.Url == wsUrl);
+
             if (existingWs != null)
             {
-                _logger.LogInformation("LLBot 已存在 WebSocket 连接配置: {Url}", wsUrl);
+                // 如果已存在，确保它是启用的
+                if (!existingWs.Enable)
+                {
+                    existingWs.Enable = true;
+                    await File.WriteAllTextAsync(configPath,
+                        JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                    _logger.LogInformation("已启用现有的 WebSocket 连接配置: {Url}", wsUrl);
+                }
+                else
+                {
+                    _logger.LogInformation("LLBot 已存在 WebSocket 连接配置: {Url}", wsUrl);
+                }
                 return;
             }
 
@@ -509,12 +520,24 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             var json = await File.ReadAllTextAsync(configPath);
             var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
 
+            // 检查是否已存在 WebSocket 服务端配置到该端口（无论启用状态）
             var existingWs = config.OB11.Connect.FirstOrDefault(c =>
-                c.Type == "ws" && c.Port == wsPort && c.Enable);
+                c.Type == "ws" && c.Port == wsPort);
 
             if (existingWs != null)
             {
-                _logger.LogInformation("LLBot 已存在 WebSocket 服务端配置: 端口 {Port}", wsPort);
+                // 如果已存在，确保它是启用的
+                if (!existingWs.Enable)
+                {
+                    existingWs.Enable = true;
+                    await File.WriteAllTextAsync(configPath,
+                        JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                    _logger.LogInformation("已启用现有的 WebSocket 服务端配置: 端口 {Port}", wsPort);
+                }
+                else
+                {
+                    _logger.LogInformation("LLBot 已存在 WebSocket 服务端配置: 端口 {Port}", wsPort);
+                }
                 return;
             }
 
