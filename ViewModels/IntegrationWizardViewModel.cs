@@ -56,6 +56,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     public bool DDBotInstalled => _ddbotInstallService.IsInstalled;
     public bool YunzaiInstalled => _yunzaiInstallService.IsInstalled;
     public bool ZeroBotPluginInstalled => _zeroBotPluginInstallService.IsInstalled;
+    public bool ShowZeroBotPlugin => !PlatformHelper.IsMacOS;
 
     public ReactiveCommand<string, Unit> SelectFrameworkCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelInstallCommand { get; }

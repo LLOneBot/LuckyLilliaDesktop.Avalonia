@@ -176,21 +176,22 @@
                         <!-- ZeroBot-Plugin -->
                         <Button Command="{Binding SelectFrameworkCommand}" CommandParameter="zbp"
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                                Padding="12" Background="Transparent" Margin="4">
+                                Padding="12" Background="Transparent" Margin="4"
+                                IsVisible="{Binding ShowZeroBotPlugin}">
                             <StackPanel Orientation="Horizontal" Spacing="16">
                                 <Border Width="48" Height="48" CornerRadius="8" ClipToBounds="True">
                                     <Image Source="/Assets/Icons/zbp.png" Stretch="UniformToFill"/>
                                 </Border>
                                 <StackPanel VerticalAlignment="Center" Spacing="4">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="ZeroBot-Plugin" FontSize="16" FontWeight="SemiBold" 
+                                        <TextBlock Text="ZeroBot-Plugin" FontSize="16" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextPrimary}"/>
-                                        <Border Background="#22C55E" CornerRadius="4" Padding="6,2" 
+                                        <Border Background="#22C55E" CornerRadius="4" Padding="6,2"
                                                 VerticalAlignment="Center" IsVisible="{Binding ZeroBotPluginInstalled}">
                                             <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
                                         </Border>
                                     </StackPanel>
-                                    <TextBlock Text="基于 ZeroBot 的多功能群管/娱乐插件集" FontSize="12" 
+                                    <TextBlock Text="基于 ZeroBot 的多功能群管/娱乐插件集" FontSize="12"
                                                Foreground="{DynamicResource TextSecondary}"/>
                                 </StackPanel>
                             </StackPanel>
