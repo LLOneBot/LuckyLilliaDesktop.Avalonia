@@ -45,15 +45,19 @@ public class PythonHelper : IPythonHelper
     {
         get
         {
-            // 检查 uv 是否安装（macOS/Linux 或 Windows）
+            // Windows: 需要嵌入式 Python + uv（uv 可能位于 bin/uv 或 PythonDir/Scripts）
             if (PlatformHelper.IsWindows)
             {
-                return File.Exists("bin/uv/uv.exe");
+                if (!File.Exists(PythonExe))
+                    return false;
+
+                return File.Exists(Path.GetFullPath("bin/uv/uv.exe")) ||
+                       File.Exists(Path.Combine(PythonDir, "Scripts", "uv.exe")) ||
+                       File.Exists(Path.Combine(PythonDir, "uv.exe"));
             }
-            else
-            {
-                return File.Exists("bin/uv/uv");
-            }
+
+            // macOS/Linux: 使用 bin/uv/uv
+            return File.Exists(Path.GetFullPath("bin/uv/uv"));
         }
     }
 
@@ -88,33 +92,45 @@ public class PythonHelper : IPythonHelper
         }
     }
 
-    private async Task<bool> EnsureUvInstalledAsync(CancellationToken ct)
+    private async Task<bool> EnsureUvInstalledAsync(CancellationToken ct, Action<string>? onOutput = null)
     {
         var uvDir = "bin/uv";
-        var uvExePath = Path.Combine(uvDir, "uv");
+        var uvExeName = PlatformHelper.IsWindows ? "uv.exe" : "uv";
+        var uvExePath = Path.Combine(uvDir, uvExeName);
 
         // 如果 uv 已经存在，直接返回
         if (File.Exists(uvExePath))
         {
             _logger.LogInformation("uv 已安装: {Path}", uvExePath);
+            onOutput?.Invoke($"uv 已安装: {Path.GetFullPath(uvExePath)}");
             return true;
         }
 
         try
         {
             _logger.LogInformation("开始下载安装 uv...");
+            onOutput?.Invoke("开始下载安装 uv...");
             Directory.CreateDirectory(uvDir);
 
-            // 确定架构和平台
+            // 确定架构与平台
             var uvArch = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "aarch64" : "x86_64";
-            var uvPlatform = PlatformHelper.IsMacOS ? "apple-darwin" : "unknown-linux-gnu";
-            var uvFileName = $"uv-{uvArch}-{uvPlatform}.tar.gz";
-            var uvUrl = $"https://github.com/astral-sh/uv/releases/latest/download/{uvFileName}";
 
-            // 使用 GitHub 代理
+            string uvFileName;
+            if (PlatformHelper.IsWindows)
+            {
+                // uv Windows release: uv-x86_64-pc-windows-msvc.zip / uv-aarch64-pc-windows-msvc.zip
+                uvFileName = $"uv-{uvArch}-pc-windows-msvc.zip";
+            }
+            else
+            {
+                var uvPlatform = PlatformHelper.IsMacOS ? "apple-darwin" : "unknown-linux-gnu";
+                uvFileName = $"uv-{uvArch}-{uvPlatform}.tar.gz";
+            }
+
+            var uvUrl = $"https://github.com/astral-sh/uv/releases/latest/download/{uvFileName}";
             string[] uvDownloadUrls = GetGitHubUrlsWithProxy(uvUrl);
 
-            var tempTarGz = Path.Combine(Path.GetTempPath(), "uv.tar.gz");
+            var tempDownload = Path.Combine(Path.GetTempPath(), PlatformHelper.IsWindows ? "uv.zip" : "uv.tar.gz");
             bool downloadSuccess = false;
 
             foreach (var url in uvDownloadUrls)
@@ -122,97 +138,147 @@ public class PythonHelper : IPythonHelper
                 try
                 {
                     _logger.LogInformation("尝试下载 uv: {Url}", url);
+                    onOutput?.Invoke($"尝试下载 uv: {url}");
                     using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
 
                     if (!response.IsSuccessStatusCode)
                     {
                         _logger.LogWarning("下载失败: {StatusCode}", response.StatusCode);
+                        onOutput?.Invoke($"下载失败: {response.StatusCode}");
                         continue;
                     }
 
                     await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-                    await using var fileStream = new FileStream(tempTarGz, FileMode.Create, FileAccess.Write, FileShare.None);
+                    await using var fileStream = new FileStream(tempDownload, FileMode.Create, FileAccess.Write, FileShare.None);
                     await contentStream.CopyToAsync(fileStream, ct);
 
                     downloadSuccess = true;
                     _logger.LogInformation("uv 下载成功");
+                    onOutput?.Invoke("uv 下载成功，正在处理...");
                     break;
                 }
                 catch (OperationCanceledException)
                 {
                     _logger.LogInformation("下载 uv 被取消");
+                    onOutput?.Invoke("下载 uv 被取消");
                     throw;
                 }
                 catch (HttpRequestException ex)
                 {
                     _logger.LogWarning(ex, "从 {Url} 下载 uv 网络错误", url);
+                    onOutput?.Invoke($"下载网络错误: {ex.Message}");
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "从 {Url} 下载 uv 失败", url);
+                    onOutput?.Invoke($"下载失败: {ex.Message}");
                 }
             }
 
             if (!downloadSuccess)
             {
                 _logger.LogError("无法下载 uv");
+                onOutput?.Invoke("无法下载 uv");
                 return false;
             }
 
-            // 解压 uv
             var tempExtractDir = Path.Combine(Path.GetTempPath(), "uv-extract");
             if (Directory.Exists(tempExtractDir))
                 Directory.Delete(tempExtractDir, true);
             Directory.CreateDirectory(tempExtractDir);
 
-            var tarPsi = new ProcessStartInfo
+            if (PlatformHelper.IsWindows)
             {
-                FileName = "tar",
-                Arguments = $"-xzf \"{tempTarGz}\" -C \"{tempExtractDir}\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var tarProc = Process.Start(tarPsi);
-            await tarProc!.WaitForExitAsync(ct);
+                onOutput?.Invoke("正在解压 uv...");
+                // 解压 zip
+                ZipFile.ExtractToDirectory(tempDownload, tempExtractDir, true);
 
-            if (tarProc.ExitCode != 0)
-            {
-                _logger.LogError("解压 uv 失败");
-                return false;
+                // zip 内通常包含 uv.exe/uvx.exe
+                var candidate1 = Path.Combine(tempExtractDir, "uv.exe");
+                var candidate2 = Path.Combine(tempExtractDir, "uvx.exe");
+                string? uvSource = File.Exists(candidate1) ? candidate1 : null;
+
+                if (uvSource == null)
+                {
+                    // 兼容未来 zip 结构变化：递归查找 uv.exe
+                    foreach (var file in Directory.EnumerateFiles(tempExtractDir, "uv.exe", SearchOption.AllDirectories))
+                    {
+                        uvSource = file;
+                        break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(uvSource) || !File.Exists(uvSource))
+                {
+                    _logger.LogError("找不到 uv.exe，解压目录: {Path}", tempExtractDir);
+                    onOutput?.Invoke($"找不到 uv.exe，解压目录: {tempExtractDir}");
+                    return false;
+                }
+
+                File.Copy(uvSource, uvExePath, true);
+
+                // 清理临时文件
+                File.Delete(tempDownload);
+                Directory.Delete(tempExtractDir, true);
+
+                _logger.LogInformation("uv 安装完成: {Path}", Path.GetFullPath(uvExePath));
+                onOutput?.Invoke($"uv 安装完成: {Path.GetFullPath(uvExePath)}");
+                return true;
             }
-
-            // 找到 uv 可执行文件并复制
-            var uvExeSource = Path.Combine(tempExtractDir, $"uv-{uvArch}-{uvPlatform}", "uv");
-
-            if (!File.Exists(uvExeSource))
+            else
             {
-                _logger.LogError("找不到 uv 可执行文件: {Path}", uvExeSource);
-                return false;
+                onOutput?.Invoke("正在解压 uv...");
+                // macOS/Linux: 解 tar.gz（依赖系统 tar）
+                var tarPsi = new ProcessStartInfo
+                {
+                    FileName = "tar",
+                    Arguments = $"-xzf \"{tempDownload}\" -C \"{tempExtractDir}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var tarProc = Process.Start(tarPsi);
+                await tarProc!.WaitForExitAsync(ct);
+
+                if (tarProc.ExitCode != 0)
+                {
+                    _logger.LogError("解压 uv 失败");
+                    onOutput?.Invoke("解压 uv 失败");
+                    return false;
+                }
+
+                var uvPlatform = PlatformHelper.IsMacOS ? "apple-darwin" : "unknown-linux-gnu";
+                var uvExeSource = Path.Combine(tempExtractDir, $"uv-{uvArch}-{uvPlatform}", "uv");
+                if (!File.Exists(uvExeSource))
+                {
+                    _logger.LogError("找不到 uv 可执行文件: {Path}", uvExeSource);
+                    onOutput?.Invoke($"找不到 uv 可执行文件: {uvExeSource}");
+                    return false;
+                }
+
+                File.Copy(uvExeSource, uvExePath, true);
+
+                var chmodPsi = new ProcessStartInfo
+                {
+                    FileName = "chmod",
+                    Arguments = $"+x \"{uvExePath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var chmodProc = Process.Start(chmodPsi);
+                await chmodProc!.WaitForExitAsync(ct);
+
+                File.Delete(tempDownload);
+                Directory.Delete(tempExtractDir, true);
+
+                _logger.LogInformation("uv 安装完成: {Path}", Path.GetFullPath(uvExePath));
+                onOutput?.Invoke($"uv 安装完成: {Path.GetFullPath(uvExePath)}");
+                return true;
             }
-
-            File.Copy(uvExeSource, uvExePath, true);
-
-            // 添加可执行权限
-            var chmodPsi = new ProcessStartInfo
-            {
-                FileName = "chmod",
-                Arguments = $"+x \"{uvExePath}\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var chmodProc = Process.Start(chmodPsi);
-            await chmodProc!.WaitForExitAsync(ct);
-
-            // 清理临时文件
-            File.Delete(tempTarGz);
-            Directory.Delete(tempExtractDir, true);
-
-            _logger.LogInformation("uv 安装完成: {Path}", Path.GetFullPath(uvExePath));
-            return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "安装 uv 失败");
+            onOutput?.Invoke($"安装 uv 失败: {ex.Message}");
             return false;
         }
     }
@@ -222,7 +288,7 @@ public class PythonHelper : IPythonHelper
         try
         {
             // 确保 uv 已安装，uv 会自动管理 Python
-            if (!await EnsureUvInstalledAsync(ct))
+            if (!await EnsureUvInstalledAsync(ct, null))
             {
                 return false;
             }
@@ -268,8 +334,67 @@ public class PythonHelper : IPythonHelper
         // 安装 uv
         await RunCommandAsync(PythonExe, $"-m pip install uv -i {PipMirror}", Path.GetFullPath(PythonDir), null, ct);
 
+        // 兼容旧逻辑：把 pip 安装出来的 uv.exe 复制到 bin/uv/uv.exe
+        var uvFromPip = Path.Combine(PythonDir, "Scripts", "uv.exe");
+        if (!File.Exists(uvFromPip))
+        {
+            // 有些环境 scripts 会直接落在根目录
+            var uvFromRoot = Path.Combine(PythonDir, "uv.exe");
+            if (File.Exists(uvFromRoot))
+                uvFromPip = uvFromRoot;
+        }
+
+        if (!File.Exists(uvFromPip))
+        {
+            _logger.LogError("uv 安装后未找到可执行文件: {Path}", uvFromPip);
+            return false;
+        }
+
+        try
+        {
+            var uvDir = Path.GetFullPath("bin/uv");
+            Directory.CreateDirectory(uvDir);
+            var uvTarget = Path.Combine(uvDir, "uv.exe");
+            File.Copy(uvFromPip, uvTarget, overwrite: true);
+            _logger.LogInformation("uv 已就绪: {Path}", uvTarget);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "复制 uv.exe 到 bin/uv 失败，将尝试直接使用 PythonDir/Scripts/uv.exe");
+        }
+
         _logger.LogInformation("Python + uv 安装完成");
         return true;
+    }
+
+    private string? TryResolveUvExecutablePathWindows()
+    {
+        var uvInBin = Path.GetFullPath("bin/uv/uv.exe");
+        if (File.Exists(uvInBin))
+            return uvInBin;
+
+        var uvInScripts = Path.Combine(PythonDir, "Scripts", "uv.exe");
+        if (File.Exists(uvInScripts))
+        {
+            // 尝试复制到 bin/uv，保持调用方兼容
+            try
+            {
+                var uvDir = Path.GetFullPath("bin/uv");
+                Directory.CreateDirectory(uvDir);
+                File.Copy(uvInScripts, uvInBin, overwrite: true);
+                return uvInBin;
+            }
+            catch
+            {
+                return uvInScripts;
+            }
+        }
+
+        var uvInRoot = Path.Combine(PythonDir, "uv.exe");
+        if (File.Exists(uvInRoot))
+            return uvInRoot;
+
+        return null;
     }
 
     public async Task<bool> CreateVenvAsync(string targetDir, Action<string>? onOutput = null, CancellationToken ct = default)
@@ -311,20 +436,39 @@ public class PythonHelper : IPythonHelper
 
         if (PlatformHelper.IsWindows)
         {
-            var uvExe = Path.GetFullPath("bin/uv/uv.exe");
-            if (!File.Exists(uvExe))
+            var uvExe = TryResolveUvExecutablePathWindows();
+            if (string.IsNullOrEmpty(uvExe) || !File.Exists(uvExe))
             {
-                _logger.LogError("uv 未安装: {Path}", uvExe);
+                // Windows 也按 macOS 逻辑：缺 uv 就自动下载
+                onOutput?.Invoke("未检测到 uv，正在下载...");
+                if (!await EnsureUvInstalledAsync(ct, onOutput))
+                {
+                    var expected = Path.GetFullPath("bin/uv/uv.exe");
+                    _logger.LogError("uv 未安装: {Path}", expected);
+                    onOutput?.Invoke($"uv 未安装: {expected}");
+                    return false;
+                }
+
+                uvExe = TryResolveUvExecutablePathWindows();
+            }
+
+            if (string.IsNullOrEmpty(uvExe) || !File.Exists(uvExe))
+            {
+                var expected = Path.GetFullPath("bin/uv/uv.exe");
+                _logger.LogError("uv 未安装: {Path}", expected);
+                onOutput?.Invoke($"uv 未安装: {expected}");
                 return false;
             }
+
             uvCommand = uvExe;
         }
         else
         {
             // macOS/Linux: 确保 uv 已安装
-            if (!await EnsureUvInstalledAsync(ct))
+            if (!await EnsureUvInstalledAsync(ct, onOutput))
             {
                 _logger.LogError("无法安装 uv");
+                onOutput?.Invoke("无法安装 uv");
                 return false;
             }
 
@@ -332,6 +476,7 @@ public class PythonHelper : IPythonHelper
             if (!File.Exists(uvExe))
             {
                 _logger.LogError("uv 未安装: {Path}", uvExe);
+                onOutput?.Invoke($"uv 未安装: {uvExe}");
                 return false;
             }
             uvCommand = uvExe;

@@ -151,7 +151,22 @@ public class AstrBotInstallService : IAstrBotInstallService
         try
         {
             var astrBotPath = Path.GetFullPath(AstrBotDir);
-            var uvExe = Path.GetFullPath(PlatformHelper.IsWindows ? "bin/uv/uv.exe" : "bin/uv/uv");
+            string uvExe;
+
+            if (PlatformHelper.IsWindows)
+            {
+                var uvInBin = Path.GetFullPath("bin/uv/uv.exe");
+                var uvInScripts = Path.GetFullPath(Path.Combine("bin/python", "Scripts", "uv.exe"));
+                var uvInRoot = Path.GetFullPath(Path.Combine("bin/python", "uv.exe"));
+
+                uvExe = File.Exists(uvInBin) ? uvInBin :
+                       File.Exists(uvInScripts) ? uvInScripts :
+                       uvInRoot;
+            }
+            else
+            {
+                uvExe = Path.GetFullPath("bin/uv/uv");
+            }
 
             if (!File.Exists(uvExe))
             {

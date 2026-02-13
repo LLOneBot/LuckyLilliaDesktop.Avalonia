@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Management;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -24,6 +25,10 @@ public class ProcessManager : IProcessManager, IDisposable
     private static readonly ConcurrentDictionary<int, string> _instanceNameCache = new();
     private static readonly ConcurrentDictionary<int, (DateTime Time, TimeSpan CpuTime)> _cpuSampleCache = new();
     private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+
+    private static readonly object _processTreeCacheLock = new();
+    private static DateTime _childrenMapCacheTimeUtc;
+    private static Dictionary<int, List<int>>? _childrenMapCache;
 
     // Job Object 句柄，用于自动清理子进程
     private static IntPtr _jobHandle = IntPtr.Zero;
@@ -778,42 +783,113 @@ public class ProcessManager : IProcessManager, IDisposable
 
     private static double GetProcessTreeMemory(int parentPid)
     {
-        double totalMemory = 0;
-        var pidsToCheck = new List<int> { parentPid };
-        var checkedPids = new HashSet<int>();
+        // 旧实现：枚举所有进程 + NtQueryInformationProcess 获取父 PID，
+        // 会在普通用户权限下频繁触发 Win32Exception（拒绝访问/进程已退出），调试时非常“刷屏”。
+        // 新实现：Windows 上使用 WMI 获取 (pid, ppid) 并做短缓存，避免句柄访问。
 
-        while (pidsToCheck.Count > 0)
+        if (!PlatformHelper.IsWindows)
         {
-            var currentPid = pidsToCheck[0];
-            pidsToCheck.RemoveAt(0);
+            try
+            {
+                using var proc = Process.GetProcessById(parentPid);
+                return GetSingleProcessMemory(proc);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
 
-            if (checkedPids.Contains(currentPid))
+        var childrenMap = TryGetChildrenMapCached();
+        if (childrenMap == null)
+        {
+            // 失败时直接返回 0，让上层走 WorkingSet/PerformanceCounter 的 fallback
+            return 0;
+        }
+
+        double totalMemory = 0;
+        var queue = new Queue<int>();
+        var visited = new HashSet<int>();
+        queue.Enqueue(parentPid);
+
+        while (queue.Count > 0)
+        {
+            var pid = queue.Dequeue();
+            if (!visited.Add(pid))
                 continue;
-            checkedPids.Add(currentPid);
 
             try
             {
-                var proc = Process.GetProcessById(currentPid);
+                using var proc = Process.GetProcessById(pid);
                 totalMemory += GetSingleProcessMemory(proc);
+            }
+            catch
+            {
+                // ignore
+            }
 
-                // 查找子进程
-                foreach (var p in Process.GetProcesses())
+            if (childrenMap.TryGetValue(pid, out var children))
+            {
+                foreach (var childPid in children)
                 {
-                    try
-                    {
-                        if (GetParentProcessId(p.Id) == currentPid && !checkedPids.Contains(p.Id))
-                        {
-                            pidsToCheck.Add(p.Id);
-                        }
-                    }
-                    catch { }
-                    finally { p.Dispose(); }
+                    if (!visited.Contains(childPid))
+                        queue.Enqueue(childPid);
                 }
             }
-            catch { }
         }
 
         return totalMemory;
+    }
+
+    private static Dictionary<int, List<int>>? TryGetChildrenMapCached()
+    {
+        // WMI 仅在 Windows 可用
+        if (!PlatformHelper.IsWindows)
+            return null;
+
+        lock (_processTreeCacheLock)
+        {
+            var nowUtc = DateTime.UtcNow;
+            if (_childrenMapCache != null && (nowUtc - _childrenMapCacheTimeUtc).TotalSeconds < 2)
+            {
+                return _childrenMapCache;
+            }
+
+            try
+            {
+                var map = new Dictionary<int, List<int>>();
+
+                using var searcher = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId FROM Win32_Process");
+                using var results = searcher.Get();
+                foreach (ManagementObject obj in results)
+                {
+                    var pidObj = obj["ProcessId"];
+                    var ppidObj = obj["ParentProcessId"];
+                    if (pidObj == null || ppidObj == null)
+                        continue;
+
+                    var pid = Convert.ToInt32(pidObj);
+                    var ppid = Convert.ToInt32(ppidObj);
+
+                    if (!map.TryGetValue(ppid, out var list))
+                    {
+                        list = new List<int>();
+                        map[ppid] = list;
+                    }
+                    list.Add(pid);
+                }
+
+                _childrenMapCache = map;
+                _childrenMapCacheTimeUtc = nowUtc;
+                return _childrenMapCache;
+            }
+            catch
+            {
+                _childrenMapCache = null;
+                _childrenMapCacheTimeUtc = nowUtc;
+                return null;
+            }
+        }
     }
 
     private static double GetSingleProcessMemory(Process process)

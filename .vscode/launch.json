@@ -6,10 +6,12 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net8.0/LuckyLilliaDesktop.dll",
+            "program": "${workspaceFolder}/bin/Debug/net9.0/LuckyLilliaDesktop.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
+            "justMyCode": true,
+            "enableStepFiltering": true,
             "stopAtEntry": false
         },
         {
@@ -17,9 +19,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "publish-win",
-            "program": "${workspaceFolder}/bin/Release/net8.0/win-x64/publish/LuckyLilliaDesktop.dll",
+            "program": "${workspaceFolder}/bin/Release/net9.0/win-x64/publish/LuckyLilliaDesktop.exe",
             "args": [],
-            "cwd": "${workspaceFolder}/bin/Release/net8.0/win-x64/publish",
+            "cwd": "${workspaceFolder}/bin/Release/net9.0/win-x64/publish",
             "console": "internalConsole",
             "stopAtEntry": false
         },
@@ -28,9 +30,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "publish-osx",
-            "program": "${workspaceFolder}/bin/Release/net8.0/osx-x64/publish/LuckyLilliaDesktop.dll",
+            "program": "${workspaceFolder}/bin/Release/net9.0/osx-x64/publish/LuckyLilliaDesktop",
             "args": [],
-            "cwd": "${workspaceFolder}/bin/Release/net8.0/osx-x64/publish",
+            "cwd": "${workspaceFolder}/bin/Release/net9.0/osx-x64/publish",
             "console": "internalConsole",
             "stopAtEntry": false
         }
