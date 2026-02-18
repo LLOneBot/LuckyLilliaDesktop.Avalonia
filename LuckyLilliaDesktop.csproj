@@ -11,7 +11,7 @@
     <Product>Lucky Lillia Desktop</Product>
     <AssemblyTitle>Lucky Lillia Desktop</AssemblyTitle>
     <Description>幸运莉莉娅桌面端</Description>
-    <Version>2.4.4</Version>
+    <Version>2.5.0</Version>
   </PropertyGroup>
 
   <!-- Windows特定配置 -->
@@ -23,9 +23,10 @@
 
   <!-- 发布配置（仅在发布时使用） -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- macOS 不支持 PublishSingleFile with native libraries -->
+    <PublishSingleFile Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'linux-x64'">true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'linux-x64'">true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
