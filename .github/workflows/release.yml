@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  release:
+  release-windows:
     runs-on: windows-latest
     permissions:
       contents: write
@@ -20,7 +20,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Restore dependencies
         run: dotnet restore
@@ -28,14 +28,14 @@ jobs:
       - name: Build and Publish
         run: |
           dotnet publish -c Release -r win-x64
-          dir bin\Release\net8.0-windows\win-x64\publish
-          (Get-Item bin\Release\net8.0-windows\win-x64\publish\LuckyLilliaDesktop.exe).Length / 1MB
+          dir bin\Release\net9.0-windows\win-x64\publish
+          (Get-Item bin\Release\net9.0-windows\win-x64\publish\LuckyLilliaDesktop.exe).Length / 1MB
 
       - name: Rename exe
-        run: Rename-Item -Path bin\Release\net8.0-windows\win-x64\publish\LuckyLilliaDesktop.exe -NewName lucky-lillia-desktop.exe
+        run: Rename-Item -Path bin\Release\net9.0-windows\win-x64\publish\LuckyLilliaDesktop.exe -NewName lucky-lillia-desktop.exe
 
       - name: Compress to zip
-        run: Compress-Archive -Path bin\Release\net8.0-windows\win-x64\publish\lucky-lillia-desktop.exe -DestinationPath lucky-lillia-desktop-win-x64.zip
+        run: Compress-Archive -Path bin\Release\net9.0-windows\win-x64\publish\lucky-lillia-desktop.exe -DestinationPath lucky-lillia-desktop-win-x64.zip
 
       - name: Upload artifact
         if: github.event_name == 'workflow_dispatch'
@@ -72,7 +72,7 @@ jobs:
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
           mkdir package
-          copy bin\Release\net8.0-windows\win-x64\publish\lucky-lillia-desktop.exe package\
+          copy bin\Release\net9.0-windows\win-x64\publish\lucky-lillia-desktop.exe package\
           @"
           {
             "name": "lucky-lillia-desktop-win-x64",
@@ -85,3 +85,90 @@ jobs:
           "@ | Out-File -FilePath package\package.json -Encoding utf8
           tar -czf lucky-lillia-desktop-win-x64.tgz package
           npm publish lucky-lillia-desktop-win-x64.tgz --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  release-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      id-token: write
+    strategy:
+      matrix:
+        arch: [arm64] # x64 暂时注释
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build macOS app
+        run: |
+          chmod +x build-macos-app.sh
+          ./build-macos-app.sh ${{ matrix.arch }}
+
+      - name: Create tar.gz package
+        run: |
+          cd bin/Release/net9.0/osx-${{ matrix.arch }}
+          tar -czf ../../../../lucky-lillia-desktop-macos-${{ matrix.arch }}.tar.gz LuckyLilliaDesktop.app
+          cd ../../../../
+
+      - name: Upload artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lucky-lillia-desktop-macos-${{ matrix.arch }}
+          path: lucky-lillia-desktop-macos-${{ matrix.arch }}.tar.gz
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Lucky-Lillia-Desktop ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: true
+          files: lucky-lillia-desktop-macos-${{ matrix.arch }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        if: github.event_name == 'push'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Update npm
+        if: github.event_name == 'push'
+        run: npm install -g npm@latest
+
+      - name: Prepare and publish npm package
+        if: github.event_name == 'push'
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          mkdir -p package
+          cp -r bin/Release/net9.0/osx-${{ matrix.arch }}/LuckyLilliaDesktop.app package/
+          cat > package/package.json << EOF
+          {
+            "name": "lucky-lillia-desktop-macos-${{ matrix.arch }}",
+            "version": "$VERSION",
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/LLOneBot/LuckyLilliaDesktop.Avalonia"
+            }
+          }
+          EOF
+          tar -czf lucky-lillia-desktop-macos-${{ matrix.arch }}.tgz package
+          npm publish lucky-lillia-desktop-macos-${{ matrix.arch }}.tgz --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
