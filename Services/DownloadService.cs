@@ -457,21 +457,44 @@ public class DownloadService : IDownloadService
             }
 
             string? newExePath = null;
-            var executablePattern = "*" + PlatformHelper.ExecutableExtension;
-            foreach (var file in Directory.GetFiles(tempDir, executablePattern))
-            {
-                newExePath = file;
-                break;
-            }
 
-            if (string.IsNullOrEmpty(newExePath))
+            // macOS: 查找 .app 目录
+            if (PlatformHelper.IsMacOS)
             {
-                // 也搜索子目录，以防 package/ 没被正确展开
-                var deepSearch = Directory.GetFiles(tempDir, executablePattern, SearchOption.AllDirectories);
-                _logger.LogWarning("顶层未找到可执行文件，深度搜索结果: {Files}",
-                    string.Join(", ", deepSearch.Select(Path.GetFileName)));
-                if (deepSearch.Length > 0)
-                    newExePath = deepSearch[0];
+                var appBundles = Directory.GetDirectories(tempDir, "*.app");
+                if (appBundles.Length > 0)
+                {
+                    newExePath = appBundles[0];
+                    _logger.LogInformation("找到 .app bundle: {Path}", newExePath);
+                }
+                else
+                {
+                    // 深度搜索子目录
+                    var deepSearch = Directory.GetDirectories(tempDir, "*.app", SearchOption.AllDirectories);
+                    _logger.LogWarning("顶层未找到 .app bundle，深度搜索结果: {Count} 个", deepSearch.Length);
+                    if (deepSearch.Length > 0)
+                        newExePath = deepSearch[0];
+                }
+            }
+            else
+            {
+                // Windows/Linux: 查找可执行文件
+                var executablePattern = "*" + PlatformHelper.ExecutableExtension;
+                foreach (var file in Directory.GetFiles(tempDir, executablePattern))
+                {
+                    newExePath = file;
+                    break;
+                }
+
+                if (string.IsNullOrEmpty(newExePath))
+                {
+                    // 也搜索子目录，以防 package/ 没被正确展开
+                    var deepSearch = Directory.GetFiles(tempDir, executablePattern, SearchOption.AllDirectories);
+                    _logger.LogWarning("顶层未找到可执行文件，深度搜索结果: {Files}",
+                        string.Join(", ", deepSearch.Select(Path.GetFileName)));
+                    if (deepSearch.Length > 0)
+                        newExePath = deepSearch[0];
+                }
             }
 
             if (string.IsNullOrEmpty(newExePath))
@@ -480,8 +503,15 @@ public class DownloadService : IDownloadService
                 return new AppUpdateResult { Success = false, Error = "更新包中未找到可执行文件" };
             }
 
-            _logger.LogInformation("找到新版本exe: {Path} ({Size} bytes)",
-                newExePath, new FileInfo(newExePath).Length);
+            if (PlatformHelper.IsMacOS && Directory.Exists(newExePath))
+            {
+                _logger.LogInformation("找到新版本 .app: {Path}", newExePath);
+            }
+            else
+            {
+                _logger.LogInformation("找到新版本exe: {Path} ({Size} bytes)",
+                    newExePath, new FileInfo(newExePath).Length);
+            }
 
             var currentExe = GetCurrentExePath();
             if (string.IsNullOrEmpty(currentExe))
@@ -518,6 +548,18 @@ public class DownloadService : IDownloadService
     }
 
     private string CreateUpdateScript(string newExePath, string currentExePath, int currentPid, string tempDir)
+    {
+        if (PlatformHelper.IsWindows)
+        {
+            return CreateWindowsUpdateScript(newExePath, currentExePath, currentPid, tempDir);
+        }
+        else
+        {
+            return CreateUnixUpdateScript(newExePath, currentExePath, currentPid, tempDir);
+        }
+    }
+
+    private string CreateWindowsUpdateScript(string newExePath, string currentExePath, int currentPid, string tempDir)
     {
         var currentDir = Path.GetDirectoryName(currentExePath)!;
         var currentExeName = Path.GetFileName(currentExePath);
@@ -626,6 +668,156 @@ public class DownloadService : IDownloadService
             """;
 
         File.WriteAllText(scriptPath, scriptContent, new System.Text.UTF8Encoding(false));
+        _logger.LogInformation("更新脚本已生成: {Path}, 日志文件: {LogFile}", scriptPath, logFile);
+        return scriptPath;
+    }
+
+    private string CreateUnixUpdateScript(string newExePath, string currentExePath, int currentPid, string tempDir)
+    {
+        var currentDir = Path.GetDirectoryName(currentExePath)!;
+        var currentExeName = Path.GetFileName(currentExePath);
+        var scriptPath = Path.Combine(tempDir, "_update.sh");
+        // 日志文件放在临时目录，避免备份后原目录不存在
+        var logFile = Path.Combine(tempDir, "_update.log");
+
+        // macOS 上如果是 .app，需要处理整个 .app bundle
+        var isAppBundle = currentExePath.Contains(".app/Contents/MacOS/");
+        string targetPath, sourcePath;
+
+        if (isAppBundle)
+        {
+            // 提取当前 .app 路径
+            var appIndex = currentExePath.IndexOf(".app/Contents/MacOS/");
+            var currentAppPath = currentExePath[..(appIndex + 4)]; // 包含 .app
+
+            // 新版本 newExePath 就是 .app 本身（因为前面的代码找到的是 .app 目录）
+            targetPath = currentAppPath;
+            sourcePath = newExePath;  // newExePath 已经是 .app 路径了
+        }
+        else
+        {
+            targetPath = currentExePath;
+            sourcePath = newExePath;
+        }
+
+        var scriptContent = $$"""
+            #!/bin/bash
+            set -e
+
+            CURRENT_DIR="{{currentDir}}"
+            CURRENT_EXE="{{currentExePath}}"
+            NEW_EXE="{{newExePath}}"
+            TARGET_PATH="{{targetPath}}"
+            SOURCE_PATH="{{sourcePath}}"
+            TEMP_DIR="{{tempDir}}"
+            LOG_FILE="{{logFile}}"
+            PID={{currentPid}}
+
+            log() {
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+            }
+
+            log "====== 开始更新 ======"
+            log "PID=$PID"
+            log "CURRENT_EXE=$CURRENT_EXE"
+            log "NEW_EXE=$NEW_EXE"
+            log "TARGET_PATH=$TARGET_PATH"
+            log "SOURCE_PATH=$SOURCE_PATH"
+            log "TEMP_DIR=$TEMP_DIR"
+
+            if [ ! -e "$SOURCE_PATH" ]; then
+                log "错误: 新版本文件不存在"
+                exit 1
+            fi
+
+            log "新版本文件存在，大小: $(du -h "$SOURCE_PATH" | cut -f1)"
+
+            # 等待进程退出
+            log "等待程序退出..."
+            count=0
+            while kill -0 $PID 2>/dev/null; do
+                count=$((count + 1))
+                if [ $count -ge 20 ]; then
+                    log "等待超时，强制终止"
+                    kill -9 $PID 2>/dev/null || true
+                    sleep 1
+                    break
+                fi
+                echo "等待程序退出... $count/20"
+                sleep 1
+            done
+
+            log "程序已退出，开始更新"
+
+            # 备份旧版本
+            if [ -e "$TARGET_PATH" ]; then
+                log "备份旧版本..."
+                rm -rf "$TARGET_PATH.bak" 2>/dev/null || true
+                mv "$TARGET_PATH" "$TARGET_PATH.bak"
+                log "备份完成"
+            else
+                log "旧版本不存在，跳过备份"
+            fi
+
+            # 安装新版本
+            log "正在安装新版本..."
+            if [ -d "$SOURCE_PATH" ]; then
+                # 复制目录（如 .app bundle）
+                cp -R "$SOURCE_PATH" "$TARGET_PATH"
+            else
+                # 复制单个文件
+                cp "$SOURCE_PATH" "$TARGET_PATH"
+                chmod +x "$TARGET_PATH"
+            fi
+
+            if [ ! -e "$TARGET_PATH" ]; then
+                log "错误: 复制后目标文件不存在"
+                if [ -e "$TARGET_PATH.bak" ]; then
+                    log "恢复旧版本..."
+                    mv "$TARGET_PATH.bak" "$TARGET_PATH"
+                fi
+                exit 1
+            fi
+
+            log "复制成功，大小: $(du -h "$TARGET_PATH" | cut -f1)"
+
+            # 启动新版本
+            log "更新完成！正在启动新版本..."
+            sleep 2
+
+            cd "$CURRENT_DIR"
+            log "启动: $CURRENT_EXE"
+
+            if [ -d "$TARGET_PATH" ]; then
+                # .app bundle - 使用 open 命令
+                open "$TARGET_PATH" &
+            else
+                # 单个可执行文件
+                nohup "$CURRENT_EXE" > /dev/null 2>&1 &
+            fi
+
+            log "启动命令已执行"
+            log "====== 更新完成 ======"
+
+            sleep 3
+            rm -rf "$TEMP_DIR" 2>/dev/null || true
+            """;
+
+        File.WriteAllText(scriptPath, scriptContent, new System.Text.UTF8Encoding(false));
+
+        // 添加执行权限
+        if (PlatformHelper.IsMacOS || PlatformHelper.IsLinux)
+        {
+            var chmod = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "chmod",
+                Arguments = $"+x \"{scriptPath}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            chmod?.WaitForExit();
+        }
+
         _logger.LogInformation("更新脚本已生成: {Path}, 日志文件: {LogFile}", scriptPath, logFile);
         return scriptPath;
     }

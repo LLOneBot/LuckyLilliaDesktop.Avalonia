@@ -1,4 +1,5 @@
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System;
@@ -601,17 +602,48 @@ public class AboutViewModel : ViewModelBase
 
         try
         {
-            // 必须脱离 Job Object，否则主进程退出时脚本也会被杀掉
             var workDir = Path.GetDirectoryName(_pendingAppUpdateScript) ?? "";
-            if (!_processManager.StartProcessOutsideJob(_pendingAppUpdateScript, workDir))
+
+            if (PlatformHelper.IsWindows)
             {
-                _logger.LogError("通过 Job Breakaway 启动更新脚本失败，回退到 ShellExecute");
-                Process.Start(new ProcessStartInfo
+                // Windows: 必须脱离 Job Object，否则主进程退出时脚本也会被杀掉
+                if (!_processManager.StartProcessOutsideJob(_pendingAppUpdateScript, workDir))
                 {
-                    FileName = _pendingAppUpdateScript,
-                    UseShellExecute = true,
-                    WorkingDirectory = workDir
-                });
+                    _logger.LogError("通过 Job Breakaway 启动更新脚本失败，回退到 ShellExecute");
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = _pendingAppUpdateScript,
+                        UseShellExecute = true,
+                        WorkingDirectory = workDir
+                    });
+                }
+            }
+            else
+            {
+                // macOS/Linux: 在终端窗口中执行脚本，这样用户可以看到执行过程
+                if (PlatformHelper.IsMacOS)
+                {
+                    // macOS: 使用 open -a Terminal 在新终端窗口中执行
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "open",
+                        Arguments = $"-a Terminal \"{_pendingAppUpdateScript}\"",
+                        UseShellExecute = false,
+                        WorkingDirectory = workDir
+                    });
+                }
+                else
+                {
+                    // Linux: 使用 bash 执行
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "/bin/bash",
+                        Arguments = $"\"{_pendingAppUpdateScript}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WorkingDirectory = workDir
+                    });
+                }
             }
         }
         catch (Exception ex)
