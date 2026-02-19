@@ -297,6 +297,24 @@
                         CornerRadius="12"
                         Padding="24">
                     <StackPanel Spacing="16">
+                        <!-- 工作目录（只读） -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="工作目录（数据存储位置）" Foreground="{DynamicResource TextSecondary}"/>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right"
+                                        Content="打开"
+                                        Command="{Binding OpenWorkingDirectoryCommand}"
+                                        Margin="8,0,0,0"
+                                        Width="80"/>
+                                <TextBox Text="{Binding WorkingDirectory}"
+                                         IsReadOnly="True"
+                                         Watermark="当前工作目录"
+                                         Background="{DynamicResource BackgroundSecondary}"/>
+                            </DockPanel>
+                        </StackPanel>
+
+                        <Border Height="1" Background="{DynamicResource BorderColor}"/>
+
                         <!-- QQ 路径 -->
                         <StackPanel Spacing="8">
                             <TextBlock Text="QQ 路径" Foreground="{DynamicResource TextSecondary}"/>
@@ -341,7 +359,7 @@
 
                         <!-- Node.js 路径 -->
                         <StackPanel Spacing="8">
-                            <TextBlock Text="Node.js 路径" Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="Node 路径" Foreground="{DynamicResource TextSecondary}"/>
                             <DockPanel>
                                 <Button DockPanel.Dock="Right"
                                         Content="浏览..."

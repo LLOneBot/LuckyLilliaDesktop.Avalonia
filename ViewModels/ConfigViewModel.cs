@@ -306,8 +306,11 @@ public class ConfigViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> TestCommandCommand { get; }
     public ReactiveCommand<Unit, Unit> TestEmailCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenEmailGuideCommand { get; }
+    public ReactiveCommand<Unit, Unit> OpenWorkingDirectoryCommand { get; }
     public ReactiveCommand<Unit, Unit> SaveConfigCommand { get; }
     public ReactiveCommand<Unit, Unit> LoadConfigCommand { get; }
+
+    public string WorkingDirectory => Environment.CurrentDirectory;
 
     public ConfigViewModel(IConfigManager configManager, IEmailService emailService, ILogger<ConfigViewModel> logger)
     {
@@ -377,6 +380,52 @@ public class ConfigViewModel : ViewModelBase
             catch (Exception ex)
             {
                 _logger.LogError(ex, "打开邮件设置向导失败");
+            }
+        });
+        OpenWorkingDirectoryCommand = ReactiveCommand.Create(() =>
+        {
+            try
+            {
+                var workingDir = Environment.CurrentDirectory;
+                if (System.IO.Directory.Exists(workingDir))
+                {
+                    if (Utils.PlatformHelper.IsMacOS)
+                    {
+                        // macOS: 使用 open 命令打开 Finder
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "open",
+                            Arguments = $"\"{workingDir}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        });
+                    }
+                    else if (Utils.PlatformHelper.IsWindows)
+                    {
+                        // Windows: 使用 explorer 打开资源管理器
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "explorer.exe",
+                            Arguments = $"\"{workingDir}\"",
+                            UseShellExecute = false
+                        });
+                    }
+                    else
+                    {
+                        // Linux: 尝试使用 xdg-open
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "xdg-open",
+                            Arguments = $"\"{workingDir}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "打开工作目录失败");
             }
         });
         SaveConfigCommand = ReactiveCommand.CreateFromTask(SaveConfigAsync);
