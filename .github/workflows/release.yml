@@ -112,6 +112,10 @@ jobs:
           chmod +x build-macos-app.sh
           ./build-macos-app.sh ${{ matrix.arch }}
 
+      - name: Remove quarantine attributes
+        run: |
+          xattr -cr bin/Release/net9.0/osx-${{ matrix.arch }}/LuckyLilliaDesktop.app || true
+
       - name: Create tar.gz package
         run: |
           cd bin/Release/net9.0/osx-${{ matrix.arch }}

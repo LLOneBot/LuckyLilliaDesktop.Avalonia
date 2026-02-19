@@ -23,7 +23,7 @@ echo "========================================="
 
 # 1. 发布应用
 echo ""
-echo "步骤 1/4: 发布应用..."
+echo "步骤 1/5: 发布应用..."
 dotnet publish -c Release -r "$RID" --self-contained true
 
 if [ $? -ne 0 ]; then
@@ -33,7 +33,7 @@ fi
 
 # 2. 创建 .app 目录结构
 echo ""
-echo "步骤 2/4: 创建 .app 目录结构..."
+echo "步骤 2/5: 创建 .app 目录结构..."
 APP_DIR="bin/Release/net9.0/$RID/$APP_NAME.app"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
@@ -41,12 +41,12 @@ mkdir -p "$APP_DIR/Contents/Resources"
 
 # 3. 复制发布的文件到 .app 中
 echo ""
-echo "步骤 3/4: 复制应用文件..."
+echo "步骤 3/5: 复制应用文件..."
 cp -r "bin/Release/net9.0/$RID/publish/"* "$APP_DIR/Contents/MacOS/"
 
 # 4. 创建 Info.plist
 echo ""
-echo "步骤 4/4: 创建 Info.plist..."
+echo "步骤 4/5: 创建 Info.plist..."
 cat > "$APP_DIR/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -85,6 +85,23 @@ fi
 
 # 设置可执行权限
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
+
+# 5. 代码签名（ad-hoc 签名，避免 Gatekeeper 问题）
+echo ""
+echo "步骤 5/5: 代码签名..."
+echo "对应用进行 ad-hoc 签名以避免 macOS Gatekeeper 问题..."
+
+# 签名所有可执行文件和动态库
+find "$APP_DIR/Contents/MacOS" -type f \( -name "*.dylib" -o -perm +111 \) -exec codesign --force --deep --sign - {} \; 2>/dev/null || true
+
+# 签名整个 app bundle
+codesign --force --deep --sign - "$APP_DIR"
+
+if [ $? -eq 0 ]; then
+    echo "✓ 代码签名完成"
+else
+    echo "⚠ 代码签名失败（这可能导致在其他 Mac 上运行时出现 Gatekeeper 警告）"
+fi
 
 echo ""
 echo "========================================="
