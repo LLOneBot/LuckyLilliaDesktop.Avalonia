@@ -890,20 +890,45 @@ public class HomeViewModel : ViewModelBase
             // 检查并下载缺失的文件
             var pmhqExists = !string.IsNullOrEmpty(config.PmhqPath) && File.Exists(config.PmhqPath);
 
-            // 检查 Node.js：优先使用 PATH 中的 Node.js（版本 >= 22）
+            // 检查 Node.js：先验证配置中的路径是否有效，如果无效则重置
             var nodeExists = false;
-            var systemNode = Utils.NodeHelper.FindNodeInPath();
-            if (!string.IsNullOrEmpty(systemNode))
+            if (!string.IsNullOrEmpty(config.NodePath) && File.Exists(config.NodePath))
             {
-                if (await Utils.NodeHelper.CheckNodeVersionValidAsync(systemNode, 24, _logger))
+                if (await Utils.NodeHelper.CheckNodeVersionValidAsync(config.NodePath, 24, _logger))
                 {
-                    _logger.LogInformation("在系统PATH中找到Node.js (版本>=24): {Path}", systemNode);
-                    config.NodePath = systemNode;
+                    _logger.LogInformation("配置中的Node.js路径有效: {Path}", config.NodePath);
                     nodeExists = true;
                 }
                 else
                 {
-                    _logger.LogWarning("系统PATH中的Node.js版本低于24: {Path}", systemNode);
+                    _logger.LogWarning("配置中的Node.js版本低于24，将重新检测: {Path}", config.NodePath);
+                    config.NodePath = string.Empty; // 重置无效路径
+                }
+            }
+            else if (!string.IsNullOrEmpty(config.NodePath))
+            {
+                _logger.LogWarning("配置中的Node.js路径不存在，将重新检测: {Path}", config.NodePath);
+                config.NodePath = string.Empty; // 重置无效路径
+            }
+
+            // 如果配置中的路径无效，优先使用 PATH 中的 Node.js（版本 >= 24）
+            if (!nodeExists)
+            // 如果配置中的路径无效，优先使用 PATH 中的 Node.js（版本 >= 24）
+            if (!nodeExists)
+            {
+                var systemNode = Utils.NodeHelper.FindNodeInPath();
+                if (!string.IsNullOrEmpty(systemNode))
+                {
+                    if (await Utils.NodeHelper.CheckNodeVersionValidAsync(systemNode, 24, _logger))
+                    {
+                        _logger.LogInformation("在系统PATH中找到Node.js (版本>=24): {Path}", systemNode);
+                        config.NodePath = systemNode;
+                        nodeExists = true;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("系统PATH中的Node.js版本低于24: {Path}", systemNode);
+                    }
                 }
             }
 
