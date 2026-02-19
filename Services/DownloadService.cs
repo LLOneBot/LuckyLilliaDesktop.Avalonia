@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Formats.Tar;
 using System.IO;
 using System.IO.Compression;
@@ -188,7 +189,7 @@ public class DownloadService : IDownloadService
 
     private async Task<bool> DownloadQQForMacOSAsync(IProgress<DownloadProgress>? progress, CancellationToken ct)
     {
-        var tempFile = Path.Combine(Path.GetTempPath(), "QQ-macos.zip");
+        var tempFile = Path.Combine(Path.GetTempPath(), "QQ-macos.tar.xz");
         _logger.LogInformation("macOS QQ 原始下载地址: {Url}", Constants.QQDownloadUrl);
         _logger.LogInformation("临时文件: {Path}", tempFile);
 
@@ -270,8 +271,32 @@ public class DownloadService : IDownloadService
         }
         Directory.CreateDirectory(qqDir);
 
-        // 解压 zip 文件
-        System.IO.Compression.ZipFile.ExtractToDirectory(tempFile, qqDir, true);
+        // 解压 tar.xz 文件
+        var tarPsi = new ProcessStartInfo
+        {
+            FileName = "tar",
+            Arguments = $"-xJf \"{tempFile}\" -C \"{qqDir}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true
+        };
+
+        using var tarProc = Process.Start(tarPsi);
+        if (tarProc == null)
+        {
+            _logger.LogError("无法启动 tar 进程");
+            return false;
+        }
+
+        await tarProc.WaitForExitAsync(ct);
+
+        if (tarProc.ExitCode != 0)
+        {
+            var error = await tarProc.StandardError.ReadToEndAsync(ct);
+            _logger.LogError("解压 QQ 失败，退出码: {ExitCode}，错误: {Error}", tarProc.ExitCode, error);
+            return false;
+        }
 
         try { File.Delete(tempFile); } catch { }
 

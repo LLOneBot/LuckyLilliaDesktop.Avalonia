@@ -73,7 +73,7 @@ public static class Constants
     /// QQ 下载地址
     /// </summary>
     public static string QQDownloadUrl => PlatformHelper.IsMacOS
-        ? "https://github.com/LLOneBot/exe/releases/download/0.0.0/QQ-macos.zip"
+        ? "https://github.com/LLOneBot/exe/releases/download/0.0.0/QQ-macos.tar.xz"
         : "https://dldir1v6.qq.com/qqfile/qq/QQNT/c50d6326/QQ9.9.22.40768_x64.exe";
 
     /// <summary>
