@@ -28,14 +28,14 @@ jobs:
       - name: Build and Publish
         run: |
           dotnet publish -c Release -r win-x64
-          dir bin\Release\net9.0-windows\win-x64\publish
-          (Get-Item bin\Release\net9.0-windows\win-x64\publish\LuckyLilliaDesktop.exe).Length / 1MB
+          dir bin\Release\net9.0\win-x64\publish
+          (Get-Item bin\Release\net9.0\win-x64\publish\LuckyLilliaDesktop.exe).Length / 1MB
 
       - name: Rename exe
-        run: Rename-Item -Path bin\Release\net9.0-windows\win-x64\publish\LuckyLilliaDesktop.exe -NewName lucky-lillia-desktop.exe
+        run: Rename-Item -Path bin\Release\net9.0\win-x64\publish\LuckyLilliaDesktop.exe -NewName lucky-lillia-desktop.exe
 
       - name: Compress to zip
-        run: Compress-Archive -Path bin\Release\net9.0-windows\win-x64\publish\lucky-lillia-desktop.exe -DestinationPath lucky-lillia-desktop-win-x64.zip
+        run: Compress-Archive -Path bin\Release\net9.0\win-x64\publish\lucky-lillia-desktop.exe -DestinationPath lucky-lillia-desktop-win-x64.zip
 
       - name: Upload artifact
         if: github.event_name == 'workflow_dispatch'
@@ -72,7 +72,7 @@ jobs:
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
           mkdir package
-          copy bin\Release\net9.0-windows\win-x64\publish\lucky-lillia-desktop.exe package\
+          copy bin\Release\net9.0\win-x64\publish\lucky-lillia-desktop.exe package\
           @"
           {
             "name": "lucky-lillia-desktop-win-x64",
@@ -85,8 +85,6 @@ jobs:
           "@ | Out-File -FilePath package\package.json -Encoding utf8
           tar -czf lucky-lillia-desktop-win-x64.tgz package
           npm publish lucky-lillia-desktop-win-x64.tgz --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   release-macos:
     runs-on: macos-latest
@@ -169,6 +167,4 @@ jobs:
           EOF
           tar -czf lucky-lillia-desktop-macos-${{ matrix.arch }}.tgz package
           npm publish lucky-lillia-desktop-macos-${{ matrix.arch }}.tgz --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
