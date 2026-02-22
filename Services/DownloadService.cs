@@ -692,7 +692,8 @@ public class DownloadService : IDownloadService
             (goto) 2>nul & rmdir /s /q "%TEMP_DIR%" 2>nul
             """;
 
-        File.WriteAllText(scriptPath, scriptContent, new System.Text.UTF8Encoding(false));
+        // .bat 在 cmd.exe 下对 UTF-8 无 BOM 的解析不稳定；脚本包含中文，使用 BOM 更兼容
+        File.WriteAllText(scriptPath, scriptContent, new System.Text.UTF8Encoding(true));
         _logger.LogInformation("更新脚本已生成: {Path}, 日志文件: {LogFile}", scriptPath, logFile);
         return scriptPath;
     }
