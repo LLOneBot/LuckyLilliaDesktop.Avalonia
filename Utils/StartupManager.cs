@@ -11,6 +11,9 @@ public static class StartupManager
 
     public static bool IsStartupEnabled()
     {
+        if (!PlatformHelper.IsWindows)
+            return false;
+
         try
         {
             var result = RunSchtasks($"/Query /TN \"{TaskName}\" /FO CSV /NH");
@@ -24,6 +27,9 @@ public static class StartupManager
 
     public static bool EnableStartup()
     {
+        if (!PlatformHelper.IsWindows)
+            return false;
+
         try
         {
             var exePath = Environment.ProcessPath;
@@ -60,6 +66,9 @@ public static class StartupManager
 
     public static bool DisableStartup()
     {
+        if (!PlatformHelper.IsWindows)
+            return false;
+
         try
         {
             CleanupLegacyRegistry();
@@ -77,6 +86,9 @@ public static class StartupManager
     /// </summary>
     public static void MigrateFromLegacyRegistry()
     {
+        if (!PlatformHelper.IsWindows)
+            return;
+
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(LegacyRegistryPath, true);
@@ -92,6 +104,9 @@ public static class StartupManager
 
     private static void CleanupLegacyRegistry()
     {
+        if (!PlatformHelper.IsWindows)
+            return;
+
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(LegacyRegistryPath, true);

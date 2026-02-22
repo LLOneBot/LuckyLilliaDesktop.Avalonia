@@ -516,8 +516,13 @@ public class ConfigViewModel : ViewModelBase
 
             if (string.IsNullOrEmpty(QQPath))
             {
-                // 在后台线程执行注册表操作
-                var detectedPath = await Task.Run(() => Utils.QQPathHelper.GetQQPathFromRegistry());
+                // 在后台线程执行平台相关的 QQ 路径检测
+                var detectedPath = await Task.Run(() =>
+                {
+                    if (Utils.PlatformHelper.IsWindows)
+                        return Utils.QQPathHelper.GetQQPathFromRegistry();
+                    return Utils.QQPathHelper.GetDefaultQQPath();
+                });
                 if (!string.IsNullOrEmpty(detectedPath))
                     QQPath = detectedPath;
             }

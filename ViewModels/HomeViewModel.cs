@@ -721,9 +721,7 @@ public class HomeViewModel : ViewModelBase
             // 如果 QQ 路径为空，尝试自动检测
             if (string.IsNullOrEmpty(config.QQPath))
             {
-                var detectedPath = Utils.PlatformHelper.IsWindows
-                    ? Utils.QQPathHelper.GetQQPathFromRegistry()
-                    : Utils.QQPathHelper.GetMacOSQQPath();
+                var detectedPath = Utils.QQPathHelper.GetDefaultQQPath();
 
                 if (!string.IsNullOrEmpty(detectedPath))
                 {
@@ -795,7 +793,15 @@ public class HomeViewModel : ViewModelBase
                                 var success = await _downloadService.DownloadQQAsync(progress, _downloadCts.Token);
                                 if (success)
                                 {
-                                    config.QQPath = Utils.QQPathHelper.GetQQPathFromRegistry() ?? string.Empty;
+                                    // Windows 安装完成后尝试从注册表重新检测
+                                    if (Utils.PlatformHelper.IsWindows)
+                                    {
+                                        config.QQPath = Utils.QQPathHelper.GetQQPathFromRegistry() ?? string.Empty;
+                                    }
+                                    else
+                                    {
+                                        config.QQPath = Utils.QQPathHelper.GetDefaultQQPath() ?? string.Empty;
+                                    }
                                     _logger.LogInformation("QQ 安装完成");
                                 }
                                 else
@@ -1146,74 +1152,77 @@ public class HomeViewModel : ViewModelBase
                 
                 _logger.LogInformation("QQ 进程检测完成，结果: {ApiReady}", apiReady);
 
-                // TODO: 暂时注释掉下载兼容版PMHQ的逻辑
-                // // 检查QQ进程是否存在
-                // if (!apiReady)
-                // {
-                //     _logger.LogWarning("10秒后未检测到QQ进程，可能需要兼容版PMHQ");
-                //     
-                //     // 询问用户是否下载兼容版PMHQ
-                //     if (ConfirmDialog != null)
-                //     {
-                //         var downloadCompatible = await ConfirmDialog(
-                //             "QQ无法启动",
-                //             "检测到QQ无法启动，是否下载兼容版 PMHQ 5.3.0？");
-                //         
-                //         if (downloadCompatible)
-                //         {
-                //             _logger.LogInformation("用户选择下载兼容版PMHQ");
-                //             
-                //             // 先停止当前PMHQ
-                //             await _processManager.StopPmhqAsync();
-                //             
-                //             // 下载兼容版PMHQ
-                //             var downloadSuccess = await DownloadCompatiblePmhqAsync(config.PmhqPath);
-                //             
-                //             if (downloadSuccess)
-                //             {
-                //                 _logger.LogInformation("兼容版PMHQ下载成功，重新启动...");
-                //                 
-                //                 // 重新启动PMHQ
-                //                 pmhqSuccess = await _processManager.StartPmhqAsync(
-                //                     config.PmhqPath,
-                //                     config.QQPath,
-                //                     config.AutoLoginQQ,
-                //                     config.Headless);
-                //                 
-                //                 if (!pmhqSuccess)
-                //                 {
-                //                     ErrorMessage = "兼容版PMHQ启动失败";
-                //                     BotStatus = ProcessStatus.Stopped;
-                //                     return;
-                //                 }
-                //                 
-                //                 // 重新设置端口
-                //                 if (_processManager.PmhqPort.HasValue)
-                //                 {
-                //                     _pmhqClient.SetPort(_processManager.PmhqPort.Value);
-                //                     
-                //                     if (!string.IsNullOrEmpty(config.AutoLoginQQ) && config.Headless)
-                //                     {
-                //                         StartSSEListener(_processManager.PmhqPort.Value);
-                //                     }
-                //                 }
-                //             }
-                //             else
-                //             {
-                //                 ErrorMessage = "兼容版PMHQ下载失败";
-                //                 BotStatus = ProcessStatus.Stopped;
-                //                 return;
-                //             }
-                //         }
-                //         else
-                //         {
-                //             _logger.LogInformation("用户取消下载兼容版PMHQ");
-                //             await _processManager.StopPmhqAsync();
-                //             BotStatus = ProcessStatus.Stopped;
-                //             return;
-                //         }
-                //     }
-                // }
+                // 检查 QQ 进程是否存在：在一定时间内仍未检测到时，提示用户下载兼容版 PMHQ 5.3.0
+                if (!apiReady)
+                {
+                    _logger.LogWarning("10秒后未检测到QQ进程，可能需要兼容版PMHQ");
+
+                    if (ConfirmDialog != null)
+                    {
+                        var downloadCompatible = await ConfirmDialog(
+                            "QQ无法启动",
+                            "检测到QQ无法启动，是否下载兼容版 PMHQ 5.3.0？");
+
+                        if (downloadCompatible)
+                        {
+                            _logger.LogInformation("用户选择下载兼容版PMHQ");
+
+                            // 先停止当前 PMHQ，避免覆盖文件时被占用
+                            await _processManager.StopPmhqAsync();
+
+                            // 下载兼容版 PMHQ
+                            var downloadSuccess = await DownloadCompatiblePmhqAsync(config.PmhqPath);
+
+                            if (downloadSuccess)
+                            {
+                                _logger.LogInformation("兼容版PMHQ下载成功，重新启动...");
+
+                                // 重新启动 PMHQ
+                                pmhqSuccess = await _processManager.StartPmhqAsync(
+                                    config.PmhqPath,
+                                    config.QQPath,
+                                    config.AutoLoginQQ,
+                                    config.Headless);
+
+                                if (!pmhqSuccess)
+                                {
+                                    ErrorMessage = "兼容版PMHQ启动失败";
+                                    BotStatus = ProcessStatus.Stopped;
+                                    return;
+                                }
+
+                                // 重新设置端口
+                                if (_processManager.PmhqPort.HasValue)
+                                {
+                                    _pmhqClient.SetPort(_processManager.PmhqPort.Value);
+
+                                    if (!string.IsNullOrEmpty(config.AutoLoginQQ) && config.Headless)
+                                    {
+                                        StartSSEListener(_processManager.PmhqPort.Value);
+                                    }
+                                }
+
+                                if (OnDownloadCompleted != null)
+                                {
+                                    await OnDownloadCompleted();
+                                }
+                            }
+                            else
+                            {
+                                ErrorMessage = "兼容版PMHQ下载失败";
+                                BotStatus = ProcessStatus.Stopped;
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogInformation("用户取消下载兼容版PMHQ");
+                            await _processManager.StopPmhqAsync();
+                            BotStatus = ProcessStatus.Stopped;
+                            return;
+                        }
+                    }
+                }
 
                 // 无头模式且没有自动登录QQ号时，显示登录对话框
                 if (config.Headless && string.IsNullOrEmpty(config.AutoLoginQQ))
@@ -1688,85 +1697,93 @@ public class HomeViewModel : ViewModelBase
         HasRecentLogs = RecentLogs.Count > 0;
     }
 
-    // TODO: 暂时注释掉下载兼容版PMHQ的方法
-    // /// <summary>
-    // /// 下载兼容版 PMHQ 5.3.0
-    // /// </summary>
-    // private async Task<bool> DownloadCompatiblePmhqAsync(string targetPath)
-    // {
-    //     const string compatibleVersion = "5.3.0";
-    //     
-    //     try
-    //     {
-    //         _logger.LogInformation("开始从 npm 下载兼容版 PMHQ {Version}...", compatibleVersion);
-    //         
-    //         _downloadCts = new CancellationTokenSource();
-    //         IsDownloading = true;
-    //         DownloadingItem = "兼容版 PMHQ";
-    //         
-    //         try
-    //         {
-    //             // 备份原文件
-    //             var backupPath = targetPath + ".bak";
-    //             if (File.Exists(targetPath))
-    //             {
-    //                 if (File.Exists(backupPath))
-    //                 {
-    //                     File.Delete(backupPath);
-    //                 }
-    //                 File.Move(targetPath, backupPath);
-    //                 _logger.LogInformation("已备份原文件到: {BackupPath}", backupPath);
-    //             }
-    //             
-    //             var progress = new Progress<DownloadProgress>(p =>
-    //             {
-    //                 DownloadProgress = p.Percentage;
-    //                 DownloadStatus = p.Status;
-    //             });
-    //             
-    //             // 使用 DownloadService 从 npm 下载指定版本（会自动跳过 package.json）
-    //             var success = await _downloadService.DownloadPmhqAsync(
-    //                 version: compatibleVersion, 
-    //                 progress: progress, 
-    //                 ct: _downloadCts.Token);
-    //             
-    //             if (!success)
-    //             {
-    //                 _logger.LogError("从 npm 下载兼容版 PMHQ 失败");
-    //                 
-    //                 // 恢复备份
-    //                 if (File.Exists(backupPath))
-    //                 {
-    //                     if (File.Exists(targetPath))
-    //                     {
-    //                         File.Delete(targetPath);
-    //                     }
-    //                     File.Move(backupPath, targetPath);
-    //                     _logger.LogInformation("已恢复原文件");
-    //                 }
-    //                 return false;
-    //             }
-    //             
-    //             _logger.LogInformation("兼容版 PMHQ 下载成功");
-    //             DownloadStatus = "下载完成";
-    //             return true;
-    //         }
-    //         finally
-    //         {
-    //             IsDownloading = false;
-    //             DownloadingItem = "";
-    //             _downloadCts = null;
-    //         }
-    //     }
-    //     catch (OperationCanceledException)
-    //     {
-    //         _logger.LogInformation("下载已取消");
-    //         return false;
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         _logger.LogError(ex, "下载兼容版 PMHQ 失败");
-    //         return false;
-    //     }
-    // }
+    /// <summary>
+    /// 下载兼容版 PMHQ 5.3.0
+    /// </summary>
+    private async Task<bool> DownloadCompatiblePmhqAsync(string targetPath)
+    {
+        const string compatibleVersion = "5.3.0";
+
+        if (string.IsNullOrWhiteSpace(targetPath))
+        {
+            _logger.LogWarning("PmhqPath 为空，使用默认路径进行兼容版下载");
+            targetPath = Utils.Constants.DefaultPaths.PmhqExe;
+        }
+
+        try
+        {
+            _logger.LogInformation("开始从 npm 下载兼容版 PMHQ {Version}...", compatibleVersion);
+
+            _downloadCts = new CancellationTokenSource();
+            IsDownloading = true;
+            DownloadingItem = "兼容版 PMHQ";
+
+            try
+            {
+                // 备份原文件
+                var backupPath = targetPath + ".bak";
+                if (File.Exists(targetPath))
+                {
+                    if (File.Exists(backupPath))
+                    {
+                        File.Delete(backupPath);
+                    }
+
+                    File.Move(targetPath, backupPath);
+                    _logger.LogInformation("已备份原文件到: {BackupPath}", backupPath);
+                }
+
+                var progress = new Progress<DownloadProgress>(p =>
+                {
+                    DownloadProgress = p.Percentage;
+                    DownloadStatus = p.Status;
+                });
+
+                // 使用 DownloadService 从 npm 下载指定版本（会自动跳过 package.json）
+                var success = await _downloadService.DownloadPmhqAsync(
+                    version: compatibleVersion,
+                    progress: progress,
+                    ct: _downloadCts.Token);
+
+                if (!success)
+                {
+                    _logger.LogError("从 npm 下载兼容版 PMHQ 失败");
+
+                    // 恢复备份
+                    if (File.Exists(backupPath))
+                    {
+                        if (File.Exists(targetPath))
+                        {
+                            File.Delete(targetPath);
+                        }
+
+                        File.Move(backupPath, targetPath);
+                        _logger.LogInformation("已恢复原文件");
+                    }
+
+                    return false;
+                }
+
+                _logger.LogInformation("兼容版 PMHQ 下载成功");
+                DownloadStatus = "下载完成";
+                return true;
+            }
+            finally
+            {
+                IsDownloading = false;
+                DownloadingItem = "";
+                _downloadCts = null;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("下载已取消");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "下载兼容版 PMHQ 失败");
+            return false;
+        }
+    }
 }

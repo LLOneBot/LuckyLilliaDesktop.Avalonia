@@ -1,5 +1,7 @@
+using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace LuckyLilliaDesktop.Utils;
 
@@ -11,17 +13,20 @@ public static class PlatformHelper
     /// <summary>
     /// 判断当前是否为Windows平台
     /// </summary>
-    public static bool IsWindows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+    [SupportedOSPlatformGuard("windows")]
+    public static bool IsWindows => OperatingSystem.IsWindows();
 
     /// <summary>
     /// 判断当前是否为macOS平台
     /// </summary>
-    public static bool IsMacOS => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+    [SupportedOSPlatformGuard("macos")]
+    public static bool IsMacOS => OperatingSystem.IsMacOS();
 
     /// <summary>
     /// 判断当前是否为Linux平台
     /// </summary>
-    public static bool IsLinux => RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+    [SupportedOSPlatformGuard("linux")]
+    public static bool IsLinux => OperatingSystem.IsLinux();
 
     /// <summary>
     /// 获取当前平台的可执行文件扩展名
