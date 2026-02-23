@@ -257,6 +257,13 @@ public class ProcessManager : IProcessManager, IDisposable
                 return false;
             }
 
+            // Windows 上尽早附加日志收集，避免 PMHQ 很快退出时丢失输出
+            // macOS 上 UseShellExecute = true，无法附加日志收集
+            if (PlatformHelper.IsWindows)
+            {
+                _logCollector.AttachProcess("PMHQ", _pmhqProcess);
+            }
+
             // 等待一小段时间确认进程启动
             await Task.Delay(500);
 
@@ -271,9 +278,29 @@ public class ProcessManager : IProcessManager, IDisposable
                     _logger.LogInformation("PMHQ 进程正常退出（这是预期行为），返回码: {ExitCode}", exitCode);
                     _logger.LogInformation("PMHQ 已启动 QQ，HTTP API 由 QQ 进程提供");
 
-                    // 清理进程对象，但保持状态为 Running
-                    _pmhqProcess.Dispose();
+                    // PMHQ 可能在退出前输出了日志；给日志读取线程一点时间把缓冲读完
+                    // 然后分离并释放进程对象（不影响后续状态机，仍视为 Running）
+                    var exitedProcess = _pmhqProcess;
                     _pmhqProcess = null;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            if (PlatformHelper.IsWindows)
+                            {
+                                await Task.Delay(300);
+                                _logCollector.DetachProcess("PMHQ");
+                            }
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+                        finally
+                        {
+                            try { exitedProcess.Dispose(); } catch { }
+                        }
+                    });
 
                     _pmhqStatus = ProcessStatus.Running;
                     ProcessStatusChanged?.Invoke(this, _pmhqStatus);
@@ -282,19 +309,17 @@ public class ProcessManager : IProcessManager, IDisposable
                 else
                 {
                     _logger.LogError("PMHQ 进程异常退出，返回码: {ExitCode}", exitCode);
+
+                    if (PlatformHelper.IsWindows)
+                    {
+                        _logCollector.DetachProcess("PMHQ");
+                    }
                     _pmhqProcess.Dispose();
                     _pmhqProcess = null;
                     _pmhqStatus = ProcessStatus.Error;
                     ProcessStatusChanged?.Invoke(this, _pmhqStatus);
                     return false;
                 }
-            }
-
-            // macOS 上使用 UseShellExecute = true，无法附加日志收集
-            // Windows 上可以附加日志收集
-            if (PlatformHelper.IsWindows)
-            {
-                _logCollector.AttachProcess("PMHQ", _pmhqProcess);
             }
 
             _pmhqStatus = ProcessStatus.Running;
@@ -1129,11 +1154,13 @@ public class ProcessManager : IProcessManager, IDisposable
 
             if (name == "PMHQ")
             {
+                _logCollector.DetachProcess("PMHQ");
                 _pmhqStatus = ProcessStatus.Stopped;
                 ProcessStatusChanged?.Invoke(this, _pmhqStatus);
             }
             else if (name == "LLBot")
             {
+                _logCollector.DetachProcess("LLBot");
                 _llbotStatus = ProcessStatus.Stopped;
                 ProcessStatusChanged?.Invoke(this, _llbotStatus);
             }
