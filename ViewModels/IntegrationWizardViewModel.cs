@@ -457,6 +457,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         {
             var json = await File.ReadAllTextAsync(configPath);
             var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            var changed = false;
             
             var wsUrl = string.IsNullOrEmpty(path) 
                 ? $"ws://127.0.0.1:{wsPort}" 
@@ -472,13 +473,24 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 if (!existingWs.Enable)
                 {
                     existingWs.Enable = true;
-                    await File.WriteAllTextAsync(configPath,
-                        JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                    changed = true;
                     _logger.LogInformation("已启用现有的 WebSocket 连接配置: {Url}", wsUrl);
                 }
                 else
                 {
                     _logger.LogInformation("LLBot 已存在 WebSocket 连接配置: {Url}", wsUrl);
+                }
+
+                if (!config.OB11.Enable)
+                {
+                    config.OB11.Enable = true;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    await File.WriteAllTextAsync(configPath,
+                        JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
                 }
                 return;
             }
@@ -495,6 +507,11 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 ReportSelfMessage = false,
                 HeartInterval = 60000
             });
+
+            if (!config.OB11.Enable)
+            {
+                config.OB11.Enable = true;
+            }
 
             await File.WriteAllTextAsync(configPath, 
                 JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
@@ -520,6 +537,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         {
             var json = await File.ReadAllTextAsync(configPath);
             var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            var changed = false;
 
             // 检查是否已存在 WebSocket 服务端配置到该端口（无论启用状态）
             var existingWs = config.OB11.Connect.FirstOrDefault(c =>
@@ -531,13 +549,24 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 if (!existingWs.Enable)
                 {
                     existingWs.Enable = true;
-                    await File.WriteAllTextAsync(configPath,
-                        JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                    changed = true;
                     _logger.LogInformation("已启用现有的 WebSocket 服务端配置: 端口 {Port}", wsPort);
                 }
                 else
                 {
                     _logger.LogInformation("LLBot 已存在 WebSocket 服务端配置: 端口 {Port}", wsPort);
+                }
+
+                if (!config.OB11.Enable)
+                {
+                    config.OB11.Enable = true;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    await File.WriteAllTextAsync(configPath,
+                        JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
                 }
                 return;
             }
@@ -554,6 +583,11 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 ReportSelfMessage = false,
                 HeartInterval = 60000
             });
+
+            if (!config.OB11.Enable)
+            {
+                config.OB11.Enable = true;
+            }
 
             await File.WriteAllTextAsync(configPath,
                 JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
