@@ -11,7 +11,7 @@
     <Product>Lucky Lillia Desktop</Product>
     <AssemblyTitle>Lucky Lillia Desktop</AssemblyTitle>
     <Description>幸运莉莉娅桌面端</Description>
-    <Version>2.5.2</Version>
+    <Version>2.5.3</Version>
   </PropertyGroup>
 
   <!-- Windows特定配置 -->
