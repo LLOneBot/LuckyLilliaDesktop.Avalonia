@@ -34,7 +34,7 @@ fi
 # 2. 创建 .app 目录结构
 echo ""
 echo "步骤 2/5: 创建 .app 目录结构..."
-APP_DIR="bin/Release/net9.0/$RID/$APP_NAME.app"
+APP_DIR="bin/Release/net8.0/$RID/$APP_NAME.app"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
@@ -42,7 +42,7 @@ mkdir -p "$APP_DIR/Contents/Resources"
 # 3. 复制发布的文件到 .app 中
 echo ""
 echo "步骤 3/5: 复制应用文件..."
-cp -r "bin/Release/net9.0/$RID/publish/"* "$APP_DIR/Contents/MacOS/"
+cp -r "bin/Release/net8.0/$RID/publish/"* "$APP_DIR/Contents/MacOS/"
 
 # 4. 创建 Info.plist
 echo ""

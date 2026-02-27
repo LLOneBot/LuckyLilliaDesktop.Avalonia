@@ -20,7 +20,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Restore dependencies
         run: dotnet restore
@@ -28,14 +28,14 @@ jobs:
       - name: Build and Publish
         run: |
           dotnet publish -c Release -r win-x64
-          dir bin\Release\net9.0\win-x64\publish
-          (Get-Item bin\Release\net9.0\win-x64\publish\LuckyLilliaDesktop.exe).Length / 1MB
+          dir bin\Release\net8.0\win-x64\publish
+          (Get-Item bin\Release\net8.0\win-x64\publish\LuckyLilliaDesktop.exe).Length / 1MB
 
       - name: Rename exe
-        run: Rename-Item -Path bin\Release\net9.0\win-x64\publish\LuckyLilliaDesktop.exe -NewName lucky-lillia-desktop.exe
+        run: Rename-Item -Path bin\Release\net8.0\win-x64\publish\LuckyLilliaDesktop.exe -NewName lucky-lillia-desktop.exe
 
       - name: Compress to zip
-        run: Compress-Archive -Path bin\Release\net9.0\win-x64\publish\lucky-lillia-desktop.exe -DestinationPath lucky-lillia-desktop-win-x64.zip
+        run: Compress-Archive -Path bin\Release\net8.0\win-x64\publish\lucky-lillia-desktop.exe -DestinationPath lucky-lillia-desktop-win-x64.zip
 
       - name: Upload artifact
         if: github.event_name == 'workflow_dispatch'
@@ -72,7 +72,7 @@ jobs:
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
           mkdir package
-          copy bin\Release\net9.0\win-x64\publish\lucky-lillia-desktop.exe package\
+          copy bin\Release\net8.0\win-x64\publish\lucky-lillia-desktop.exe package\
           @"
           {
             "name": "lucky-lillia-desktop-win-x64",
@@ -102,7 +102,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Restore dependencies
         run: dotnet restore
@@ -114,11 +114,11 @@ jobs:
 
       - name: Remove quarantine attributes
         run: |
-          xattr -cr bin/Release/net9.0/osx-${{ matrix.arch }}/LuckyLilliaDesktop.app || true
+          xattr -cr bin/Release/net8.0/osx-${{ matrix.arch }}/LuckyLilliaDesktop.app || true
 
       - name: Create tar.gz package
         run: |
-          cd bin/Release/net9.0/osx-${{ matrix.arch }}
+          cd bin/Release/net8.0/osx-${{ matrix.arch }}
           tar -czf ../../../../lucky-lillia-desktop-macos-${{ matrix.arch }}.tar.gz LuckyLilliaDesktop.app
           cd ../../../../
 
@@ -158,7 +158,7 @@ jobs:
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           mkdir -p package
-          cp -r bin/Release/net9.0/osx-${{ matrix.arch }}/LuckyLilliaDesktop.app package/
+          cp -r bin/Release/net8.0/osx-${{ matrix.arch }}/LuckyLilliaDesktop.app package/
           cat > package/package.json << EOF
           {
             "name": "lucky-lillia-desktop-macos-${{ matrix.arch }}",
