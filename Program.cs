@@ -40,6 +40,36 @@ class Program
 
                             Environment.CurrentDirectory = appSupportDir;
                         }
+                        else if (!string.IsNullOrEmpty(parentDir) && parentDir.Contains("/AppTranslocation/"))
+                        {
+                            // macOS App Translocation：尝试获取原始路径，去除隔离标记后重启
+                            var translocatedAppPath = exeDir.Substring(0, exeDir.IndexOf(".app/Contents/MacOS")) + ".app";
+                            var originalAppPath = Utils.AppTranslocationHelper.GetOriginalPath(translocatedAppPath);
+
+                            if (!string.IsNullOrEmpty(originalAppPath) && originalAppPath != translocatedAppPath)
+                            {
+                                // 去除隔离标记
+                                var xattr = new System.Diagnostics.Process();
+                                xattr.StartInfo.FileName = "/usr/bin/xattr";
+                                xattr.StartInfo.Arguments = $"-cr \"{originalAppPath}\"";
+                                xattr.StartInfo.UseShellExecute = false;
+                                xattr.StartInfo.CreateNoWindow = true;
+                                xattr.Start();
+                                xattr.WaitForExit();
+
+                                // 从原始路径重新启动
+                                System.Diagnostics.Process.Start("/usr/bin/open", $"\"{originalAppPath}\"");
+                                Environment.Exit(0);
+                                return;
+                            }
+
+                            // 获取原始路径失败时，回退到 Application Support
+                            var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                            var appSupportDir = System.IO.Path.Combine(homeDir, "Library", "Application Support", "LuckyLilliaDesktop");
+                            if (!System.IO.Directory.Exists(appSupportDir))
+                                System.IO.Directory.CreateDirectory(appSupportDir);
+                            Environment.CurrentDirectory = appSupportDir;
+                        }
                         else if (!string.IsNullOrEmpty(parentDir) && System.IO.Directory.Exists(parentDir))
                         {
                             // 其他位置：使用 .app 的父目录（自定义工作区）
