@@ -7,6 +7,7 @@ using System.Reactive.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
 using LuckyLilliaDesktop.Utils;
@@ -24,6 +25,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     private readonly IDDBotInstallService _ddbotInstallService;
     private readonly IYunzaiInstallService _yunzaiInstallService;
     private readonly IZeroBotPluginInstallService _zeroBotPluginInstallService;
+    private readonly IOpenClawInstallService _openClawInstallService;
     private readonly ISelfInfoService _selfInfoService;
     private readonly IDisposable _uinSubscription;
 
@@ -39,6 +41,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     private bool _hasUin;
     private string? _currentUin;
     private CancellationTokenSource? _cts;
+    private IDisposable? _onboardWatcher;
 
     public bool IsInstalling { get => _isInstalling; set => this.RaiseAndSetIfChanged(ref _isInstalling, value); }
     public int CurrentStep { get => _currentStep; set => this.RaiseAndSetIfChanged(ref _currentStep, value); }
@@ -56,6 +59,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     public bool DDBotInstalled => _ddbotInstallService.IsInstalled;
     public bool YunzaiInstalled => _yunzaiInstallService.IsInstalled;
     public bool ZeroBotPluginInstalled => _zeroBotPluginInstallService.IsInstalled;
+    public bool OpenClawInstalled => _openClawInstallService.IsInstalled;
     public bool ShowZeroBotPlugin => !PlatformHelper.IsMacOS;
 
     public ReactiveCommand<string, Unit> SelectFrameworkCommand { get; }
@@ -74,6 +78,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         IDDBotInstallService ddbotInstallService,
         IYunzaiInstallService yunzaiInstallService,
         IZeroBotPluginInstallService zeroBotPluginInstallService,
+        IOpenClawInstallService openClawInstallService,
         ISelfInfoService selfInfoService,
         ILogger<IntegrationWizardViewModel> logger)
     {
@@ -83,6 +88,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         _ddbotInstallService = ddbotInstallService;
         _yunzaiInstallService = yunzaiInstallService;
         _zeroBotPluginInstallService = zeroBotPluginInstallService;
+        _openClawInstallService = openClawInstallService;
         _selfInfoService = selfInfoService;
         _logger = logger;
 
@@ -108,6 +114,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "ddbot" => "DDBot",
             "yunzai" => "云崽",
             "zbp" => "ZeroBot-Plugin",
+            "openclaw" => "OpenClaw",
             _ => framework
         };
 
@@ -121,6 +128,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "ddbot" => _ddbotInstallService.IsInstalled,
             "yunzai" => _yunzaiInstallService.IsInstalled,
             "zbp" => _zeroBotPluginInstallService.IsInstalled,
+            "openclaw" => _openClawInstallService.IsInstalled,
             _ => false
         };
 
@@ -189,6 +197,12 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             case "zbp":
                 _zeroBotPluginInstallService.StartZeroBotPlugin();
                 break;
+            case "openclaw":
+                if (_openClawInstallService.IsFirstRun)
+                    _openClawInstallService.StartOnboard();
+                else
+                    _openClawInstallService.StartGateway();
+                break;
         }
     }
 
@@ -202,6 +216,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "ddbot" => "https://ddbot.songlist.icu/",
             "yunzai" => "https://yunzai-bot.com/",
             "zbp" => "https://github.com/FloatTech/ZeroBot-Plugin",
+            "openclaw" => "https://github.com/constansino/openclaw_qq",
             _ => ""
         };
 
@@ -302,6 +317,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 "ddbot" => await _ddbotInstallService.InstallAsync(progress, _cts.Token),
                 "yunzai" => await _yunzaiInstallService.InstallAsync(progress, _cts.Token),
                 "zbp" => await _zeroBotPluginInstallService.InstallAsync(progress, _cts.Token),
+                "openclaw" => await _openClawInstallService.InstallAsync(progress, _cts.Token),
                 _ => false
             };
 
@@ -314,6 +330,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 this.RaisePropertyChanged(nameof(DDBotInstalled));
                 this.RaisePropertyChanged(nameof(YunzaiInstalled));
                 this.RaisePropertyChanged(nameof(ZeroBotPluginInstalled));
+                this.RaisePropertyChanged(nameof(OpenClawInstalled));
                 
                 if (framework == "koishi")
                     await OnKoishiInstallCompletedAsync();
@@ -327,6 +344,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                     await OnYunzaiInstallCompletedAsync();
                 else if (framework == "zbp")
                     await OnZeroBotPluginInstallCompletedAsync();
+                else if (framework == "openclaw")
+                    await OnOpenClawInstallCompletedAsync();
             }
         }
         catch (Exception ex)
@@ -666,6 +685,124 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 $"安装路径: {installPath}\n\nZeroBot-Plugin 是一个基于 ZeroBot 的多功能群管/娱乐插件集\n\n3秒后将自动启动 ZeroBot-Plugin...", 3, startZbp);
     }
 
+    private async Task OnOpenClawInstallCompletedAsync()
+    {
+        // 智能查找/配置 OneBot11 正向 WS 端口
+        var wsPort = await EnsureOpenClawWebSocketAsync();
+
+        // 首次安装完成后，弹出 cmd 执行 onboard 初始化
+        Action startOnboard = () =>
+        {
+            _openClawInstallService.StartOnboard();
+
+            // 启动 FileSystemWatcher 监控 onboard 完成
+            _onboardWatcher?.Dispose();
+            _onboardWatcher = _openClawInstallService.WatchOnboardComplete(() =>
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+                {
+                    _logger.LogInformation("onboard 完成，自动配置并启动 gateway");
+
+                    // 配置 openclaw.json
+                    _openClawInstallService.EnsureOpenClawConfigured(wsPort);
+
+                    // 启动 gateway
+                    _openClawInstallService.StartGateway();
+
+                    if (ShowAlertCallback != null)
+                        await ShowAlertCallback("OpenClaw 已就绪",
+                            $"检测到初始化配置完成，已自动配置 WebSocket 端口 {wsPort} 并启动 OpenClaw Gateway。");
+                });
+            });
+        };
+
+        if (ShowAutoCloseAlertCallback != null)
+            await ShowAutoCloseAlertCallback("OpenClaw 安装完成",
+                $"OpenClaw 已安装完成，WebSocket 端口: {wsPort}\n\n3秒后将弹出终端窗口进行初始化配置（openclaw onboard），完成后将自动启动 Gateway。", 3, startOnboard);
+    }
+
+    /// <summary>
+    /// 查找或创建 OpenClaw 使用的 OneBot11 正向 WS：
+    /// 1. 优先查找名为 OpenClaw 的正向 ws，启用并返回端口
+    /// 2. 其次查找已启用的正向 ws，直接复用端口
+    /// 3. 都没有则查找可用端口新建一个
+    /// </summary>
+    private async Task<int> EnsureOpenClawWebSocketAsync()
+    {
+        if (string.IsNullOrEmpty(_currentUin)) return 3001;
+
+        var configPath = Path.Combine("bin", "llbot", "data", $"config_{_currentUin}.json");
+        if (!File.Exists(configPath)) return 3001;
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(configPath);
+            var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            var changed = false;
+
+            // 1. 查找名为 OpenClaw 的正向 ws
+            var openclawWs = config.OB11.Connect.FirstOrDefault(c =>
+                c.Type == "ws" && string.Equals(c.Name, "OpenClaw", StringComparison.OrdinalIgnoreCase));
+            if (openclawWs != null)
+            {
+                if (!openclawWs.Enable)
+                {
+                    openclawWs.Enable = true;
+                    changed = true;
+                }
+                if (!config.OB11.Enable)
+                {
+                    config.OB11.Enable = true;
+                    changed = true;
+                }
+                if (changed)
+                {
+                    await File.WriteAllTextAsync(configPath,
+                        JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                }
+                _logger.LogInformation("复用已有 OpenClaw WebSocket 配置，端口: {Port}", openclawWs.Port);
+                return openclawWs.Port;
+            }
+
+            // 2. 查找已启用的正向 ws
+            var enabledWs = config.OB11.Connect.FirstOrDefault(c =>
+                c.Type == "ws" && c.Enable);
+            if (enabledWs != null)
+            {
+                _logger.LogInformation("复用已启用的正向 WebSocket，端口: {Port}", enabledWs.Port);
+                return enabledWs.Port;
+            }
+
+            // 3. 没有任何正向 ws，找可用端口新建
+            var port = FindAvailablePort(3001);
+            config.OB11.Connect.Add(new OB11Connection
+            {
+                Type = "ws",
+                Name = "OpenClaw",
+                Enable = true,
+                Host = "127.0.0.1",
+                Port = port,
+                Token = "",
+                MessageFormat = "array",
+                ReportSelfMessage = false,
+                HeartInterval = 60000
+            });
+
+            if (!config.OB11.Enable)
+                config.OB11.Enable = true;
+
+            await File.WriteAllTextAsync(configPath,
+                JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+            _logger.LogInformation("已新建 OpenClaw WebSocket 服务端配置，端口: {Port}", port);
+            return port;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "配置 OpenClaw WebSocket 失败");
+            return 3001;
+        }
+    }
+
     private void CreateYunzaiStartBat(string installPath)
     {
         try
@@ -785,5 +922,9 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public void Dispose() => _uinSubscription.Dispose();
+    public void Dispose()
+    {
+        _uinSubscription.Dispose();
+        _onboardWatcher?.Dispose();
+    }
 }

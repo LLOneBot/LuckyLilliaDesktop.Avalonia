@@ -53,11 +53,34 @@
                 <ItemsControl>
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <UniformGrid Rows="3" />
+                            <UniformGrid Rows="4" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     
                     <ItemsControl.Items>
+                        <!-- OpenClaw -->
+                        <Button Command="{Binding SelectFrameworkCommand}" CommandParameter="openclaw"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                Padding="12" Background="Transparent" Margin="4">
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <Border Width="48" Height="48" CornerRadius="8" ClipToBounds="True">
+                                    <Image Source="/Assets/Icons/openclaw.jpg" Stretch="UniformToFill"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center" Spacing="4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="OpenClaw" FontSize="16" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimary}"/>
+                                        <Border Background="#22C55E" CornerRadius="4" Padding="6,2"
+                                                VerticalAlignment="Center" IsVisible="{Binding OpenClawInstalled}">
+                                            <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="支持多种大模型的自动化 AI 助手" FontSize="12"
+                                               Foreground="{DynamicResource TextSecondary}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
                         <!-- Koishi -->
                         <Button Command="{Binding SelectFrameworkCommand}" CommandParameter="koishi"
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
@@ -68,14 +91,14 @@
                                 </Border>
                                 <StackPanel VerticalAlignment="Center" Spacing="4">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Koishi" FontSize="16" FontWeight="SemiBold" 
+                                        <TextBlock Text="Koishi" FontSize="16" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextPrimary}"/>
-                                        <Border Background="#22C55E" CornerRadius="4" Padding="6,2" 
+                                        <Border Background="#22C55E" CornerRadius="4" Padding="6,2"
                                                 VerticalAlignment="Center" IsVisible="{Binding KoishiInstalled}">
                                             <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
                                         </Border>
                                     </StackPanel>
-                                    <TextBlock Text="跨平台、可扩展的聊天机器人框架" FontSize="12" 
+                                    <TextBlock Text="跨平台、可扩展的聊天机器人框架" FontSize="12"
                                                Foreground="{DynamicResource TextSecondary}"/>
                                 </StackPanel>
                             </StackPanel>

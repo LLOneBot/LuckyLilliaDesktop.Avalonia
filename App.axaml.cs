@@ -97,6 +97,7 @@ public partial class App : Application
         services.AddSingleton<IDDBotInstallService, DDBotInstallService>();
         services.AddSingleton<IYunzaiInstallService, YunzaiInstallService>();
         services.AddSingleton<IZeroBotPluginInstallService, ZeroBotPluginInstallService>();
+        services.AddSingleton<IOpenClawInstallService, OpenClawInstallService>();
 
         // ViewModels（瞬态）
         services.AddTransient<MainWindowViewModel>();
