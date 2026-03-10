@@ -19,7 +19,7 @@ public interface IOpenClawInstallService
     bool IsFirstRun { get; }
     void StartOnboard();
     void StartGateway();
-    void EnsureOpenClawConfigured(int wsPort = 3001);
+    void EnsureOpenClawConfigured(int wsPort = 3001, string? adminQQ = null);
 
     /// <summary>
     /// 启动 onboard 并监控进程退出，退出码为 0 时触发 onComplete
@@ -330,7 +330,7 @@ public class OpenClawInstallService : IOpenClawInstallService
     /// <summary>
     /// 确保 openclaw.json 中包含 QQ 频道和插件配置
     /// </summary>
-    public void EnsureOpenClawConfigured(int wsPort = 3001)
+    public void EnsureOpenClawConfigured(int wsPort = 3001, string? adminQQ = null)
     {
         var configPath = Path.Combine(OpenClawConfigDir, "openclaw.json");
         if (!File.Exists(configPath))
@@ -355,14 +355,34 @@ public class OpenClawInstallService : IOpenClawInstallService
             var channels = root["channels"]!.AsObject();
             if (!channels.ContainsKey("qq"))
             {
-                channels["qq"] = new JsonObject
+                var qqConfig = new JsonObject
                 {
                     ["wsUrl"] = $"ws://127.0.0.1:{wsPort}",
                     ["accessToken"] = "",
-                    ["requireMention"] = true
+                    ["requireMention"] = true,
+                    ["enableEmptyReplyFallback"] = false
                 };
+                if (!string.IsNullOrWhiteSpace(adminQQ))
+                    qqConfig["admins"] = adminQQ;
+                channels["qq"] = qqConfig;
                 changed = true;
                 _logger.LogInformation("已添加 openclaw.json channels.qq 配置");
+            }
+            else
+            {
+                // channels.qq 已存在，仅补充缺失字段
+                var qq = channels["qq"]!.AsObject();
+                if (!string.IsNullOrWhiteSpace(adminQQ) && !qq.ContainsKey("admins"))
+                {
+                    qq["admins"] = adminQQ;
+                    changed = true;
+                    _logger.LogInformation("已添加 openclaw.json channels.qq.admins");
+                }
+                if (!qq.ContainsKey("enableEmptyReplyFallback"))
+                {
+                    qq["enableEmptyReplyFallback"] = false;
+                    changed = true;
+                }
             }
 
             // 确保 plugins.entries.qq 存在

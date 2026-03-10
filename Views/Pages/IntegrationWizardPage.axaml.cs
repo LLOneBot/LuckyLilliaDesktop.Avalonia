@@ -29,6 +29,7 @@ public partial class IntegrationWizardPage : UserControl
             vm.ShowAutoCloseAlertCallback = ShowAutoCloseAlertDialogAsync;
             vm.ThreeChoiceCallback = ShowThreeChoiceDialogAsync;
             vm.FourChoiceCallback = ShowFourChoiceDialogAsync;
+            vm.TextInputCallback = ShowTextInputDialogAsync;
             vm.OnPageEnter();
         }
     }
@@ -91,5 +92,16 @@ public partial class IntegrationWizardPage : UserControl
             return (int)result;
         }
         return 3; // Cancel
+    }
+
+    private async Task<string?> ShowTextInputDialogAsync(string title, string message, string watermark)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is Window window)
+        {
+            var dialog = new TextInputDialog(message, watermark);
+            return await dialog.ShowDialog<string?>(window);
+        }
+        return null;
     }
 }

@@ -69,6 +69,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     public Func<string, string, int, Action, Task>? ShowAutoCloseAlertCallback { get; set; }
     public Func<string, string, Task<int>>? ThreeChoiceCallback { get; set; }
     public Func<string, string, Task<int>>? FourChoiceCallback { get; set; }
+    public Func<string, string, string, Task<string?>>? TextInputCallback { get; set; }
 
     public IntegrationWizardViewModel(
         IKoishiInstallService koishiInstallService,
@@ -689,6 +690,12 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         // 智能查找/配置 OneBot11 正向 WS 端口
         var wsPort = await EnsureOpenClawWebSocketAsync();
 
+        // 询问主人QQ号
+        string? adminQQ = null;
+        if (TextInputCallback != null)
+            adminQQ = await TextInputCallback("设置主人QQ",
+                "OpenClaw 权限特殊，需要设置主人QQ，只有主人才可使用功能", "主人QQ号");
+
         // 首次安装完成后，弹出终端执行 onboard，并监控进程退出
         Action startOnboard = () =>
         {
@@ -698,8 +705,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 {
                     _logger.LogInformation("onboard 进程正常退出，自动配置并启动 gateway");
 
-                    // 配置 openclaw.json
-                    _openClawInstallService.EnsureOpenClawConfigured(wsPort);
+                    // 配置 openclaw.json（含主人QQ）
+                    _openClawInstallService.EnsureOpenClawConfigured(wsPort, adminQQ);
 
                     // 启动 gateway
                     _openClawInstallService.StartGateway();

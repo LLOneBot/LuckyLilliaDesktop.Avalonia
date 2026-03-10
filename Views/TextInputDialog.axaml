@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LuckyLilliaDesktop.Views.TextInputDialog"
+        Title=""
+        Width="360"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+    <Border CornerRadius="12"
+            Background="{DynamicResource CardBackground}"
+            BorderBrush="{DynamicResource BorderColor}"
+            BorderThickness="1"
+            Padding="24">
+        <StackPanel Spacing="16">
+            <TextBlock x:Name="MessageText"
+                       Text=""
+                       FontSize="16"
+                       Foreground="{DynamicResource TextPrimary}"
+                       TextWrapping="Wrap"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"/>
+
+            <TextBox x:Name="InputBox"
+                     Watermark=""
+                     FontSize="14"
+                     Padding="10,8"/>
+
+            <StackPanel Orientation="Horizontal"
+                        Spacing="12"
+                        HorizontalAlignment="Center">
+                <Button x:Name="OkButton"
+                        Content="确定"
+                        Width="100"
+                        Padding="0,10"
+                        Background="{DynamicResource PrimaryBrush}"
+                        Foreground="White"
+                        HorizontalContentAlignment="Center"
+                        Click="OnOkClick"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
