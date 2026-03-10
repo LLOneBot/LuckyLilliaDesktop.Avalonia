@@ -44,7 +44,7 @@ public class PmhqClient : IPmhqClient, IDisposable
     public PmhqClient(ILogger<PmhqClient> logger)
     {
         _logger = logger;
-        _httpClient = new HttpClient
+        _httpClient = new HttpClient(new HttpClientHandler { UseProxy = false })
         {
             Timeout = TimeSpan.FromSeconds(5)
         };
