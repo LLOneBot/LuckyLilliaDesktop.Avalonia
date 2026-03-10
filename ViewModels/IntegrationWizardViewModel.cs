@@ -41,7 +41,6 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     private bool _hasUin;
     private string? _currentUin;
     private CancellationTokenSource? _cts;
-    private IDisposable? _onboardWatcher;
 
     public bool IsInstalling { get => _isInstalling; set => this.RaiseAndSetIfChanged(ref _isInstalling, value); }
     public int CurrentStep { get => _currentStep; set => this.RaiseAndSetIfChanged(ref _currentStep, value); }
@@ -690,18 +689,14 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         // 智能查找/配置 OneBot11 正向 WS 端口
         var wsPort = await EnsureOpenClawWebSocketAsync();
 
-        // 首次安装完成后，弹出 cmd 执行 onboard 初始化
+        // 首次安装完成后，弹出终端执行 onboard，并监控进程退出
         Action startOnboard = () =>
         {
-            _openClawInstallService.StartOnboard();
-
-            // 启动 FileSystemWatcher 监控 onboard 完成
-            _onboardWatcher?.Dispose();
-            _onboardWatcher = _openClawInstallService.WatchOnboardComplete(() =>
+            _openClawInstallService.StartOnboardAndWatch(() =>
             {
-                Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+                Dispatcher.UIThread.Post(async () =>
                 {
-                    _logger.LogInformation("onboard 完成，自动配置并启动 gateway");
+                    _logger.LogInformation("onboard 进程正常退出，自动配置并启动 gateway");
 
                     // 配置 openclaw.json
                     _openClawInstallService.EnsureOpenClawConfigured(wsPort);
@@ -922,9 +917,5 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _uinSubscription.Dispose();
-        _onboardWatcher?.Dispose();
-    }
+    public void Dispose() => _uinSubscription.Dispose();
 }

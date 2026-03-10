@@ -22,9 +22,9 @@ public interface IOpenClawInstallService
     void EnsureOpenClawConfigured(int wsPort = 3001);
 
     /// <summary>
-    /// 监控 onboard 完成（openclaw.json 被创建），完成后触发回调
+    /// 启动 onboard 并监控进程退出，退出码为 0 时触发 onComplete
     /// </summary>
-    IDisposable WatchOnboardComplete(Action onComplete);
+    void StartOnboardAndWatch(Action onComplete);
 }
 
 public class OpenClawInstallService : IOpenClawInstallService
@@ -144,42 +144,94 @@ public class OpenClawInstallService : IOpenClawInstallService
     }
 
     /// <summary>
-    /// 首次启动：弹出 cmd 执行 openclaw onboard --install-daemon，用户交互
+    /// 首次启动：弹出终端执行 openclaw onboard --install-daemon，用户交互
     /// </summary>
     public void StartOnboard()
+    {
+        LaunchOnboardProcess(null);
+    }
+
+    /// <summary>
+    /// 启动 onboard 并监控进程退出，退出码为 0 时触发 onComplete
+    /// </summary>
+    public void StartOnboardAndWatch(Action onComplete)
+    {
+        LaunchOnboardProcess(onComplete);
+    }
+
+    private void LaunchOnboardProcess(Action? onComplete)
     {
         try
         {
             var openclawCmd = GetOpenClawCommand();
+            Process? process = null;
 
             if (PlatformHelper.IsWindows)
             {
-                Process.Start(new ProcessStartInfo
+                // 用 /c 使 cmd 在 onboard 结束后自动退出，以便监听退出码
+                process = Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = $"/k \"\"{openclawCmd}\" onboard --install-daemon\"",
+                    Arguments = $"/c \"\"{openclawCmd}\" onboard --install-daemon\"",
                     UseShellExecute = true
                 });
             }
             else if (PlatformHelper.IsMacOS)
             {
-                var script = $"tell application \\\"Terminal\\\" to do script \\\"{openclawCmd} onboard --install-daemon\\\"";
-                Process.Start(new ProcessStartInfo
+                // macOS: 通过 osascript 启动 Terminal 运行命令
+                // Terminal.app 进程无法直接监控子命令退出，用包装脚本写退出码到临时文件
+                if (onComplete != null)
                 {
-                    FileName = "osascript",
-                    Arguments = $"-e \"{script}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                });
+                    var exitFlagFile = Path.Combine(Path.GetTempPath(), $"openclaw_onboard_{Environment.ProcessId}.exit");
+                    var script = $"tell application \\\"Terminal\\\" to do script \\\"{openclawCmd} onboard --install-daemon; echo $? > {exitFlagFile}\\\"";
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "osascript",
+                        Arguments = $"-e \"{script}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+                    // 轮询退出码文件
+                    _ = PollExitFlagAsync(exitFlagFile, onComplete);
+                }
+                else
+                {
+                    var script = $"tell application \\\"Terminal\\\" to do script \\\"{openclawCmd} onboard --install-daemon\\\"";
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "osascript",
+                        Arguments = $"-e \"{script}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+                }
             }
             else
             {
-                Process.Start(new ProcessStartInfo
+                process = Process.Start(new ProcessStartInfo
                 {
                     FileName = "xterm",
-                    Arguments = $"-e \"{openclawCmd} onboard --install-daemon && read -p 'Press enter to exit...'\"",
+                    Arguments = $"-e \"{openclawCmd} onboard --install-daemon\"",
                     UseShellExecute = true
                 });
+            }
+
+            if (process != null && onComplete != null)
+            {
+                process.EnableRaisingEvents = true;
+                process.Exited += (_, _) =>
+                {
+                    _logger.LogInformation("onboard 进程已退出，退出码: {ExitCode}", process.ExitCode);
+                    if (process.ExitCode == 0)
+                    {
+                        onComplete();
+                    }
+                    else
+                    {
+                        _logger.LogWarning("onboard 进程退出码非 0，不触发自动配置");
+                    }
+                    process.Dispose();
+                };
             }
 
             _logger.LogInformation("OpenClaw onboard 已启动");
@@ -187,6 +239,41 @@ public class OpenClawInstallService : IOpenClawInstallService
         catch (Exception ex)
         {
             _logger.LogError(ex, "启动 OpenClaw onboard 失败");
+        }
+    }
+
+    /// <summary>
+    /// macOS 下轮询退出码文件，检测 onboard 完成
+    /// </summary>
+    private async Task PollExitFlagAsync(string exitFlagFile, Action onComplete)
+    {
+        try
+        {
+            // 最长等待 30 分钟
+            for (var i = 0; i < 360; i++)
+            {
+                await Task.Delay(5000);
+                if (!File.Exists(exitFlagFile)) continue;
+
+                var content = (await File.ReadAllTextAsync(exitFlagFile)).Trim();
+                try { File.Delete(exitFlagFile); } catch { }
+
+                if (content == "0")
+                {
+                    _logger.LogInformation("macOS onboard 完成，退出码: 0");
+                    onComplete();
+                }
+                else
+                {
+                    _logger.LogWarning("macOS onboard 退出码: {Code}，不触发自动配置", content);
+                }
+                return;
+            }
+            _logger.LogWarning("等待 macOS onboard 完成超时");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "轮询 macOS onboard 退出码失败");
         }
     }
 
@@ -308,54 +395,6 @@ public class OpenClawInstallService : IOpenClawInstallService
         {
             _logger.LogError(ex, "配置 openclaw.json 失败");
         }
-    }
-
-    /// <summary>
-    /// 监控 ~/.openclaw/openclaw.json 是否被创建（onboard 完成的标志），
-    /// 检测到后触发回调。返回 IDisposable 用于停止监控。
-    /// </summary>
-    public IDisposable WatchOnboardComplete(Action onComplete)
-    {
-        var dir = OpenClawConfigDir;
-        Directory.CreateDirectory(dir);
-
-        // 如果 openclaw.json 已存在，直接触发
-        if (File.Exists(Path.Combine(dir, "openclaw.json")))
-        {
-            _logger.LogInformation("openclaw.json 已存在，直接触发 onboard 完成回调");
-            onComplete();
-            return new EmptyDisposable();
-        }
-
-        var watcher = new FileSystemWatcher(dir)
-        {
-            Filter = "openclaw.json",
-            NotifyFilter = NotifyFilters.FileName | NotifyFilters.CreationTime | NotifyFilters.LastWrite,
-            EnableRaisingEvents = true
-        };
-
-        var triggered = false;
-
-        void OnDetected(object sender, FileSystemEventArgs e)
-        {
-            if (triggered) return;
-            triggered = true;
-            _logger.LogInformation("检测到 openclaw.json 创建，onboard 已完成");
-            watcher.EnableRaisingEvents = false;
-            onComplete();
-        }
-
-        watcher.Created += OnDetected;
-        watcher.Changed += OnDetected;
-        watcher.Renamed += (s, e) => OnDetected(s, e);
-
-        _logger.LogInformation("开始监控 {Dir} 等待 openclaw.json 创建", dir);
-        return watcher;
-    }
-
-    private class EmptyDisposable : IDisposable
-    {
-        public void Dispose() { }
     }
 
     /// <summary>
