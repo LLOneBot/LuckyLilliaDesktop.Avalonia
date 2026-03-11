@@ -1121,6 +1121,25 @@ public class HomeViewModel : ViewModelBase
             {
                 _logger.LogInformation("PMHQ 启动成功");
 
+                // 先启动 LLBot，确保 WebSocket 服务就绪，避免错过 QQ 事件
+                _logger.LogInformation("正在启动 LLBot...");
+                var llbotSuccess = await _processManager.StartLLBotAsync(
+                    config.NodePath,
+                    config.LLBotPath);
+
+                if (llbotSuccess)
+                {
+                    _logger.LogInformation("LLBot 启动成功");
+                    IsServicesRunning = true;
+                }
+                else
+                {
+                    ErrorMessage = "LLBot 启动失败，请检查日志";
+                    _logger.LogError("LLBot 启动失败");
+                    BotStatus = ProcessStatus.Stopped;
+                    return;
+                }
+
                 // 设置 PmhqClient 端口并开始轮询
                 if (_processManager.PmhqPort.HasValue)
                 {
@@ -1244,30 +1263,10 @@ public class HomeViewModel : ViewModelBase
 
                 StartInfoPolling();
 
-                // 等待一段时间后启动 LLBot
-                await Task.Delay(2000);
+                BotStatus = ProcessStatus.Running;
 
-                // 启动 LLBot
-                _logger.LogInformation("正在启动 LLBot...");
-                var llbotSuccess = await _processManager.StartLLBotAsync(
-                    config.NodePath,
-                    config.LLBotPath);
-
-                if (llbotSuccess)
-                {
-                    _logger.LogInformation("LLBot 启动成功");
-                    IsServicesRunning = true;
-                    BotStatus = ProcessStatus.Running;
-
-                    // 执行启动后命令
-                    await ExecuteStartupCommandAsync(config);
-                }
-                else
-                {
-                    ErrorMessage = "LLBot 启动失败，请检查日志";
-                    _logger.LogError("LLBot 启动失败");
-                    BotStatus = ProcessStatus.Stopped;
-                }
+                // 执行启动后命令
+                await ExecuteStartupCommandAsync(config);
             }
             else
             {
