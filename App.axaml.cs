@@ -9,6 +9,7 @@ using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace LuckyLilliaDesktop;
@@ -65,12 +66,15 @@ public partial class App : Application
     {
         var services = new ServiceCollection();
 
-        // 配置 Serilog - 每次启动创建新日志文件
+        // 配置 Serilog - 每次启动创建新日志文件，限制单文件大小并清理旧日志
+        CleanupOldLogs("logs", maxAgeDays: 7, maxTotalFiles: 50);
         var logFileName = $"logs/{DateTime.Now:yyyyMMdd_HHmmss}.log";
         var logger = new LoggerConfiguration()
             .WriteTo.Console(outputTemplate: "{Timestamp:HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
             .WriteTo.File(logFileName,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+                fileSizeLimitBytes: 10 * 1024 * 1024,  // 单文件最大 10MB
+                rollOnFileSizeLimit: true)              // 超限后自动创建新文件 (_001, _002...)
             .CreateLogger();
         
         // 设置为全局 logger
@@ -252,6 +256,38 @@ public partial class App : Application
         Log.Information("应用退出");
         Environment.Exit(0);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 启动时清理旧日志文件：超过 maxAgeDays 天的删除，总文件数超过 maxTotalFiles 时删除最旧的
+    /// </summary>
+    private static void CleanupOldLogs(string logDir, int maxAgeDays, int maxTotalFiles)
+    {
+        try
+        {
+            if (!System.IO.Directory.Exists(logDir)) return;
+
+            var files = new System.IO.DirectoryInfo(logDir)
+                .GetFiles("*.log")
+                .OrderBy(f => f.CreationTime)
+                .ToList();
+
+            var cutoff = DateTime.Now.AddDays(-maxAgeDays);
+
+            // 删除超龄文件
+            foreach (var file in files.Where(f => f.CreationTime < cutoff).ToList())
+            {
+                try { file.Delete(); files.Remove(file); } catch { }
+            }
+
+            // 如果仍超出总数限制，删除最旧的
+            while (files.Count > maxTotalFiles)
+            {
+                try { files[0].Delete(); } catch { }
+                files.RemoveAt(0);
+            }
+        }
+        catch { }
     }
 
     private void ShowMainWindow()
