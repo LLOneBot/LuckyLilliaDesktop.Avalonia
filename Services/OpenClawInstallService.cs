@@ -35,6 +35,9 @@ public class OpenClawInstallService : IOpenClawInstallService
 
     private const string Node24Dir = "bin/node24";
     private const string NodeVersion = "v24.4.1";
+    private const string GitDir = "bin/git";
+    private const string GitVersion = "2.49.0";
+    private const string MinGitVersion = "2.49.0.windows.1";
 
     private static string OpenClawExtDir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "extensions", "openclaw_qq");
@@ -71,58 +74,63 @@ public class OpenClawInstallService : IOpenClawInstallService
 
     public async Task<bool> InstallAsync(IProgress<InstallProgress>? progress = null, CancellationToken ct = default)
     {
-        const int totalSteps = 4;
+        const int totalSteps = 5;
         try
         {
-            // Step 1: 确保 Node.js 24 已安装
+            // Step 1: 确保 Git 可用
+            Report(progress, 1, totalSteps, "检查 Git", "正在检查 Git 环境...");
+            if (!await EnsureGitAsync(progress, 1, totalSteps, ct))
+                return false;
+
+            // Step 2: 确保 Node.js 24 已安装
             var nodeExeName = PlatformHelper.IsWindows ? "node.exe" : "node";
             if (!File.Exists(Path.Combine(Node24Dir, nodeExeName)))
             {
-                Report(progress, 1, totalSteps, "下载 Node.js 24", "正在下载...");
-                if (!await DownloadNodeAsync(progress, 1, totalSteps, ct))
+                Report(progress, 2, totalSteps, "下载 Node.js 24", "正在下载...");
+                if (!await DownloadNodeAsync(progress, 2, totalSteps, ct))
                     return false;
             }
             else
             {
-                Report(progress, 1, totalSteps, "检查 Node.js 24", "Node.js 24 已存在，跳过下载");
+                Report(progress, 2, totalSteps, "检查 Node.js 24", "Node.js 24 已存在，跳过下载");
             }
 
-            // Step 2: 安装 openclaw CLI
-            Report(progress, 2, totalSteps, "安装 OpenClaw", "正在安装 openclaw...");
+            // Step 3: 安装 openclaw CLI
+            Report(progress, 3, totalSteps, "安装 OpenClaw", "正在安装 openclaw...");
             var npmCmd = PlatformHelper.IsWindows
                 ? Path.GetFullPath(Path.Combine(Node24Dir, "npm.cmd"))
                 : Path.GetFullPath(Path.Combine(Node24Dir, "bin", "npm"));
 
             if (!await RunCommandAsync(npmCmd, "install -g openclaw@latest --registry=https://registry.npmmirror.com",
                 Path.GetFullPath(Node24Dir),
-                line => Report(progress, 2, totalSteps, "安装 OpenClaw", line), ct))
+                line => Report(progress, 3, totalSteps, "安装 OpenClaw", line), ct))
             {
-                ReportError(progress, 2, totalSteps, "安装 openclaw 失败");
+                ReportError(progress, 3, totalSteps, "安装 openclaw 失败");
                 return false;
             }
             _logger.LogInformation("openclaw CLI 安装完成");
 
-            // Step 3: 下载 openclaw_qq 扩展
-            Report(progress, 3, totalSteps, "下载 openclaw_qq", "正在下载扩展...");
+            // Step 4: 下载 openclaw_qq 扩展
+            Report(progress, 4, totalSteps, "下载 openclaw_qq", "正在下载扩展...");
             var extensionsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "extensions");
             Directory.CreateDirectory(extensionsDir);
 
             if (!await _archiveHelper.DownloadAndExtractAsync("constansino/openclaw_qq", "main", OpenClawExtDir,
-                (downloaded, total) => Report(progress, 3, totalSteps, "下载 openclaw_qq",
+                (downloaded, total) => Report(progress, 4, totalSteps, "下载 openclaw_qq",
                     $"正在下载... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
                     total > 0 ? (double)downloaded / total * 100 : 0), ct))
             {
-                ReportError(progress, 3, totalSteps, "下载 openclaw_qq 失败");
+                ReportError(progress, 4, totalSteps, "下载 openclaw_qq 失败");
                 return false;
             }
 
-            // Step 4: 在 openclaw_qq 目录执行 npm install
-            Report(progress, 4, totalSteps, "安装扩展依赖", "正在安装 openclaw_qq 依赖...");
+            // Step 5: 在 openclaw_qq 目录执行 npm install
+            Report(progress, 5, totalSteps, "安装扩展依赖", "正在安装 openclaw_qq 依赖...");
             if (!await RunCommandAsync(npmCmd, "install --registry=https://registry.npmmirror.com",
                 OpenClawExtDir,
-                line => Report(progress, 4, totalSteps, "安装扩展依赖", line), ct))
+                line => Report(progress, 5, totalSteps, "安装扩展依赖", line), ct))
             {
-                ReportError(progress, 4, totalSteps, "安装 openclaw_qq 依赖失败");
+                ReportError(progress, 5, totalSteps, "安装 openclaw_qq 依赖失败");
                 return false;
             }
 
@@ -473,6 +481,131 @@ public class OpenClawInstallService : IOpenClawInstallService
             return Path.GetFullPath(Path.Combine(Node24Dir, "bin", "openclaw"));
     }
 
+    /// <summary>
+    /// 获取 Git 可执行文件路径（内置或系统）
+    /// </summary>
+    private string? FindGitPath()
+    {
+        // 1. 检查内置 bin/git
+        var builtinGit = PlatformHelper.IsWindows
+            ? Path.GetFullPath(Path.Combine(GitDir, "cmd", "git.exe"))
+            : Path.GetFullPath(Path.Combine(GitDir, "bin", "git"));
+        if (File.Exists(builtinGit)) return builtinGit;
+
+        // 2. 检查系统 PATH
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "--version",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            using var p = Process.Start(psi);
+            if (p != null)
+            {
+                p.WaitForExit(5000);
+                if (p.ExitCode == 0) return "git"; // 系统 git 可用
+            }
+        }
+        catch { }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 获取内置 Git 需要加到 PATH 的目录
+    /// </summary>
+    private string? GetBuiltinGitBinDir()
+    {
+        var dir = PlatformHelper.IsWindows
+            ? Path.GetFullPath(Path.Combine(GitDir, "cmd"))
+            : Path.GetFullPath(Path.Combine(GitDir, "bin"));
+        return Directory.Exists(dir) ? dir : null;
+    }
+
+    /// <summary>
+    /// 确保 Git 可用，如果没有则下载便携版 Git
+    /// </summary>
+    private async Task<bool> EnsureGitAsync(IProgress<InstallProgress>? progress, int step, int totalSteps, CancellationToken ct)
+    {
+        if (FindGitPath() != null)
+        {
+            Report(progress, step, totalSteps, "检查 Git", "Git 已存在，跳过下载");
+            _logger.LogInformation("Git 已可用");
+            return true;
+        }
+
+        Report(progress, step, totalSteps, "下载 Git", "正在下载便携版 Git...");
+
+        if (PlatformHelper.IsWindows)
+        {
+            return await DownloadMinGitWindowsAsync(progress, step, totalSteps, ct);
+        }
+
+        // macOS / Linux: 提示用户安装
+        var hint = PlatformHelper.IsMacOS
+            ? "请先安装 Git：运行 xcode-select --install 或从 https://git-scm.com 下载"
+            : "请先安装 Git：运行 sudo apt install git 或对应包管理器命令";
+        ReportError(progress, step, totalSteps, hint);
+        return false;
+    }
+
+    /// <summary>
+    /// Windows: 下载 MinGit 便携版
+    /// </summary>
+    private async Task<bool> DownloadMinGitWindowsAsync(IProgress<InstallProgress>? progress, int step, int totalSteps, CancellationToken ct)
+    {
+        var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture ==
+                   System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "64-bit";
+        var zipName = $"MinGit-{GitVersion}-{arch}.zip";
+        var zipPath = Path.Combine(Path.GetTempPath(), zipName);
+
+        string[] urls =
+        [
+            $"https://mirror.ghproxy.com/https://github.com/git-for-windows/git/releases/download/v{MinGitVersion}/{zipName}",
+            $"https://ghfast.top/https://github.com/git-for-windows/git/releases/download/v{MinGitVersion}/{zipName}",
+            $"https://github.com/git-for-windows/git/releases/download/v{MinGitVersion}/{zipName}"
+        ];
+
+        var downloadOk = await _gitHubHelper.DownloadWithFallbackAsync(urls, zipPath,
+            (downloaded, total) => Report(progress, step, totalSteps, "下载 Git",
+                $"正在下载... {downloaded / 1024 / 1024:F1} MB / {total / 1024 / 1024:F1} MB",
+                total > 0 ? (double)downloaded / total * 100 : 0), ct);
+
+        if (!downloadOk)
+        {
+            ReportError(progress, step, totalSteps, "下载 Git 失败");
+            return false;
+        }
+
+        Report(progress, step, totalSteps, "解压 Git", "正在解压...");
+        await SafeDeleteDirectoryAsync(GitDir);
+        Directory.CreateDirectory(GitDir);
+
+        try
+        {
+            await Task.Run(() => System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, GitDir, true), ct)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "解压 MinGit 失败");
+            ReportError(progress, step, totalSteps, "解压 Git 失败");
+            return false;
+        }
+        finally
+        {
+            try { File.Delete(zipPath); } catch { }
+        }
+
+        _logger.LogInformation("MinGit 已安装到 {Dir}", GitDir);
+        return true;
+    }
+
     private async Task<bool> DownloadNodeAsync(IProgress<InstallProgress>? progress, int step, int totalSteps, CancellationToken ct)
     {
         string nodePlatform;
@@ -598,6 +731,14 @@ public class OpenClawInstallService : IOpenClawInstallService
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+
+        // 如果存在内置 Git，将其加到子进程的 PATH 前面
+        var gitBinDir = GetBuiltinGitBinDir();
+        if (gitBinDir != null)
+        {
+            var currentPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+            psi.Environment["PATH"] = gitBinDir + Path.PathSeparator + currentPath;
+        }
 
         using var process = Process.Start(psi);
         if (process == null) return false;
