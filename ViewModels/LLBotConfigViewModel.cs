@@ -280,6 +280,9 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<OB11ConnectionViewModel, Unit> RemoveConnectionCommand { get; }
     public ReactiveCommand<Unit, Unit> AddWebhookUrlCommand { get; }
     public ReactiveCommand<string, Unit> RemoveWebhookUrlCommand { get; }
+    public ReactiveCommand<Unit, Unit> OpenOb11DocsCommand { get; }
+    public ReactiveCommand<Unit, Unit> OpenMilkyDocsCommand { get; }
+    public ReactiveCommand<Unit, Unit> OpenSatoriDocsCommand { get; }
 
     public LLBotConfigViewModel(
         IPmhqClient pmhqClient,
@@ -299,6 +302,9 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         RemoveConnectionCommand = ReactiveCommand.Create<OB11ConnectionViewModel>(RemoveConnection);
         AddWebhookUrlCommand = ReactiveCommand.Create(AddWebhookUrl);
         RemoveWebhookUrlCommand = ReactiveCommand.Create<string>(RemoveWebhookUrl);
+        OpenOb11DocsCommand = ReactiveCommand.Create(() => OpenUrl("https://www.luckylillia.com/guide/develop#onebot11-%E5%8D%8F%E8%AE%AE"));
+        OpenMilkyDocsCommand = ReactiveCommand.Create(() => OpenUrl("https://www.luckylillia.com/guide/develop#milky-%E5%8D%8F%E8%AE%AE"));
+        OpenSatoriDocsCommand = ReactiveCommand.Create(() => OpenUrl("https://www.luckylillia.com/guide/develop#satori-%E5%8D%8F%E8%AE%AE"));
 
         _uinSubscription = _selfInfoService.UinStream
             .ObserveOn(RxApp.MainThreadScheduler)
@@ -618,6 +624,19 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "打开 WebUI 失败");
+        }
+    }
+
+    private void OpenUrl(string url)
+    {
+        try
+        {
+            _logger.LogInformation("打开链接: {Url}", url);
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "打开链接失败");
         }
     }
 

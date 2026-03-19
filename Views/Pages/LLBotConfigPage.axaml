@@ -126,6 +126,11 @@
                                       Width="20" Height="20"
                                       Foreground="{DynamicResource PrimaryBrush}"
                                       Margin="0,0,10,0"/>
+                            <Button DockPanel.Dock="Right"
+                                    Content="文档"
+                                    Command="{Binding OpenOb11DocsCommand}"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"/>
                             <TextBlock Text="OneBot 11" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
                         </DockPanel>
                         <CheckBox Content="启用 OneBot 11" IsChecked="{Binding Ob11Enable}" Foreground="{DynamicResource TextPrimary}"/>
@@ -233,6 +238,11 @@
                                       Width="20" Height="20"
                                       Foreground="{DynamicResource PrimaryBrush}"
                                       Margin="0,0,10,0"/>
+                            <Button DockPanel.Dock="Right"
+                                    Content="文档"
+                                    Command="{Binding OpenSatoriDocsCommand}"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"/>
                             <TextBlock Text="Satori" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
                         </DockPanel>
                         <StackPanel Orientation="Horizontal" Spacing="16">
@@ -273,6 +283,11 @@
                                       Width="20" Height="20"
                                       Foreground="{DynamicResource PrimaryBrush}"
                                       Margin="0,0,10,0"/>
+                            <Button DockPanel.Dock="Right"
+                                    Content="文档"
+                                    Command="{Binding OpenMilkyDocsCommand}"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"/>
                             <TextBlock Text="Milky" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
                         </DockPanel>
                         <StackPanel Orientation="Horizontal" Spacing="16">
