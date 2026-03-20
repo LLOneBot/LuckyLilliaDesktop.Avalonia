@@ -22,6 +22,7 @@ public interface IPythonHelper
     Task<bool> InstallRequirementsAsync(string venvDir, string requirementsFile, Action<string>? onOutput = null, CancellationToken ct = default);
     Task<bool> UvInstallRequirementsAsync(string targetDir, string requirementsFile, Action<string>? onOutput = null, CancellationToken ct = default);
     Task RunCommandAsync(string exe, string args, string workDir, Action<string>? onOutput = null, CancellationToken ct = default);
+    string? ResolveUvExecutablePath();
 }
 
 public class PythonHelper : IPythonHelper
@@ -367,34 +368,41 @@ public class PythonHelper : IPythonHelper
         return true;
     }
 
-    private string? TryResolveUvExecutablePathWindows()
+    public string? ResolveUvExecutablePath()
     {
-        var uvInBin = Path.GetFullPath("bin/uv/uv.exe");
-        if (File.Exists(uvInBin))
-            return uvInBin;
-
-        var uvInScripts = Path.Combine(PythonDir, "Scripts", "uv.exe");
-        if (File.Exists(uvInScripts))
+        if (PlatformHelper.IsWindows)
         {
-            // 尝试复制到 bin/uv，保持调用方兼容
-            try
-            {
-                var uvDir = Path.GetFullPath("bin/uv");
-                Directory.CreateDirectory(uvDir);
-                File.Copy(uvInScripts, uvInBin, overwrite: true);
+            var uvInBin = Path.GetFullPath("bin/uv/uv.exe");
+            if (File.Exists(uvInBin))
                 return uvInBin;
-            }
-            catch
+
+            var uvInScripts = Path.Combine(PythonDir, "Scripts", "uv.exe");
+            if (File.Exists(uvInScripts))
             {
-                return uvInScripts;
+                // 尝试复制到 bin/uv，保持调用方兼容
+                try
+                {
+                    var uvDir = Path.GetFullPath("bin/uv");
+                    Directory.CreateDirectory(uvDir);
+                    File.Copy(uvInScripts, uvInBin, overwrite: true);
+                    return uvInBin;
+                }
+                catch
+                {
+                    return uvInScripts;
+                }
             }
+
+            var uvInRoot = Path.Combine(PythonDir, "uv.exe");
+            if (File.Exists(uvInRoot))
+                return uvInRoot;
+
+            return null;
         }
 
-        var uvInRoot = Path.Combine(PythonDir, "uv.exe");
-        if (File.Exists(uvInRoot))
-            return uvInRoot;
-
-        return null;
+        // macOS/Linux
+        var uvPath = Path.GetFullPath("bin/uv/uv");
+        return File.Exists(uvPath) ? uvPath : null;
     }
 
     public async Task<bool> CreateVenvAsync(string targetDir, Action<string>? onOutput = null, CancellationToken ct = default)
@@ -436,7 +444,7 @@ public class PythonHelper : IPythonHelper
 
         if (PlatformHelper.IsWindows)
         {
-            var uvExe = TryResolveUvExecutablePathWindows();
+            var uvExe = ResolveUvExecutablePath();
             if (string.IsNullOrEmpty(uvExe) || !File.Exists(uvExe))
             {
                 // Windows 也按 macOS 逻辑：缺 uv 就自动下载
@@ -449,7 +457,7 @@ public class PythonHelper : IPythonHelper
                     return false;
                 }
 
-                uvExe = TryResolveUvExecutablePathWindows();
+                uvExe = ResolveUvExecutablePath();
             }
 
             if (string.IsNullOrEmpty(uvExe) || !File.Exists(uvExe))

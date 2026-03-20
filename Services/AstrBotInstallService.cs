@@ -151,24 +151,9 @@ public class AstrBotInstallService : IAstrBotInstallService
         try
         {
             var astrBotPath = Path.GetFullPath(AstrBotDir);
-            string uvExe;
+            var uvExe = _pythonHelper.ResolveUvExecutablePath();
 
-            if (PlatformHelper.IsWindows)
-            {
-                var uvInBin = Path.GetFullPath("bin/uv/uv.exe");
-                var uvInScripts = Path.GetFullPath(Path.Combine("bin/python", "Scripts", "uv.exe"));
-                var uvInRoot = Path.GetFullPath(Path.Combine("bin/python", "uv.exe"));
-
-                uvExe = File.Exists(uvInBin) ? uvInBin :
-                       File.Exists(uvInScripts) ? uvInScripts :
-                       uvInRoot;
-            }
-            else
-            {
-                uvExe = Path.GetFullPath("bin/uv/uv");
-            }
-
-            if (!File.Exists(uvExe))
+            if (string.IsNullOrEmpty(uvExe) || !File.Exists(uvExe))
             {
                 _logger.LogError("uv 未正确安装: {Path}", uvExe);
                 return;

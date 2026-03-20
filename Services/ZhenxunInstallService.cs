@@ -124,11 +124,11 @@ public class ZhenxunInstallService : IZhenxunInstallService
         try
         {
             var zhenxunPath = Path.GetFullPath(ZhenxunDir);
-            var uvExe = Path.GetFullPath(PlatformHelper.IsWindows ? "bin/uv/uv.exe" : "bin/uv/uv");
+            var uvExe = _pythonHelper.ResolveUvExecutablePath();
 
-            if (!File.Exists(uvExe))
+            if (string.IsNullOrEmpty(uvExe) || !File.Exists(uvExe))
             {
-                _logger.LogError("uv 未正确安装: {Path}", uvExe);
+                _logger.LogError("uv 未正确安装，已搜索 bin/uv、Scripts、PythonDir 均未找到");
                 return;
             }
 
