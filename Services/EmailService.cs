@@ -68,7 +68,7 @@ public class EmailService : IEmailService
             };
 
             var json = JsonSerializer.Serialize(config, options);
-            await File.WriteAllTextAsync(_configPath, json, Encoding.UTF8);
+            await File.WriteAllTextAsync(_configPath, json, new UTF8Encoding(false));
 
             _logger.LogInformation("邮件配置已保存到 {Path}", _configPath);
             return true;
