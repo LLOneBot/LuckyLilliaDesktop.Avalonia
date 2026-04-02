@@ -41,16 +41,18 @@
                         CornerRadius="8"
                         Padding="16,12"
                         IsVisible="{Binding HasError}">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+                    <DockPanel>
+                        <PathIcon DockPanel.Dock="Left"
+                                  Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
                                   Width="24" Height="24"
-                                  Foreground="White"/>
+                                  Foreground="White"
+                                  Margin="0,0,12,0"/>
                         <TextBlock Text="{Binding ErrorMessage}"
                                    Foreground="White"
                                    FontSize="14"
                                    TextWrapping="Wrap"
                                    VerticalAlignment="Center"/>
-                    </StackPanel>
+                    </DockPanel>
                 </Border>
 
                 <!-- 标题 -->
