@@ -28,7 +28,7 @@ public partial class IntegrationWizardPage : UserControl
             vm.ShowAlertCallback = ShowAlertDialogAsync;
             vm.ShowAutoCloseAlertCallback = ShowAutoCloseAlertDialogAsync;
             vm.ThreeChoiceCallback = ShowThreeChoiceDialogAsync;
-            vm.FourChoiceCallback = ShowFourChoiceDialogAsync;
+            vm.FrameworkActionCallback = ShowFrameworkActionDialogAsync;
             vm.TextInputCallback = ShowTextInputDialogAsync;
             vm.OnPageEnter();
         }
@@ -82,16 +82,16 @@ public partial class IntegrationWizardPage : UserControl
         return 2; // Cancel
     }
 
-    private async Task<int> ShowFourChoiceDialogAsync(string title, string message)
+    private async Task<(int choice, bool autoStart)> ShowFrameworkActionDialogAsync(string title, string message, bool autoStartChecked, bool showAutoStart)
     {
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel is Window window)
         {
-            var dialog = new FourChoiceDialog(message);
-            var result = await dialog.ShowDialog<FourChoiceResult>(window);
-            return (int)result;
+            var dialog = new FrameworkActionDialog(message, autoStartChecked, showAutoStart);
+            var result = await dialog.ShowDialog<FrameworkActionResult>(window);
+            return ((int)result, dialog.AutoStartChecked);
         }
-        return 3; // Cancel
+        return (4, autoStartChecked); // Cancel
     }
 
     private async Task<string?> ShowTextInputDialogAsync(string title, string message, string watermark)

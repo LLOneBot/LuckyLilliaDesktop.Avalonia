@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using Serilog;
@@ -29,6 +30,7 @@ public class HomeViewModel : ViewModelBase
     private readonly IDownloadService _downloadService;
     private readonly IUpdateChecker _updateChecker;
     private readonly IUpdateStateService _updateStateService;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<HomeViewModel> _logger;
     private CancellationTokenSource? _downloadCts;
     private CancellationTokenSource? _infoPollingCts;
@@ -359,6 +361,7 @@ public class HomeViewModel : ViewModelBase
         IDownloadService downloadService,
         IUpdateChecker updateChecker,
         IUpdateStateService updateStateService,
+        IServiceProvider serviceProvider,
         ILogger<HomeViewModel> logger)
     {
         _processManager = processManager;
@@ -370,6 +373,7 @@ public class HomeViewModel : ViewModelBase
         _downloadService = downloadService;
         _updateChecker = updateChecker;
         _updateStateService = updateStateService;
+        _serviceProvider = serviceProvider;
         _logger = logger;
 
         // 订阅资源监控流
@@ -504,6 +508,75 @@ public class HomeViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "执行启动后命令失败");
+        }
+    }
+
+    private async Task StartAutoFrameworksAsync(AppConfig config)
+    {
+        if (config.AutoStartFrameworks.Count == 0) return;
+
+        try
+        {
+            _logger.LogInformation("自动启动框架: {Frameworks}", string.Join(", ", config.AutoStartFrameworks));
+            await Task.Delay(3000); // 等待 LLBot 初始化
+
+            foreach (var framework in config.AutoStartFrameworks)
+            {
+                try
+                {
+                    switch (framework)
+                    {
+                        case "koishi":
+                            _serviceProvider.GetRequiredService<IKoishiInstallService>().StartKoishi();
+                            break;
+                        case "astrbot":
+                            _serviceProvider.GetRequiredService<IAstrBotInstallService>().StartAstrBot();
+                            break;
+                        case "zhenxun":
+                            _serviceProvider.GetRequiredService<IZhenxunInstallService>().StartZhenxun();
+                            break;
+                        case "ddbot":
+                            _serviceProvider.GetRequiredService<IDDBotInstallService>().StartDDBot();
+                            break;
+                        case "yunzai":
+                            _serviceProvider.GetRequiredService<IYunzaiInstallService>().StartYunzai();
+                            break;
+                        case "zbp":
+                            _serviceProvider.GetRequiredService<IZeroBotPluginInstallService>().StartZeroBotPlugin();
+                            break;
+                        case "openclaw":
+                            var openClaw = _serviceProvider.GetRequiredService<IOpenClawInstallService>();
+                            if (!openClaw.IsInstalled)
+                            {
+                                _logger.LogWarning("OpenClaw 未安装，跳过自动启动");
+                                continue;
+                            }
+                            // 检查 openclaw 命令是否存在
+                            var openclawCmd = Utils.PlatformHelper.IsWindows
+                                ? Path.GetFullPath(Path.Combine("bin/node24", "openclaw.cmd"))
+                                : Path.GetFullPath(Path.Combine("bin/node24", "bin", "openclaw"));
+                            if (!File.Exists(openclawCmd))
+                            {
+                                _logger.LogWarning("OpenClaw 命令不存在: {Path}，跳过自动启动", openclawCmd);
+                                continue;
+                            }
+                            if (openClaw.IsFirstRun)
+                                openClaw.StartOnboard();
+                            else
+                                openClaw.StartGateway();
+                            break;
+                    }
+                    _logger.LogInformation("已自动启动框架: {Framework}", framework);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "自动启动框架失败: {Framework}", framework);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "自动启动框架时出错");
         }
     }
 
@@ -1203,6 +1276,9 @@ public class HomeViewModel : ViewModelBase
 
                 // 执行启动后命令
                 await ExecuteStartupCommandAsync(config);
+
+                // 自动启动配置的框架
+                await StartAutoFrameworksAsync(config);
             }
             else
             {

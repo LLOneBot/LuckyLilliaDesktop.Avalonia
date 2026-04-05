@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using LuckyLilliaDesktop.Utils;
 
@@ -39,6 +40,10 @@ public class AppConfig
 
     [JsonPropertyName("startup_command")]
     public string StartupCommand { get; set; } = string.Empty;
+
+    // 框架自动启动
+    [JsonPropertyName("auto_start_frameworks")]
+    public List<string> AutoStartFrameworks { get; set; } = new();
 
     // 日志设置
     [JsonPropertyName("log_save_enabled")]

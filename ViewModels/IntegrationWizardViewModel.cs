@@ -27,6 +27,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     private readonly IZeroBotPluginInstallService _zeroBotPluginInstallService;
     private readonly IOpenClawInstallService _openClawInstallService;
     private readonly ISelfInfoService _selfInfoService;
+    private readonly IConfigManager _configManager;
     private readonly IDisposable _uinSubscription;
 
     private bool _isInstalling;
@@ -68,7 +69,10 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     public Func<string, string, Task>? ShowAlertCallback { get; set; }
     public Func<string, string, int, Action, Task>? ShowAutoCloseAlertCallback { get; set; }
     public Func<string, string, Task<int>>? ThreeChoiceCallback { get; set; }
-    public Func<string, string, Task<int>>? FourChoiceCallback { get; set; }
+    /// <summary>
+    /// 已安装框架的操作对话框回调。参数: (frameworkName, message, autoStartChecked, showAutoStart) → (choice, autoStart)
+    /// </summary>
+    public Func<string, string, bool, bool, Task<(int choice, bool autoStart)>>? FrameworkActionCallback { get; set; }
     public Func<string, string, string, Task<string?>>? TextInputCallback { get; set; }
 
     public IntegrationWizardViewModel(
@@ -80,6 +84,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         IZeroBotPluginInstallService zeroBotPluginInstallService,
         IOpenClawInstallService openClawInstallService,
         ISelfInfoService selfInfoService,
+        IConfigManager configManager,
         ILogger<IntegrationWizardViewModel> logger)
     {
         _koishiInstallService = koishiInstallService;
@@ -90,6 +95,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         _zeroBotPluginInstallService = zeroBotPluginInstallService;
         _openClawInstallService = openClawInstallService;
         _selfInfoService = selfInfoService;
+        _configManager = configManager;
         _logger = logger;
 
         SelectFrameworkCommand = ReactiveCommand.CreateFromTask<string>(OnSelectFrameworkAsync);
@@ -132,25 +138,46 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             _ => false
         };
 
-        if (isInstalled && FourChoiceCallback != null)
+        if (isInstalled && FrameworkActionCallback != null)
         {
-            // 0=启动, 1=重新安装, 2=查看文档, 3=取消
-            var choice = await FourChoiceCallback(frameworkName, $"{frameworkName} 已安装，请选择操作：");
-            
-            if (choice == 3) return; // 取消
-            
+            var config = await _configManager.LoadConfigAsync();
+            var autoStartEnabled = config.AutoStartFrameworks.Contains(framework);
+            var showAutoStart = framework != "openclaw";
+
+            // 0=启动, 1=重新安装, 2=打开目录, 3=查看文档, 4=取消
+            var (choice, autoStart) = await FrameworkActionCallback(frameworkName, $"{frameworkName} 已安装，请选择操作：", autoStartEnabled, showAutoStart);
+
+            // 保存自动启动状态
+            if (autoStart != autoStartEnabled)
+            {
+                config = await _configManager.LoadConfigAsync();
+                if (autoStart && !config.AutoStartFrameworks.Contains(framework))
+                    config.AutoStartFrameworks.Add(framework);
+                else if (!autoStart)
+                    config.AutoStartFrameworks.Remove(framework);
+                await _configManager.SaveConfigAsync(config);
+            }
+
+            if (choice == 4) return; // 取消
+
             if (choice == 0) // 启动
             {
                 StartFramework(framework);
                 return;
             }
-            
-            if (choice == 2) // 查看文档
+
+            if (choice == 2) // 打开目录
+            {
+                OpenFrameworkDir(framework);
+                return;
+            }
+
+            if (choice == 3) // 查看文档
             {
                 OpenFrameworkDocs(framework);
                 return;
             }
-            
+
             // choice == 1: 重新安装，继续执行下面的安装流程
         }
         else if (!isInstalled && ThreeChoiceCallback != null)
@@ -233,6 +260,37 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex, "打开文档失败: {Url}", url);
+            }
+        }
+    }
+
+    private void OpenFrameworkDir(string framework)
+    {
+        var dir = framework switch
+        {
+            "koishi" => Path.GetFullPath("bin/koishi"),
+            "astrbot" => Path.GetFullPath("bin/astrbot"),
+            "zhenxun" => Path.GetFullPath("bin/zhenxun"),
+            "ddbot" => Path.GetFullPath("bin/ddbot"),
+            "yunzai" => Path.GetFullPath("bin/yunzai"),
+            "zbp" => Path.GetFullPath("bin/ZeroBot-Plugin"),
+            "openclaw" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw"),
+            _ => ""
+        };
+
+        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = dir,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "打开目录失败: {Dir}", dir);
             }
         }
     }

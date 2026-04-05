@@ -1,0 +1,97 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LuckyLilliaDesktop.Views.FrameworkActionDialog"
+        Title=""
+        Width="460"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+    <Border CornerRadius="12"
+            Background="{DynamicResource CardBackground}"
+            BorderBrush="{DynamicResource BorderColor}"
+            BorderThickness="1"
+            Padding="24">
+        <Grid>
+            <Button Background="Transparent"
+                    BorderThickness="0"
+                    Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    Padding="4"
+                    Width="28" Height="28"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Margin="-12,-12"
+                    Click="OnCancelClick">
+                <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                          Width="14" Height="14"/>
+            </Button>
+            <StackPanel Spacing="20">
+                <TextBlock x:Name="MessageText"
+                           Text=""
+                           FontSize="16"
+                           Foreground="{DynamicResource TextPrimary}"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"/>
+
+            <StackPanel Spacing="12">
+                <StackPanel Orientation="Horizontal"
+                            Spacing="12"
+                            HorizontalAlignment="Center">
+                    <Button x:Name="StartButton"
+                            Content="启动"
+                            Width="90"
+                            Padding="0,10"
+                            Background="{DynamicResource PrimaryBrush}"
+                            Foreground="White"
+                            HorizontalContentAlignment="Center"
+                            Click="OnStartClick"/>
+                    <Button x:Name="ReinstallButton"
+                            Content="重新安装"
+                            Width="90"
+                            Padding="0,10"
+                            HorizontalContentAlignment="Center"
+                            Click="OnReinstallClick"/>
+                    <Button x:Name="OpenDirButton"
+                            Content="打开目录"
+                            Width="90"
+                            Padding="0,10"
+                            HorizontalContentAlignment="Center"
+                            Click="OnOpenDirClick"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Spacing="12"
+                            HorizontalAlignment="Center">
+                    <Button x:Name="ViewDocsButton"
+                            Content="查看文档"
+                            Width="90"
+                            Padding="0,10"
+                            HorizontalContentAlignment="Center"
+                            Click="OnViewDocsClick"/>
+                    <Button x:Name="CancelButton"
+                            Content="取消"
+                            Width="90"
+                            Padding="0,10"
+                            HorizontalContentAlignment="Center"
+                            Click="OnCancelClick"/>
+                </StackPanel>
+            </StackPanel>
+
+            <CheckBox x:Name="AutoStartCheckBox"
+                      Content="跟随 LLBot 自动启动"
+                      HorizontalAlignment="Center"
+                      Foreground="{DynamicResource TextSecondary}"
+                      FontSize="13"/>
+        </StackPanel>
+        </Grid>
+    </Border>
+</Window>

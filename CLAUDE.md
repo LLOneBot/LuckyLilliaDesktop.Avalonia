@@ -35,7 +35,7 @@ dotnet test LuckyLilliaDesktop.Tests/LuckyLilliaDesktop.Tests.csproj --filter "F
 
 ### MVVM with Reactive Extensions
 
-- **ViewModels** extend `ViewModelBase` (which extends ReactiveUI's `ReactiveObject`). Properties use `[Reactive]` attribute (via ReactiveUI.Fody) or `RaiseAndSetIfChanged`. Commands use `ReactiveCommand`.
+- **ViewModels** extend `ViewModelBase` (which extends ReactiveUI's `ReactiveObject`). Properties use `[Reactive]` attribute (via ReactiveUI.Fody, configured in `FodyWeavers.xml`) or `RaiseAndSetIfChanged`. Commands use `ReactiveCommand`.
 - **Views** are Avalonia AXAML files. Pages live under `Views/Pages/`, dialogs under `Views/Dialogs/`.
 - **Services** are interface-based, all registered as **singletons** in DI. ViewModels are **transient**.
 
@@ -43,17 +43,28 @@ dotnet test LuckyLilliaDesktop.Tests/LuckyLilliaDesktop.Tests.csproj --filter "F
 
 Configured in `App.axaml.cs:ConfigureServices()` using `Microsoft.Extensions.DependencyInjection`. The `IServiceProvider` is stored as `App.Services` and accessed by ViewModels to resolve dependencies.
 
+### Navigation
+
+Tab-based navigation via `MainWindowViewModel.SelectedIndex` (Home → Log → Config → LLBotConfig → IntegrationWizard → About). ViewModels receive navigation callbacks as `Action` delegates (e.g., `HomeViewModel.NavigateToLogs` sets `SelectedIndex = 1`). Dialogs are injected into ViewModels as `Func<T>` delegates for loose coupling.
+
 ### Key Service Responsibilities
 
 | Service | Role |
 |---------|------|
 | `ProcessManager` | Start/stop/monitor PMHQ and LLBot processes. Uses Windows Job Objects for subprocess cleanup. |
 | `ResourceMonitor` | Real-time CPU/memory monitoring via `IObservable<T>` streams. |
-| `PmhqClient` | HTTP client to local PMHQ API (QR login, account info, device info). |
+| `PmhqClient` | HTTP client to local PMHQ API (QR login, account info, device info, SSE events). |
 | `ConfigManager` | JSON config I/O (`app_settings.json`) with caching and raw JSON node preservation. |
 | `*InstallService` (7 services) | Each handles installation of a specific bot framework (Koishi, AstrBot, Zhenxun, DDBot, Yunzai, ZeroBotPlugin, OpenClaw). |
 | `PythonHelper` | Python/uv runtime management for Python-based bot frameworks. |
-| `DownloadService` | File downloads with progress tracking and multi-mirror npm registry support. |
+| `DownloadService` | File downloads with progress tracking and multi-mirror npm registry support (mirrors rotate on failure). |
+| `SelfInfoService` | Polls PMHQ for QQ account info; provides separate `UinStream` and `NicknameStream` observables. |
+
+### Process Management Rules
+
+- **PMHQ is a launcher** — it starts the QQ process and then exits. Always check QQ process status (not PMHQ) for login state: use `_processManager.GetProcessStatus("QQ")`, not `GetProcessStatus("PMHQ")`.
+- **SelfInfo timing** — UIN arrives before Nickname. `ISelfInfoService` exposes them as separate observable streams (`UinStream`, `NicknameStream`). Never gate logic on both being available simultaneously.
+- **Windows cleanup** — Windows Job Objects ensure the entire process tree is terminated. On macOS/Linux, relies on parent-child signal propagation.
 
 ### Platform-Specific Behavior
 
@@ -62,9 +73,26 @@ Cross-platform logic uses `PlatformHelper` (in `Utils/`). Key differences:
 - **macOS**: `.app` bundle handling in `Program.cs`, App Translocation detection/recovery, `~/Library/Application Support/LuckyLilliaDesktop` as working directory when installed to `/Applications`.
 - Working directory is set in `Program.cs` before the Avalonia app starts — this is critical because all relative paths (config, logs, binaries) depend on it.
 
+### UI Theme Rules
+
+All UI must support both light and dark themes. **Never hardcode colors** — use `DynamicResource` bindings:
+
+| Purpose | Resource Key |
+|---------|-------------|
+| Primary background | `SystemControlBackgroundAltHighBrush` |
+| Secondary background | `SystemControlBackgroundBaseLowBrush` |
+| Card background | `CardBackground` |
+| Primary text | `SystemControlForegroundBaseHighBrush` or `TextPrimary` |
+| Secondary text | `SystemControlForegroundBaseMediumBrush` or `TextSecondary` |
+| Border | `SystemControlForegroundBaseLowBrush` or `BorderColor` |
+| Accent/primary button | `PrimaryBrush` |
+| Danger action | `DangerColor` |
+
+Exceptions: brand colors (e.g. `#6C7BFF`), QR code background (must be white), and other functionally-fixed colors are acceptable with justification. Always verify contrast in both themes.
+
 ### Configuration
 
-`app_settings.json` stores runtime configuration. The `ConfigManager` preserves unknown JSON properties when writing back (via `JsonNode`), so config files remain forward-compatible.
+`app_settings.json` stores runtime configuration with snake_case JSON property names. The `ConfigManager` preserves unknown JSON properties when writing back (via `JsonNode`), so config files remain forward-compatible.
 
 ### Logging
 
