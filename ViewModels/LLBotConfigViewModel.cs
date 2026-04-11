@@ -388,7 +388,17 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            // 直接调用 API 获取 UIN，不依赖 ResourceMonitor 的缓存
+            // 优先使用 SelfInfoService 已缓存的 UIN
+            var cachedUin = _selfInfoService.CurrentUin;
+            if (!string.IsNullOrEmpty(cachedUin))
+            {
+                _currentUin = cachedUin;
+                HasUin = true;
+                await LoadConfigAsync();
+                return;
+            }
+
+            // 缓存中没有，调用 API 获取
             var selfInfo = await _pmhqClient.FetchSelfInfoAsync();
             if (selfInfo != null && !string.IsNullOrEmpty(selfInfo.Uin))
             {
