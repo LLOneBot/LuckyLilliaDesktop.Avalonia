@@ -209,6 +209,129 @@
                                                 <TextBlock Text="备注" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
                                                 <TextBox Text="{Binding Name}" Width="300" Watermark="可选，用于区分不同的连接" HorizontalAlignment="Left"/>
                                             </StackPanel>
+
+                                            <!-- 事件过滤器 -->
+                                            <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                                                <StackPanel Spacing="8">
+                                                    <Button Background="Transparent" BorderThickness="0" Padding="0"
+                                                            Command="{Binding Filter.SwitchExpandCommand}"
+                                                            HorizontalContentAlignment="Left" HorizontalAlignment="Left">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <PathIcon Data="M10 6L16 12L10 18" Width="12" Height="12" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
+                                                                       IsVisible="{Binding !Filter.IsExpanded}"/>
+                                                            <PathIcon Data="M6 10L12 16L18 10" Width="12" Height="12" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
+                                                                       IsVisible="{Binding Filter.IsExpanded}"/>
+                                                            <TextBlock Text="事件过滤器" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                                                            <Border Background="#EC4899" CornerRadius="8" Padding="6,2" VerticalAlignment="Center"
+                                                                    IsVisible="{Binding Filter.HasFilter}">
+                                                                <TextBlock FontSize="10" Foreground="White">
+                                                                    <TextBlock.Text>
+                                                                        <MultiBinding StringFormat="{}{0} 条规则">
+                                                                            <Binding Path="Filter.RuleCount"/>
+                                                                        </MultiBinding>
+                                                                    </TextBlock.Text>
+                                                                </TextBlock>
+                                                            </Border>
+                                                        </StackPanel>
+                                                    </Button>
+
+                                                    <StackPanel Spacing="8" IsVisible="{Binding Filter.IsExpanded}">
+                                                        <!-- 模式切换 -->
+                                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                                            <Button Content="可视化" Padding="8,4" FontSize="12"
+                                                                    Command="{Binding Filter.SwitchToVisualCommand}"
+                                                                    IsEnabled="{Binding !Filter.IsVisualUnsupported}"/>
+                                                            <Button Content="JSON" Padding="8,4" FontSize="12"
+                                                                    Command="{Binding Filter.SwitchToJsonCommand}"/>
+                                                        </StackPanel>
+
+                                                        <TextBlock Text="当前过滤器包含复杂查询（$and/$or 等），仅支持 JSON 编辑"
+                                                                   FontSize="11" Foreground="#D97706"
+                                                                   IsVisible="{Binding Filter.IsVisualUnsupported}"/>
+
+                                                        <!-- 可视化模式 -->
+                                                        <StackPanel Spacing="8" IsVisible="{Binding Filter.IsVisualMode}">
+                                                            <TextBlock Text="未配置过滤规则，将接收所有事件" FontSize="12"
+                                                                       Foreground="{DynamicResource TextSecondary}"
+                                                                       HorizontalAlignment="Center" Margin="0,4"
+                                                                       IsVisible="{Binding !Filter.HasFilter}"/>
+
+                                                            <Border Background="#EFF6FF" CornerRadius="6" Padding="8"
+                                                                    IsVisible="{Binding Filter.HasFilter}">
+                                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                    <TextBlock Text="只有符合以下规则的事件才会被上报" FontSize="11" Foreground="#2563EB"/>
+                                                                    <TextBlock Text="，规则之间为" FontSize="11" Foreground="#2563EB"
+                                                                               IsVisible="{Binding Filter.HasMultipleRules}"/>
+                                                                    <TextBlock Text="且 (AND)" FontSize="11" Foreground="#EC4899" FontWeight="SemiBold"
+                                                                               IsVisible="{Binding Filter.HasMultipleRules}"/>
+                                                                    <TextBlock Text="的关系" FontSize="11" Foreground="#2563EB"
+                                                                               IsVisible="{Binding Filter.HasMultipleRules}"/>
+                                                                </StackPanel>
+                                                            </Border>
+
+                                                            <!-- 规则列表 -->
+                                                            <ItemsControl ItemsSource="{Binding Filter.Rules}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate x:DataType="vm:FilterRuleViewModel">
+                                                                        <Border Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
+                                                                                CornerRadius="8" Padding="10" Margin="0,2">
+                                                                            <StackPanel Spacing="6">
+                                                                                <DockPanel>
+                                                                                    <Button DockPanel.Dock="Right" Content="删除" Padding="6,2"
+                                                                                            Foreground="{DynamicResource DangerColor}" Background="Transparent" BorderThickness="0"
+                                                                                            Command="{Binding $parent[ItemsControl].((vm:OB11ConnectionViewModel)DataContext).Filter.RemoveRuleCommand}"
+                                                                                            CommandParameter="{Binding}"/>
+                                                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                                        <ComboBox Width="140" SelectedValue="{Binding Field}" DisplayMemberBinding="{ReflectionBinding Label}"
+                                                                                                  SelectedValueBinding="{ReflectionBinding Value}"
+                                                                                                  ItemsSource="{x:Static vm:EventFilterViewModel.FieldOptions}"/>
+                                                                                        <ComboBox Width="110" SelectedValue="{Binding Operator}" DisplayMemberBinding="{ReflectionBinding Label}"
+                                                                                                  SelectedValueBinding="{ReflectionBinding Value}"
+                                                                                                  ItemsSource="{x:Static vm:EventFilterViewModel.OperatorOptions}"/>
+                                                                                    </StackPanel>
+                                                                                </DockPanel>
+                                                                                <!-- 值输入 - 列表操作符 -->
+                                                                                <TextBox Text="{Binding Value}" Watermark="{Binding ValuePlaceholder}"
+                                                                                         IsVisible="{Binding IsListOperator}"/>
+                                                                                <!-- 值输入 - 下拉选择字段 -->
+                                                                                <ComboBox SelectedValue="{Binding Value}" DisplayMemberBinding="{ReflectionBinding Label}"
+                                                                                          SelectedValueBinding="{ReflectionBinding Value}"
+                                                                                          ItemsSource="{Binding FieldOptions}"
+                                                                                          IsVisible="{Binding IsSelectField}" HorizontalAlignment="Stretch"/>
+                                                                                <!-- 值输入 - 文本/正则字段 -->
+                                                                                <TextBox Text="{Binding Value}" Watermark="{Binding ValuePlaceholder}"
+                                                                                         IsVisible="{Binding IsTextField}"/>
+                                                                                <!-- 值输入 - 数字字段 -->
+                                                                                <TextBox Text="{Binding Value}" Watermark="{Binding ValuePlaceholder}"
+                                                                                         IsVisible="{Binding IsNumberField}"/>
+                                                                            </StackPanel>
+                                                                        </Border>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+
+                                                            <Button Command="{Binding Filter.AddRuleCommand}" Padding="8,4"
+                                                                    HorizontalAlignment="Left" Background="Transparent" BorderThickness="0">
+                                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                    <TextBlock Text="+" FontSize="14" Foreground="{DynamicResource PrimaryBrush}"/>
+                                                                    <TextBlock Text="添加规则" FontSize="13" Foreground="{DynamicResource PrimaryBrush}"/>
+                                                                </StackPanel>
+                                                            </Button>
+                                                        </StackPanel>
+
+                                                        <!-- JSON 模式 -->
+                                                        <StackPanel Spacing="4" IsVisible="{Binding Filter.IsJsonMode}">
+                                                            <TextBox Text="{Binding Filter.JsonText}" AcceptsReturn="True"
+                                                                     Height="120" Watermark="{}{&quot;post_type&quot;: &quot;message&quot;}"
+                                                                     FontFamily="Consolas,Courier New,monospace" FontSize="12"/>
+                                                            <TextBlock Text="{Binding Filter.JsonError}" FontSize="11" Foreground="#DC2626"
+                                                                       IsVisible="{Binding Filter.HasJsonError}"/>
+                                                            <TextBlock Text="只有符合过滤器的事件才会被上报，留空表示接收所有事件。&#x0a;MongoDB 查询语法，支持：$eq, $ne, $in, $nin, $gt, $lt, $regex, $and, $or, $not"
+                                                                       FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>

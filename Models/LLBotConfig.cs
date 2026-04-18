@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace LuckyLilliaDesktop.Models;
@@ -121,6 +122,9 @@ public class OB11Connection
 
     [JsonPropertyName("debug")]
     public bool Debug { get; set; } = false;
+
+    [JsonPropertyName("filter")]
+    public JsonObject? Filter { get; set; }
 }
 
 public class MilkyConfig

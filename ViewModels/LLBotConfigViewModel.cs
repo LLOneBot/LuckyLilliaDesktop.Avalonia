@@ -720,6 +720,8 @@ public class OB11ConnectionViewModel : ViewModelBase
     private int _hostMode = 1; // 默认本地
     private string _customHost = string.Empty;
 
+    public EventFilterViewModel Filter { get; }
+
     public string Type
     {
         get => _type;
@@ -862,11 +864,14 @@ public class OB11ConnectionViewModel : ViewModelBase
         _reportOfflineMessage = model.ReportOfflineMessage;
         _messageFormat = model.MessageFormat;
         _debug = model.Debug;
-        
+
         // host 字符串转 mode+customHost
         var (mode, customHost) = HostToMode(model.Host);
         _hostMode = mode;
         _customHost = customHost;
+
+        Filter = new EventFilterViewModel(model.Filter);
+        Filter.PropertyModified += NotifyModified;
     }
 
     public OB11Connection ToModel() => new()
@@ -883,7 +888,8 @@ public class OB11ConnectionViewModel : ViewModelBase
         ReportSelfMessage = ReportSelfMessage,
         ReportOfflineMessage = ReportOfflineMessage,
         MessageFormat = MessageFormat,
-        Debug = Debug
+        Debug = Debug,
+        Filter = Filter.ToJsonObject()
     };
 
     // host 字符串转 mode+customHost
