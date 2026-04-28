@@ -18,29 +18,28 @@ public class LogEntryViewModel : ViewModelBase
     {
         get
         {
-            var prefix = LogEntry.Level == "stderr" ? "ERR" : "   ";
             string text;
             if (LogEntry.ProcessName == "LLBot")
             {
-                text = $"{prefix} {LogEntry.Message}";
+                text = LogEntry.Message;
             }
             else
             {
                 var timestamp = LogEntry.Timestamp.ToString("HH:mm:ss");
-                text = $"{prefix} {timestamp} [{LogEntry.ProcessName}] {LogEntry.Message}";
+                text = $"{timestamp} [{LogEntry.ProcessName}] {LogEntry.Message}";
             }
-            return SanitizeText(text);
+            return SanitizeText(text, preserveAnsi: true);
         }
     }
 
-    public bool IsError => LogEntry.Level == "stderr";
+    public bool IsError => false;
 
     public LogEntryViewModel(LogEntry logEntry)
     {
         LogEntry = logEntry;
     }
 
-    private static string SanitizeText(string text)
+    private static string SanitizeText(string text, bool preserveAnsi = false)
     {
         if (string.IsNullOrEmpty(text)) return text;
 
@@ -48,35 +47,37 @@ public class LogEntryViewModel : ViewModelBase
         for (int i = 0; i < text.Length; i++)
         {
             var c = text[i];
-            
-            // 保留常用字符范围
-            // - ASCII 可打印字符 (0x20-0x7E)
-            // - 常用标点和符号
-            // - 中日韩字符 (CJK)
-            // - 常用拉丁扩展
-            // - Emoji (通过代理对)
-            
-            // 控制字符（保留 tab, newline, cr）
+
+            // ANSI 转义序列：\x1B[...m — 保留完整序列
+            if (preserveAnsi && c == '\x1B' && i + 1 < text.Length && text[i + 1] == '[')
+            {
+                sb.Append(c);
+                i++;
+                sb.Append(text[i]);
+                while (++i < text.Length)
+                {
+                    sb.Append(text[i]);
+                    if (text[i] == 'm') break;
+                }
+                continue;
+            }
+
             if (c < 0x20 && c != '\t' && c != '\n' && c != '\r')
                 continue;
-            
-            // 代理对（emoji等），保留完整的代理对
+
             if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
             {
                 sb.Append(c);
                 sb.Append(text[++i]);
                 continue;
             }
-            
-            // 单独的代理字符（不完整），跳过
+
             if (char.IsSurrogate(c))
                 continue;
-            
-            // 私用区字符，跳过
+
             if (c >= 0xE000 && c <= 0xF8FF)
                 continue;
-            
-            // 其他字符保留，让字体回退机制处理
+
             sb.Append(c);
         }
         return sb.ToString();

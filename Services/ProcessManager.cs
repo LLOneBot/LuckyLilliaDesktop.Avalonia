@@ -416,6 +416,7 @@ public class ProcessManager : IProcessManager, IDisposable
             };
 
             startInfo.Environment["NODE_SKIP_PLATFORM_CHECK"] = "1";
+            startInfo.Environment["FORCE_COLOR"] = "3";
 
             // 添加 Node.js 参数
             startInfo.ArgumentList.Add("--enable-source-maps");

@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:LuckyLilliaDesktop.ViewModels"
+             xmlns:utils="using:LuckyLilliaDesktop.Utils"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="LuckyLilliaDesktop.Views.Pages.LogPage"
              x:DataType="vm:LogViewModel">
@@ -66,7 +67,7 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <TextBlock x:Name="LogText"
-                                   Text="{Binding FormattedText}"
+                                   utils:AnsiParser.AnsiText="{Binding FormattedText}"
                                    FontFamily="Cascadia Code,Consolas,Courier New,Segoe UI Emoji,Microsoft YaHei"
                                    FontSize="13"
                                    Foreground="{DynamicResource TextPrimary}"

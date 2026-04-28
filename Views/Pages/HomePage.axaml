@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:LuckyLilliaDesktop.ViewModels"
+             xmlns:utils="using:LuckyLilliaDesktop.Utils"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="700"
@@ -239,7 +240,7 @@
                                     <ItemsControl ItemsSource="{Binding RecentLogs}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:LogEntryViewModel">
-                                                <TextBlock Text="{Binding FormattedText}"
+                                                <TextBlock utils:AnsiParser.AnsiText="{Binding FormattedText}"
                                                            FontFamily="Cascadia Code,Consolas,Courier New,Segoe UI Emoji,Microsoft YaHei"
                                                            FontSize="13"
                                                            Foreground="{DynamicResource TextPrimary}"
