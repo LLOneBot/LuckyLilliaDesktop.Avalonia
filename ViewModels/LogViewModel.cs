@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Text.RegularExpressions;
 
 namespace LuckyLilliaDesktop.ViewModels;
 
@@ -33,6 +34,10 @@ public class LogEntryViewModel : ViewModelBase
     }
 
     public bool IsError => false;
+
+    private static readonly Regex AnsiEscapeRegex = new(@"\x1B\[[0-9;]*m", RegexOptions.Compiled);
+
+    public string PlainText => AnsiEscapeRegex.Replace(FormattedText, "");
 
     public LogEntryViewModel(LogEntry logEntry)
     {
@@ -142,7 +147,7 @@ public class LogViewModel : ViewModelBase, IDisposable
             if (SelectedLogEntries.Count == 0) return;
 
             var text = string.Join(Environment.NewLine,
-                SelectedLogEntries.Select(e => e.FormattedText));
+                SelectedLogEntries.Select(e => e.PlainText));
 
             var clipboard = Avalonia.Application.Current?.ApplicationLifetime
                 is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
