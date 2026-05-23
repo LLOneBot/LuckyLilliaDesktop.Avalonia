@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using LuckyLilliaDesktop.Services;
 using LuckyLilliaDesktop.ViewModels;
 using Microsoft.Extensions.Logging;
@@ -27,6 +28,41 @@ public partial class MainWindow : Window
         
         // 监听窗口可见性变化以优化性能
         PropertyChanged += OnWindowPropertyChanged;
+    }
+
+    private void TitleBar_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        if (e.ClickCount == 2)
+        {
+            ToggleWindowState();
+            return;
+        }
+
+        BeginMoveDrag(e);
+    }
+
+    private void MinimizeButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void MaximizeButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        ToggleWindowState();
+    }
+
+    private void CloseButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void ToggleWindowState()
+    {
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
     }
     
     private void OnWindowPropertyChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)

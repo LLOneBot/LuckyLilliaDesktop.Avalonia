@@ -4,7 +4,7 @@
         xmlns:ctrl="using:LuckyLilliaDesktop.Controls"
         x:Class="LuckyLilliaDesktop.Views.LoginDialog"
         Title="登录"
-        Width="300"
+        Width="380"
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         CanResize="False"
@@ -16,25 +16,82 @@
         TransparencyLevelHint="Transparent"
         Background="Transparent">
 
-    <Border CornerRadius="12"
-            Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
-            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="MainBackground" Color="#FFF4FA"/>
+                    <SolidColorBrush x:Key="SidebarBackground" Color="#FFFFFBFE"/>
+                    <SolidColorBrush x:Key="CardBackground" Color="#FDF7FE"/>
+                    <SolidColorBrush x:Key="CardBackgroundStrong" Color="#FFFFFFFF"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#F3C4DE"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FF5D72"/>
+                    <SolidColorBrush x:Key="SuccessColor" Color="#22C55E"/>
+                    <SolidColorBrush x:Key="WarningColor" Color="#F59E0B"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#8D6E82"/>
+                    <SolidColorBrush x:Key="TitleBarBackground" Color="#FFF9FD"/>
+                    <SolidColorBrush x:Key="WindowButtonHover" Color="#10E84D9C"/>
+                    <SolidColorBrush x:Key="CloseButtonHover" Color="#FFE6EC"/>
+                    <SolidColorBrush x:Key="WindowButtonStroke" Color="#7A6274"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#FDF7FE"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#8D6E82"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#F3C4DE"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="MainBackground" Color="#141018"/>
+                    <SolidColorBrush x:Key="SidebarBackground" Color="#1A131C"/>
+                    <SolidColorBrush x:Key="CardBackground" Color="#201722"/>
+                    <SolidColorBrush x:Key="CardBackgroundStrong" Color="#281C2B"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#241926"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#553648"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#3A2131"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FB7185"/>
+                    <SolidColorBrush x:Key="SuccessColor" Color="#34D399"/>
+                    <SolidColorBrush x:Key="WarningColor" Color="#FBBF24"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="TitleBarBackground" Color="#18111A"/>
+                    <SolidColorBrush x:Key="WindowButtonHover" Color="#342131"/>
+                    <SolidColorBrush x:Key="CloseButtonHover" Color="#4A1F2A"/>
+                    <SolidColorBrush x:Key="WindowButtonStroke" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#281C2B"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#3A2131"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#553648"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+
+    <Border CornerRadius="24"
+            Background="{DynamicResource CardBackground}"
+            BorderBrush="{DynamicResource BorderColor}"
             BorderThickness="1"
-            Padding="20,16">
+            BoxShadow="0 24 70 0 #2DE84D9C"
+            Padding="28,24">
         <Grid RowDefinitions="Auto,*">
             <!-- 标题栏 -->
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,18">
                 <TextBlock x:Name="TitleText"
                            Text="快速登录"
-                           FontSize="18"
+                           FontSize="20"
                            FontWeight="Bold"
-                           Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                           Foreground="{DynamicResource TextPrimary}"
                            VerticalAlignment="Center"/>
                 <Button Grid.Column="1"
                         Background="Transparent"
-                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                        Foreground="{DynamicResource TextSecondary}"
                         Padding="4"
-                        Width="28" Height="28"
+                        Width="32" Height="32"
                         HorizontalContentAlignment="Center"
                         VerticalContentAlignment="Center"
                         Click="OnCloseClick">
@@ -43,46 +100,46 @@
                 </Button>
             </Grid>
 
-            <StackPanel Grid.Row="1" Spacing="8">
+            <StackPanel Grid.Row="1" Spacing="12">
                 <!-- 加载中面板 -->
                 <StackPanel x:Name="LoadingPanel" Spacing="16" HorizontalAlignment="Center" Margin="0,30">
                     <ctrl:LoadingSpinner SpinnerSize="40" HorizontalAlignment="Center"/>
                     <TextBlock Text="正在获取登录信息..."
                                FontSize="13"
-                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                               Foreground="{DynamicResource TextSecondary}"
                                HorizontalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- 快速登录面板 -->
-                <StackPanel x:Name="QuickLoginPanel" Spacing="4" HorizontalAlignment="Center" IsVisible="False">
-                    <Border Width="80" Height="80" CornerRadius="40" ClipToBounds="True"
+                <StackPanel x:Name="QuickLoginPanel" Spacing="8" HorizontalAlignment="Center" IsVisible="False">
+                    <Border Width="92" Height="92" CornerRadius="46" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" ClipToBounds="True"
                             HorizontalAlignment="Center"
                             Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
                             Margin="0,4,0,0">
                         <Grid>
                             <PathIcon x:Name="DefaultAvatar"
                                       Data="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
-                                      Width="40" Height="40"
-                                      Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                                      Width="44" Height="44"
+                                      Foreground="{DynamicResource TextSecondary}"/>
                             <Image x:Name="AvatarImage" Stretch="UniformToFill"/>
                         </Grid>
                     </Border>
                     
                     <TextBlock x:Name="NicknameText"
-                               FontSize="16"
+                               FontSize="17"
                                FontWeight="Bold"
-                               Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                               Foreground="{DynamicResource TextPrimary}"
                                HorizontalAlignment="Center"
                                Margin="0,8,0,0"/>
                     
                     <TextBlock x:Name="UinText"
                                FontSize="13"
-                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                               Foreground="{DynamicResource TextSecondary}"
                                HorizontalAlignment="Center"/>
                     
                     <TextBlock x:Name="StatusText"
                                FontSize="12"
-                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                               Foreground="{DynamicResource TextSecondary}"
                                HorizontalAlignment="Center"
                                TextWrapping="Wrap"
                                TextAlignment="Center"
@@ -91,14 +148,14 @@
                     <Button x:Name="LoginButton"
                             HorizontalAlignment="Stretch"
                             Padding="0,10"
-                            Background="#2196F3"
+                            Background="{DynamicResource PrimaryBrush}"
                             Foreground="White"
-                            CornerRadius="20"
+                            CornerRadius="999"
                             HorizontalContentAlignment="Center"
                             Margin="0,8,0,0"
-                            Width="200"
+                            Width="240"
                             Click="OnLoginClick">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
                             <PathIcon Data="M10,17V14H3V10H10V7L15,12L10,17M7,2H17A2,2 0 0,1 19,4V20A2,2 0 0,1 17,22H7A2,2 0 0,1 5,20V16H7V20H17V4H7V8H5V4A2,2 0 0,1 7,2Z"
                                       Width="16" Height="16" Foreground="White"/>
                             <TextBlock Text="登录" FontSize="14" VerticalAlignment="Center"/>
@@ -109,7 +166,7 @@
                         <Button x:Name="SwitchAccountButton"
                                 Grid.Column="0"
                                 Background="Transparent"
-                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                Foreground="{DynamicResource TextSecondary}"
                                 Padding="8,6"
                                 HorizontalAlignment="Center"
                                 Click="OnSwitchAccountClick">
@@ -122,7 +179,7 @@
                         <Button x:Name="QRCodeModeButton"
                                 Grid.Column="1"
                                 Background="Transparent"
-                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                Foreground="{DynamicResource TextSecondary}"
                                 Padding="8,6"
                                 HorizontalAlignment="Center"
                                 Click="OnQRCodeModeClick">
@@ -136,10 +193,10 @@
                 </StackPanel>
 
                 <!-- 扫码登录面板 -->
-                <StackPanel x:Name="QRCodePanel" Spacing="8" HorizontalAlignment="Center" IsVisible="False">
-                    <Border Width="180" Height="180" 
-                            Background="White" 
-                            CornerRadius="8"
+                <StackPanel x:Name="QRCodePanel" Spacing="12" HorizontalAlignment="Center" IsVisible="False">
+                    <Border Width="204" Height="204" 
+                            Background="{DynamicResource CardBackgroundStrong}" 
+                            CornerRadius="16"
                             HorizontalAlignment="Center"
                             Padding="8"
                             Margin="0,4,0,0">
@@ -161,12 +218,12 @@
                     <TextBlock x:Name="QRCodeTipText"
                                Text="正在获取二维码..."
                                FontSize="13"
-                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                               Foreground="{DynamicResource TextSecondary}"
                                HorizontalAlignment="Center"/>
                     
                     <Button x:Name="QuickLoginModeButton"
                             Background="Transparent"
-                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                            Foreground="{DynamicResource TextSecondary}"
                             Padding="8,6"
                             HorizontalAlignment="Center"
                             Click="OnQuickLoginModeClick"
@@ -180,13 +237,13 @@
                 </StackPanel>
 
                 <!-- 账号列表面板 -->
-                <StackPanel x:Name="AccountListPanel" Spacing="8" IsVisible="False">
+                <StackPanel x:Name="AccountListPanel" Spacing="12" IsVisible="False">
                     <ScrollViewer MaxHeight="240">
                         <ItemsControl x:Name="AccountList"/>
                     </ScrollViewer>
                     <Button Content="返回" 
                             Background="Transparent"
-                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                            Foreground="{DynamicResource TextSecondary}"
                             Click="OnBackFromAccountList" 
                             HorizontalAlignment="Center"
                             Padding="16,6"/>

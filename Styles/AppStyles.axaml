@@ -8,6 +8,11 @@
         <converters:StatusToColorConverter x:Key="StatusToColorConverter"/>
     </Styles.Resources>
 
+    <!-- 窗口整体背景 -->
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{DynamicResource MainBackground}"/>
+    </Style>
+
     <!-- ListBox 样式 -->
     <Style Selector="ListBox">
         <Setter Property="Background" Value="Transparent"/>
@@ -15,19 +20,21 @@
     </Style>
 
     <Style Selector="ListBoxItem">
-        <Setter Property="Padding" Value="8,12"/>
-        <Setter Property="Margin" Value="4"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="10,12"/>
+        <Setter Property="Margin" Value="4,4,4,4"/>
+        <Setter Property="CornerRadius" Value="14"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="UseLayoutRounding" Value="True"/>
     </Style>
 
     <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource HoverBackground}"/>
+        <Setter Property="CornerRadius" Value="14"/>
     </Style>
 
     <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource SelectedBackground}"/>
+        <Setter Property="CornerRadius" Value="14"/>
     </Style>
 
     <!-- PathIcon 样式 -->
@@ -46,22 +53,63 @@
 
     <Style Selector="ListBoxItem:selected TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="FontSize" Value="11"/>
     </Style>
 
-    <!-- ==================== 圆角按钮样式 ==================== -->
+    <!-- 默认按钮样式 -->
+    <Style Selector="Button">
+        <Setter Property="Padding" Value="14,10"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="CornerRadius" Value="14"/>
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondary}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        Padding="{TemplateBinding Padding}">
+                    <ContentPresenter Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalContentAlignment="Center"
+                                      VerticalContentAlignment="Center"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button:pointerover">
+        <Setter Property="Background" Value="{DynamicResource HoverBackground}"/>
+    </Style>
+
+    <Style Selector="Button:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.98)"/>
+        <Setter Property="Opacity" Value="0.92"/>
+    </Style>
+
+    <!-- 圆角主按钮 -->
     <Style Selector="Button.ActionButton">
-        <Setter Property="Padding" Value="24,12"/>
-        <Setter Property="FontWeight" Value="Medium"/>
-        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="Padding" Value="18,12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="Background" Value="{DynamicResource PrimaryGradient}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <ControlTemplate>
                 <Border Background="{TemplateBinding Background}"
                         CornerRadius="{TemplateBinding CornerRadius}"
                         Padding="{TemplateBinding Padding}"
-                        BorderThickness="0">
+                        BorderThickness="{TemplateBinding BorderThickness}">
                     <ContentPresenter Content="{TemplateBinding Content}"
                                       ContentTemplate="{TemplateBinding ContentTemplate}"
                                       HorizontalContentAlignment="Center"
@@ -72,71 +120,81 @@
     </Style>
 
     <Style Selector="Button.ActionButton:pointerover">
-        <Setter Property="Opacity" Value="0.9"/>
+        <Setter Property="Opacity" Value="0.95"/>
     </Style>
 
     <Style Selector="Button.ActionButton:pressed">
-        <Setter Property="Opacity" Value="0.8"/>
         <Setter Property="RenderTransform" Value="scale(0.98)"/>
+        <Setter Property="Opacity" Value="0.9"/>
     </Style>
 
-    <!-- ==================== ProgressBar 样式 ==================== -->
+    <!-- ProgressBar 样式 -->
     <Style Selector="ProgressBar">
         <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
         <Setter Property="Background" Value="{DynamicResource BorderColor}"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Height" Value="10"/>
     </Style>
 
-    <!-- ==================== Border/Card 样式 ==================== -->
+    <!-- 卡片样式 -->
     <Style Selector="Border.Card">
         <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
-        <Setter Property="CornerRadius" Value="12"/>
-        <Setter Property="Padding" Value="16"/>
+        <Setter Property="CornerRadius" Value="20"/>
+        <Setter Property="Padding" Value="18"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
     </Style>
 
-    <!-- ==================== ScrollViewer 样式 ==================== -->
+    <!-- ScrollViewer 样式 -->
     <Style Selector="ScrollViewer">
         <Setter Property="Background" Value="Transparent"/>
     </Style>
 
-    <!-- ==================== TextBox 样式 ==================== -->
+    <!-- 文本框样式 -->
     <Style Selector="TextBox">
-        <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondary}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
-        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="14"/>
+        <Setter Property="Padding" Value="10,8"/>
     </Style>
 
-    <!-- ==================== ComboBox 样式 ==================== -->
+    <!-- 下拉框样式 -->
     <Style Selector="ComboBox">
-        <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondary}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="14"/>
+        <Setter Property="Padding" Value="10,8"/>
     </Style>
 
-    <!-- ==================== CheckBox 样式 ==================== -->
+    <!-- 复选框/开关样式 -->
     <Style Selector="CheckBox">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
     </Style>
 
-    <!-- ==================== ToggleSwitch 样式 ==================== -->
     <Style Selector="ToggleSwitch">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
     </Style>
 
-    <!-- ==================== TabControl 样式 ==================== -->
+    <!-- 选项卡样式 -->
     <Style Selector="TabControl">
         <Setter Property="Background" Value="Transparent"/>
     </Style>
 
     <Style Selector="TabItem">
         <Setter Property="FontSize" Value="13"/>
-        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="Padding" Value="12,8"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
 
     <Style Selector="TabItem:selected">
         <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
 
     <Style Selector="TabItem:pointerover">

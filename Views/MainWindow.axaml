@@ -9,61 +9,309 @@
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
         Icon="avares://LuckyLilliaDesktop/Assets/Icons/icon.ico"
-        Width="900" Height="600"
+        Width="960" Height="640"
+        MinWidth="880" MinHeight="560"
+        SystemDecorations="None"
         WindowStartupLocation="CenterScreen"
         UseLayoutRounding="True"
         Background="{DynamicResource MainBackground}">
 
-    <Design.DataContext>
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="MainBackground" Color="#FFF4FA"/>
+                    <SolidColorBrush x:Key="SidebarBackground" Color="#FFFFFBFE"/>
+                    <SolidColorBrush x:Key="CardBackground" Color="#FDF7FE"/>
+                    <SolidColorBrush x:Key="CardBackgroundStrong" Color="#FFFFFFFF"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#F3C4DE"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FF5D72"/>
+                    <SolidColorBrush x:Key="SuccessColor" Color="#22C55E"/>
+                    <SolidColorBrush x:Key="WarningColor" Color="#F59E0B"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#8D6E82"/>
+                    <SolidColorBrush x:Key="TitleBarBackground" Color="#FFF9FD"/>
+                    <SolidColorBrush x:Key="WindowButtonHover" Color="#10E84D9C"/>
+                    <SolidColorBrush x:Key="CloseButtonHover" Color="#FFE6EC"/>
+                    <SolidColorBrush x:Key="WindowButtonStroke" Color="#7A6274"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#FDF7FE"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#8D6E82"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#F3C4DE"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="MainBackground" Color="#141018"/>
+                    <SolidColorBrush x:Key="SidebarBackground" Color="#1A131C"/>
+                    <SolidColorBrush x:Key="CardBackground" Color="#201722"/>
+                    <SolidColorBrush x:Key="CardBackgroundStrong" Color="#281C2B"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#241926"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#553648"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#3A2131"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FB7185"/>
+                    <SolidColorBrush x:Key="SuccessColor" Color="#34D399"/>
+                    <SolidColorBrush x:Key="WarningColor" Color="#FBBF24"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="TitleBarBackground" Color="#18111A"/>
+                    <SolidColorBrush x:Key="WindowButtonHover" Color="#342131"/>
+                    <SolidColorBrush x:Key="CloseButtonHover" Color="#4A1F2A"/>
+                    <SolidColorBrush x:Key="WindowButtonStroke" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#281C2B"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#3A2131"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#553648"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
 
-    <Panel>
-        <!-- 主内容 -->
-        <Grid ColumnDefinitions="90,*">
+    <Window.Styles>
+        <Style Selector="Button">
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Opacity" Value="0.92"/>
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Margin" Value="6,5"/>
+            <Setter Property="Padding" Value="8,9"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+        <Style Selector="ListBoxItem:selected">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrushSoft}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="Button.vscode-titlebar-button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#C8C8C8"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+        </Style>
+        <Style Selector="Button.vscode-titlebar-button:pointerover">
+            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <Style Selector="Button.vscode-titlebar-button Path">
+            <Setter Property="Stroke" Value="#C8C8C8"/>
+            <Setter Property="StrokeThickness" Value="1.35"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="Fill" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.vscode-titlebar-button:pointerover Path">
+            <Setter Property="Stroke" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="Button.vscode-close-button:pointerover">
+            <Setter Property="Background" Value="#E81123"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="Button.vscode-close-button:pointerover Path">
+            <Setter Property="Stroke" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="Button.vscode-menu-item">
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#C8C8C8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+        </Style>
+        <Style Selector="Button.vscode-menu-item:pointerover">
+            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+
+        <Style Selector="Button.modern-window-button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Opacity" Value="0.92"/>
+        </Style>
+        <Style Selector="Button.modern-window-button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource WindowButtonHover}"/>
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <Style Selector="Button.modern-window-button Path">
+            <Setter Property="Stroke" Value="{DynamicResource WindowButtonStroke}"/>
+            <Setter Property="StrokeThickness" Value="1.35"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="Fill" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.modern-window-button:pointerover Path">
+            <Setter Property="Stroke" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="Button.modern-close-button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource CloseButtonHover}"/>
+        </Style>
+        <Style Selector="Button.modern-close-button:pointerover Path">
+            <Setter Property="Stroke" Value="{DynamicResource DangerColor}"/>
+        </Style>
+</Window.Styles>
+
+
+    <Border Background="{DynamicResource MainBackground}"
+            CornerRadius="0"
+            ClipToBounds="True">
+        <Grid RowDefinitions="54,*">
+            <!-- 自定义标题栏：VS Code / Windows 风格细线窗口按钮 -->
+            <Grid Grid.Row="0"
+                  ColumnDefinitions="Auto,*,Auto"
+                  Background="{DynamicResource TitleBarBackground}"
+                  PointerPressed="TitleBar_PointerPressed">
+                <Border Grid.ColumnSpan="3"
+                        Height="1"
+                        VerticalAlignment="Bottom"
+                        Background="{DynamicResource BorderColor}"/>
+
+                <!-- 左侧品牌区 -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="18,0,0,0"
+                            Spacing="10">
+                    <Border Width="34" Height="34"
+                            CornerRadius="17"
+                            Background="{DynamicResource PrimaryBrushSoft}"
+                            BorderBrush="{DynamicResource BorderColor}"
+                            BorderThickness="1"
+                            ClipToBounds="True"
+                            BoxShadow="0 8 24 0 #18E84D9C">
+                        <Panel>
+                            <Image Width="34" Height="34"
+                                   Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
+                                   Stretch="UniformToFill"
+                                   IsVisible="{Binding !HomeVM.HasQQInfo}">
+                                <Image.Clip>
+                                    <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
+                                </Image.Clip>
+                            </Image>
+                            <Image Width="34" Height="34"
+                                   Source="{Binding HomeVM.AvatarBitmap}"
+                                   Stretch="UniformToFill"
+                                   IsVisible="{Binding HomeVM.HasQQInfo}">
+                                <Image.Clip>
+                                    <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
+                                </Image.Clip>
+                            </Image>
+                        </Panel>
+                    </Border>
+                    <TextBlock Text="LLBot"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- 中间留作拖动区域 -->
+                <Border Grid.Column="1" Background="Transparent"/>
+
+                <!-- 右侧窗口按钮：轻量线条图标，贴合粉色 UI -->
+                <Border Grid.Column="2"
+                        Margin="0,0,10,0"
+                        Padding="0"
+                        CornerRadius="0"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="0">
+                        <Button Classes="modern-window-button"
+                                Click="MinimizeButton_Click"
+                                ToolTip.Tip="最小化">
+                            <Viewbox Width="16" Height="16">
+                                <Path Data="M 4 8 L 12 8"/>
+                            </Viewbox>
+                        </Button>
+                        <Button Classes="modern-window-button"
+                                Click="MaximizeButton_Click"
+                                ToolTip.Tip="最大化 / 还原">
+                            <Viewbox Width="16" Height="16">
+                                <Path Data="M 6 4 L 12 4 L 12 10 M 4 6 L 10 6 L 10 12 L 4 12 Z"/>
+                            </Viewbox>
+                        </Button>
+                        <Button Classes="modern-window-button modern-close-button"
+                                Click="CloseButton_Click"
+                                ToolTip.Tip="关闭">
+                            <Viewbox Width="16" Height="16">
+                                <Path Data="M 4.5 4.5 L 11.5 11.5 M 11.5 4.5 L 4.5 11.5"/>
+                            </Viewbox>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 主内容 -->
+            <Grid Grid.Row="1" ColumnDefinitions="104,*" Margin="10,10,10,10">
             <!-- 左侧导航栏 -->
             <Border Grid.Column="0"
                     Background="{DynamicResource SidebarBackground}"
-                    CornerRadius="0">
+                    CornerRadius="30,0,0,30"
+                    BorderBrush="{DynamicResource BorderColor}"
+                    BorderThickness="1"
+                    BoxShadow="0 18 60 0 #22E84D9C">
                 <Grid RowDefinitions="Auto,*,Auto">
                     <!-- 头像区域 -->
-                    <StackPanel Grid.Row="0" Margin="0,40,0,20" HorizontalAlignment="Center">
+                    <StackPanel Grid.Row="0" Margin="0,34,0,22" HorizontalAlignment="Center">
                         <!-- 头像 -->
-                        <Border Width="48" Height="48"
-                                CornerRadius="24">
+                        <Border Width="56" Height="56"
+                                CornerRadius="28"
+                                Background="{DynamicResource PrimaryBrushSoft}"
+                                BorderBrush="{DynamicResource BorderColor}"
+                                BorderThickness="1">
                             <Panel>
                                 <!-- 默认图标 -->
                                 <Image x:Name="DefaultAvatarIcon"
-                                       Width="48" Height="48"
+                                       Width="56" Height="56"
                                        Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
                                        Stretch="UniformToFill"
                                        IsVisible="{Binding !HomeVM.HasQQInfo}">
                                     <Image.Clip>
-                                        <EllipseGeometry Center="24,24" RadiusX="24" RadiusY="24"/>
+                                        <EllipseGeometry Center="28,28" RadiusX="28" RadiusY="28"/>
                                     </Image.Clip>
                                 </Image>
                                 <!-- QQ 头像 -->
                                 <Image x:Name="QQAvatarImage"
-                                       Width="48" Height="48"
+                                       Width="56" Height="56"
                                        Stretch="UniformToFill"
                                        Source="{Binding HomeVM.AvatarBitmap}"
                                        IsVisible="{Binding HomeVM.HasQQInfo}">
                                     <Image.Clip>
-                                        <EllipseGeometry Center="24,24" RadiusX="24" RadiusY="24"/>
+                                        <EllipseGeometry Center="28,28" RadiusX="28" RadiusY="28"/>
                                     </Image.Clip>
                                 </Image>
                             </Panel>
                         </Border>
                         <!-- 未登录提示 -->
                         <TextBlock Text="未登录"
-                                   FontSize="11"
+                                   FontSize="12"
                                    Foreground="{DynamicResource TextSecondary}"
                                    HorizontalAlignment="Center"
                                    Margin="0,8,0,0"
                                    IsVisible="{Binding !HomeVM.HasQQInfo}"/>
                         <!-- 昵称和 UIN -->
                         <TextBlock Text="{Binding HomeVM.QQNickname}"
-                                   FontSize="10"
+                                   FontSize="11"
                                    Foreground="{DynamicResource TextPrimary}"
                                    HorizontalAlignment="Center"
                                    TextAlignment="Center"
@@ -72,7 +320,7 @@
                                    Margin="0,8,0,0"
                                    IsVisible="{Binding HomeVM.HasQQInfo}"/>
                         <TextBlock Text="{Binding HomeVM.QQUin}"
-                                   FontSize="9"
+                                   FontSize="10"
                                    Foreground="{DynamicResource TextSecondary}"
                                    HorizontalAlignment="Center"
                                    Margin="0,2,0,0"
@@ -83,13 +331,13 @@
                     <ListBox Grid.Row="1"
                              SelectedIndex="{Binding SelectedIndex}"
                              Background="Transparent"
-                             Padding="8">
+                             Padding="8,4,8,8">
                         <!-- 控制面板 -->
                         <ListBoxItem>
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <PathIcon Data="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"
-                                          Width="24" Height="24"/>
-                                <TextBlock Text="控制面板" FontSize="11" TextAlignment="Center"/>
+                                          Width="22" Height="22"/>
+                                <TextBlock Text="控制面板" FontSize="12" TextAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
 
@@ -97,8 +345,8 @@
                         <ListBoxItem>
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <PathIcon Data="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"
-                                          Width="24" Height="24"/>
-                                <TextBlock Text="日志查看" FontSize="11" TextAlignment="Center"/>
+                                          Width="22" Height="22"/>
+                                <TextBlock Text="日志查看" FontSize="12" TextAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
 
@@ -106,8 +354,8 @@
                         <ListBoxItem>
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <PathIcon Data="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"
-                                          Width="24" Height="24"/>
-                                <TextBlock Text="系统配置" FontSize="11" TextAlignment="Center"/>
+                                          Width="22" Height="22"/>
+                                <TextBlock Text="系统配置" FontSize="12" TextAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
 
@@ -115,8 +363,8 @@
                         <ListBoxItem>
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <PathIcon Data="M20,9V7c0-1.1-0.9-2-2-2h-3c0-1.66-1.34-3-3-3S9,3.34,9,5H6C4.9,5,4,5.9,4,7v2c-1.66,0-3,1.34-3,3c0,1.66,1.34,3,3,3 v4c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2v-4c1.66,0,3-1.34,3-3C23,10.34,21.66,9,20,9z M12,6.5c0.83,0,1.5,0.67,1.5,1.5 s-0.67,1.5-1.5,1.5S10.5,8.83,10.5,8S11.17,6.5,12,6.5z M7.5,17c-0.83,0-1.5-0.67-1.5-1.5S6.67,14,7.5,14s1.5,0.67,1.5,1.5 S8.33,17,7.5,17z M12,13.5c-0.83,0-1.5-0.67-1.5-1.5s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S12.83,13.5,12,13.5z M16.5,17 c-0.83,0-1.5-0.67-1.5-1.5s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S17.33,17,16.5,17z"
-                                          Width="24" Height="24"/>
-                                <TextBlock Text="Bot配置" FontSize="11" TextAlignment="Center"/>
+                                          Width="22" Height="22"/>
+                                <TextBlock Text="Bot配置" FontSize="12" TextAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
 
@@ -124,8 +372,8 @@
                         <ListBoxItem>
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <PathIcon Data="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"
-                                          Width="24" Height="24"/>
-                                <TextBlock Text="对接框架" FontSize="11" TextAlignment="Center"/>
+                                          Width="22" Height="22"/>
+                                <TextBlock Text="对接框架" FontSize="12" TextAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
 
@@ -133,8 +381,8 @@
                         <ListBoxItem>
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
-                                          Width="24" Height="24"/>
-                                <TextBlock Text="关于应用" FontSize="11" TextAlignment="Center"/>
+                                          Width="22" Height="22"/>
+                                <TextBlock Text="关于应用" FontSize="12" TextAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
                     </ListBox>
@@ -146,7 +394,7 @@
                                 Margin="12,0,12,12"/>
                         <Button Command="{Binding ToggleThemeCommand}"
                                 HorizontalAlignment="Center"
-                                Width="32" Height="32"
+                                Width="40" Height="40"
                                 Background="Transparent"
                                 BorderThickness="0"
                                 ToolTip.Tip="切换主题">
@@ -170,8 +418,11 @@
             <!-- 右侧内容区域 -->
             <Border Grid.Column="1"
                     Background="{DynamicResource MainBackground}"
-                    CornerRadius="0,12,12,0"
-                    Margin="2,2,8,8">
+                    CornerRadius="0,30,30,0"
+                    Margin="0,8,10,10"
+                    BorderBrush="{DynamicResource BorderColor}"
+                    BorderThickness="1"
+                    BoxShadow="0 18 70 0 #18E84D9C">
                 <!-- 页面切换容器 -->
                 <Panel x:CompileBindings="False">
                     <views:HomePage DataContext="{Binding HomeVM}"
@@ -188,6 +439,7 @@
                                     IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=5}"/>
                 </Panel>
             </Border>
+            </Grid>
         </Grid>
-    </Panel>
+    </Border>
 </Window>

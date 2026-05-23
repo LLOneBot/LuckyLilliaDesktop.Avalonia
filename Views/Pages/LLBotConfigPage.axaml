@@ -7,6 +7,89 @@
              x:Class="LuckyLilliaDesktop.Views.Pages.LLBotConfigPage"
              x:DataType="vm:LLBotConfigViewModel">
 
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="MainBackground" Color="#FFF0F7"/>
+                    <SolidColorBrush x:Key="SidebarBackground" Color="#FFFBFE"/>
+                    <SolidColorBrush x:Key="CardBackground" Color="#FFFFFF"/>
+                    <SolidColorBrush x:Key="CardBackgroundStrong" Color="#FFFFFFFF"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#FFE7F3"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#EFA7D0"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#FFE7F3"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FF5D72"/>
+                    <SolidColorBrush x:Key="SuccessColor" Color="#22C55E"/>
+                    <SolidColorBrush x:Key="WarningColor" Color="#F59E0B"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#8D6E82"/>
+                    <SolidColorBrush x:Key="TitleBarBackground" Color="#FFF9FD"/>
+                    <SolidColorBrush x:Key="WindowButtonHover" Color="#10E84D9C"/>
+                    <SolidColorBrush x:Key="CloseButtonHover" Color="#FFE6EC"/>
+                    <SolidColorBrush x:Key="WindowButtonStroke" Color="#7A6274"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#FFFFFF"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#FFE7F3"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#8D6E82"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#EFA7D0"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="MainBackground" Color="#100A13"/>
+                    <SolidColorBrush x:Key="SidebarBackground" Color="#160F18"/>
+                    <SolidColorBrush x:Key="CardBackground" Color="#251827"/>
+                    <SolidColorBrush x:Key="CardBackgroundStrong" Color="#302032"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#2A1B2C"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#70425E"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#432338"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FB7185"/>
+                    <SolidColorBrush x:Key="SuccessColor" Color="#34D399"/>
+                    <SolidColorBrush x:Key="WarningColor" Color="#FBBF24"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="TitleBarBackground" Color="#18111A"/>
+                    <SolidColorBrush x:Key="WindowButtonHover" Color="#342131"/>
+                    <SolidColorBrush x:Key="CloseButtonHover" Color="#4A1F2A"/>
+                    <SolidColorBrush x:Key="WindowButtonStroke" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#302032"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#432338"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#70425E"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Button">
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="14,8"/>
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Opacity" Value="0.92"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="ComboBox">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="ListBoxItem:selected">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrushSoft}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+
     <Grid RowDefinitions="Auto,*">
         <!-- 未保存提示横幅 -->
         <Border Grid.Row="0"
@@ -49,27 +132,44 @@
 
             <!-- 配置内容 -->
             <ScrollViewer IsVisible="{Binding HasUin}">
-                <StackPanel Spacing="16" Margin="28">
+                <StackPanel Spacing="16" Margin="28,24,36,28">
                     <!-- 标题 -->
-                    <DockPanel>
-                        <PathIcon DockPanel.Dock="Left"
-                                  Data="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"
-                                  Width="36" Height="36"
-                                  Foreground="{DynamicResource PrimaryBrush}"
-                                  Margin="0,0,12,0"/>
-                        <TextBlock Text="LLBot 配置"
-                                   FontSize="32"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimary}"
-                                   VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <Border Height="2" Background="{DynamicResource PrimaryBrush}" CornerRadius="1"/>
+                    <Border Background="{DynamicResource CardBackgroundStrong}"
+                            BorderBrush="{DynamicResource BorderColor}"
+                            BorderThickness="1"
+                            CornerRadius="24"
+                            Padding="20,18"
+                            BoxShadow="0 18 54 0 #18E84D9C">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Left"
+                                    Width="52" Height="52"
+                                    CornerRadius="16"
+                                    Background="{DynamicResource PrimaryBrushSoft}"
+                                    Margin="0,0,14,0">
+                                <PathIcon Data="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"
+                                          Width="28" Height="28"
+                                          Foreground="{DynamicResource PrimaryBrush}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center" Spacing="3">
+                                <TextBlock Text="LLBot 配置"
+                                           FontSize="30"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="统一管理 WebUI、OneBot、Satori 与事件过滤规则"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
 
                     <!-- WebUI 配置 -->
-                    <Border Background="{DynamicResource CardBackground}"
+                    <Border Background="{DynamicResource CardBackgroundStrong}"
                             BorderBrush="{DynamicResource BorderColor}"
                         BorderThickness="1"
-                        CornerRadius="12" Padding="16">
+                        CornerRadius="20" Padding="16"
+                    BoxShadow="0 24 76 0 #22E84D9C">
                     <StackPanel Spacing="12">
                         <DockPanel>
                             <PathIcon DockPanel.Dock="Left"
@@ -115,10 +215,11 @@
                 </Border>
 
                 <!-- OneBot 11 配置 -->
-                <Border Background="{DynamicResource CardBackground}"
+                <Border Background="{DynamicResource CardBackgroundStrong}"
                         BorderBrush="{DynamicResource BorderColor}"
                         BorderThickness="1"
-                        CornerRadius="12" Padding="16">
+                        CornerRadius="20" Padding="16"
+                    BoxShadow="0 24 76 0 #22E84D9C">
                     <StackPanel Spacing="12">
                         <DockPanel>
                             <PathIcon DockPanel.Dock="Left"
@@ -222,7 +323,7 @@
                                                             <PathIcon Data="M6 10L12 16L18 10" Width="12" Height="12" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
                                                                        IsVisible="{Binding Filter.IsExpanded}"/>
                                                             <TextBlock Text="事件过滤器" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
-                                                            <Border Background="#EC4899" CornerRadius="8" Padding="6,2" VerticalAlignment="Center"
+                                                            <Border Background="#EC4899" CornerRadius="14" Padding="6,2" VerticalAlignment="Center"
                                                                     IsVisible="{Binding Filter.HasFilter}">
                                                                 <TextBlock FontSize="10" Foreground="White">
                                                                     <TextBlock.Text>
@@ -274,7 +375,7 @@
                                                                 <ItemsControl.ItemTemplate>
                                                                     <DataTemplate x:DataType="vm:FilterRuleViewModel">
                                                                         <Border Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
-                                                                                CornerRadius="8" Padding="10" Margin="0,2">
+                                                                                CornerRadius="14" Padding="10" Margin="0,2">
                                                                             <StackPanel Spacing="6">
                                                                                 <DockPanel>
                                                                                     <Button DockPanel.Dock="Right" Content="删除" Padding="6,2"
@@ -350,10 +451,11 @@
                 </Border>
 
                 <!-- Satori 配置 -->
-                <Border Background="{DynamicResource CardBackground}"
+                <Border Background="{DynamicResource CardBackgroundStrong}"
                         BorderBrush="{DynamicResource BorderColor}"
                         BorderThickness="1"
-                        CornerRadius="12" Padding="16">
+                        CornerRadius="20" Padding="16"
+                    BoxShadow="0 24 76 0 #22E84D9C">
                     <StackPanel Spacing="12">
                         <DockPanel>
                             <PathIcon DockPanel.Dock="Left"
@@ -395,10 +497,11 @@
                 </Border>
 
                 <!-- Milky 配置 -->
-                <Border Background="{DynamicResource CardBackground}"
+                <Border Background="{DynamicResource CardBackgroundStrong}"
                         BorderBrush="{DynamicResource BorderColor}"
                         BorderThickness="1"
-                        CornerRadius="12" Padding="16">
+                        CornerRadius="20" Padding="16"
+                    BoxShadow="0 24 76 0 #22E84D9C">
                     <StackPanel Spacing="12">
                         <DockPanel>
                             <PathIcon DockPanel.Dock="Left"
@@ -470,10 +573,11 @@
                 </Border>
 
                 <!-- 其他配置 -->
-                <Border Background="{DynamicResource CardBackground}"
+                <Border Background="{DynamicResource CardBackgroundStrong}"
                         BorderBrush="{DynamicResource BorderColor}"
                         BorderThickness="1"
-                        CornerRadius="12" Padding="16">
+                        CornerRadius="20" Padding="16"
+                    BoxShadow="0 24 76 0 #22E84D9C">
                     <StackPanel Spacing="12">
                         <DockPanel>
                             <PathIcon DockPanel.Dock="Left"
