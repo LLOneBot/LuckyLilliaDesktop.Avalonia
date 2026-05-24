@@ -12,6 +12,7 @@
         Width="960" Height="640"
         MinWidth="880" MinHeight="560"
         SystemDecorations="None"
+        CanResize="True"
         WindowStartupLocation="CenterScreen"
         UseLayoutRounding="True"
         Background="{DynamicResource MainBackground}">
@@ -238,6 +239,8 @@
                     <StackPanel Orientation="Horizontal" Spacing="0">
                         <Button Classes="modern-window-button"
                                 Click="MinimizeButton_Click"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
                                 ToolTip.Tip="最小化">
                             <Viewbox Width="16" Height="16">
                                 <Path Data="M 4 8 L 12 8"/>
@@ -245,13 +248,25 @@
                         </Button>
                         <Button Classes="modern-window-button"
                                 Click="MaximizeButton_Click"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
                                 ToolTip.Tip="最大化 / 还原">
                             <Viewbox Width="16" Height="16">
-                                <Path Data="M 6 4 L 12 4 L 12 10 M 4 6 L 10 6 L 10 12 L 4 12 Z"/>
+                                <Panel>
+                                    <!-- 普通状态：显示“最大化”图标 -->
+                                    <Path x:Name="MaximizeIconPath"
+                                          Data="M 4 4 L 12 4 L 12 12 L 4 12 Z"/>
+                                    <!-- 最大化状态：显示“还原/缩小”图标 -->
+                                    <Path x:Name="RestoreIconPath"
+                                          IsVisible="False"
+                                          Data="M 6 4 L 12 4 L 12 10 L 10 10 M 4 6 L 10 6 L 10 12 L 4 12 Z"/>
+                                </Panel>
                             </Viewbox>
                         </Button>
                         <Button Classes="modern-window-button modern-close-button"
                                 Click="CloseButton_Click"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
                                 ToolTip.Tip="关闭">
                             <Viewbox Width="16" Height="16">
                                 <Path Data="M 4.5 4.5 L 11.5 11.5 M 11.5 4.5 L 4.5 11.5"/>

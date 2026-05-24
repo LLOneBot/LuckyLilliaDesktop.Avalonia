@@ -26,8 +26,9 @@ public partial class MainWindow : Window
         PositionChanged += OnPositionChanged;
         SizeChanged += OnSizeChanged;
         
-        // 监听窗口可见性变化以优化性能
+        // 监听窗口可见性和窗口状态变化以优化性能/更新最大化按钮图标
         PropertyChanged += OnWindowPropertyChanged;
+        UpdateMaximizeRestoreIcon();
     }
 
     private void TitleBar_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -63,6 +64,14 @@ public partial class MainWindow : Window
         WindowState = WindowState == WindowState.Maximized
             ? WindowState.Normal
             : WindowState.Maximized;
+        UpdateMaximizeRestoreIcon();
+    }
+
+    private void UpdateMaximizeRestoreIcon()
+    {
+        var isMaximized = WindowState == WindowState.Maximized;
+        MaximizeIconPath.IsVisible = !isMaximized;
+        RestoreIconPath.IsVisible = isMaximized;
     }
     
     private void OnWindowPropertyChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
@@ -70,6 +79,10 @@ public partial class MainWindow : Window
         if (e.Property.Name == nameof(IsVisible))
         {
             HandleVisibilityChanged((bool?)e.NewValue ?? false);
+        }
+        else if (e.Property.Name == nameof(WindowState))
+        {
+            UpdateMaximizeRestoreIcon();
         }
     }
     
@@ -133,9 +146,8 @@ public partial class MainWindow : Window
             }
             else
             {
-                // 恢复窗口大小（不受 DPI 影响）
-                Width = config.WindowWidth > 0 ? config.WindowWidth : 900;
-                Height = config.WindowHeight > 0 ? config.WindowHeight : 600;
+                // 恢复窗口大小（只恢复普通窗口尺寸，并限制在当前屏幕工作区内，避免上次最大化后像全屏一样打开）
+                RestoreNormalWindowSize(config.WindowWidth, config.WindowHeight);
                 
                 // 只有位置有效时才恢复（避免负值过大的情况）
                 if (config.WindowLeft.HasValue && config.WindowTop.HasValue
@@ -152,6 +164,27 @@ public partial class MainWindow : Window
         {
             _logger?.LogError(ex, "加载窗口位置失败");
         }
+    }
+
+    private void RestoreNormalWindowSize(int savedWidth, int savedHeight)
+    {
+        var targetWidth = savedWidth > 0 ? savedWidth : 960;
+        var targetHeight = savedHeight > 0 ? savedHeight : 640;
+
+        var screen = Screens.ScreenFromWindow(this);
+        if (screen != null)
+        {
+            var workingArea = screen.WorkingArea;
+            var screenWidth = workingArea.Width / screen.Scaling;
+            var screenHeight = workingArea.Height / screen.Scaling;
+
+            targetWidth = (int)Math.Min(targetWidth, Math.Max(MinWidth, screenWidth * 0.9));
+            targetHeight = (int)Math.Min(targetHeight, Math.Max(MinHeight, screenHeight * 0.9));
+        }
+
+        Width = Math.Max(MinWidth, targetWidth);
+        Height = Math.Max(MinHeight, targetHeight);
+        WindowState = WindowState.Normal;
     }
 
     private void CalculateInitialWindowBounds()
@@ -200,10 +233,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 窗口最小化时不保存位置
-        if (WindowState == WindowState.Minimized)
+        // 只保存普通窗口位置和大小，避免最大化/最小化尺寸被保存后下次启动像全屏一样打开
+        if (WindowState != WindowState.Normal)
         {
-            _logger?.LogDebug("窗口最小化，跳过保存位置");
+            _logger?.LogDebug("窗口不是普通状态，跳过保存位置: {WindowState}", WindowState);
             return;
         }
 
@@ -258,7 +291,7 @@ public partial class MainWindow : Window
 
         _savePositionCts?.Cancel();
 
-        if (WindowState == WindowState.Minimized) return;
+        if (WindowState != WindowState.Normal) return;
         if (Position.X < -1000 || Position.Y < -1000) return;
 
         try

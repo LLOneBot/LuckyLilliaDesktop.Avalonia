@@ -74,7 +74,7 @@
         </Style>
 
         <Style Selector="Button.framework-card">
-            <Setter Property="Width" Value="350"/>
+            <Setter Property="MinWidth" Value="260"/>
             <Setter Property="Height" Value="82"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="0"/>
@@ -136,213 +136,216 @@
                 BorderBrush="{DynamicResource BorderColor}"
                 BorderThickness="1"
                 CornerRadius="26"
-                Padding="42,34"
+                Padding="32,28"
                 Margin="30"
-                VerticalAlignment="Center"
-                HorizontalAlignment="Center"
+                VerticalAlignment="Stretch"
+                HorizontalAlignment="Stretch"
                 IsVisible="{Binding HasUin}"
                 BoxShadow="0 18 48 0 #18E84D9C">
-            <Panel>
-                <StackPanel Spacing="28" IsVisible="{Binding !IsInstalling}">
-                    <StackPanel Spacing="10" HorizontalAlignment="Center">
-                        <TextBlock Text="选择 Bot 框架"
-                                   FontSize="24"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimary}"
-                                   HorizontalAlignment="Center"/>
-                        <TextBlock Text="选择一个框架后将启动或自动下载并配置"
-                                   FontSize="13"
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   HorizontalAlignment="Center"/>
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <Panel>
+                    <StackPanel Spacing="28" IsVisible="{Binding !IsInstalling}">
+                        <StackPanel Spacing="10" HorizontalAlignment="Center">
+                            <TextBlock Text="选择 Bot 框架"
+                                       FontSize="24"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="选择一个框架后将启动或自动下载并配置"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- 固定双列布局：不使用 UniformGrid，避免最后一项错位 -->
+                        <Grid ColumnDefinitions="350,64,350"
+                              RowDefinitions="82,18,82,18,82,18,82"
+                              HorizontalAlignment="Center">
+
+                            <!-- OpenClaw -->
+                            <Button Grid.Row="0" Grid.Column="0"
+                                    Classes="framework-card"
+                                    Command="{Binding SelectFrameworkCommand}"
+                                    CommandParameter="openclaw">
+                                <Grid Width="350" Height="82" ColumnDefinitions="92,*">
+                                    <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Image Source="/Assets/Icons/openclaw.jpg" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="OpenClaw" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                                            <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding OpenClawInstalled}">
+                                                <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="支持多种大模型的自动化 AI 助手" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+
+                            <!-- Koishi -->
+                            <Button Grid.Row="0" Grid.Column="2"
+                                    Classes="framework-card"
+                                    Command="{Binding SelectFrameworkCommand}"
+                                    CommandParameter="koishi">
+                                <Grid Width="350" Height="82" ColumnDefinitions="92,*">
+                                    <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Image Source="/Assets/Icons/koishi.png" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="Koishi" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                                            <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding KoishiInstalled}">
+                                                <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="跨平台、可扩展的聊天机器人框架" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+
+                            <!-- AstrBot -->
+                            <Button Grid.Row="2" Grid.Column="0"
+                                    Classes="framework-card"
+                                    Command="{Binding SelectFrameworkCommand}"
+                                    CommandParameter="astrbot">
+                                <Grid Width="350" Height="82" ColumnDefinitions="92,*">
+                                    <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Image Source="/Assets/Icons/astrbot.png" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="AstrBot" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                                            <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding AstrBotInstalled}">
+                                                <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="基于大语言模型的聊天机器人" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+
+                            <!-- 真寻Bot -->
+                            <Button Grid.Row="2" Grid.Column="2"
+                                    Classes="framework-card"
+                                    Command="{Binding SelectFrameworkCommand}"
+                                    CommandParameter="zhenxun">
+                                <Grid Width="350" Height="82" ColumnDefinitions="92,*">
+                                    <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Image Source="/Assets/Icons/zhenxun.png" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="真寻Bot" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                                            <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding ZhenxunInstalled}">
+                                                <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="基于 Nonebot2 的真寻机器人" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+
+                            <!-- DDBot -->
+                            <Button Grid.Row="4" Grid.Column="0"
+                                    Classes="framework-card"
+                                    Command="{Binding SelectFrameworkCommand}"
+                                    CommandParameter="ddbot">
+                                <Grid Width="350" Height="82" ColumnDefinitions="92,*">
+                                    <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Image Source="/Assets/Icons/ddbot.png" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="DDBot" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                                            <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding DDBotInstalled}">
+                                                <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="各种直播/状态推送框架" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+
+                            <!-- 云崽 -->
+                            <Button Grid.Row="4" Grid.Column="2"
+                                    Classes="framework-card"
+                                    Command="{Binding SelectFrameworkCommand}"
+                                    CommandParameter="yunzai">
+                                <Grid Width="350" Height="82" ColumnDefinitions="92,*">
+                                    <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Image Source="/Assets/Icons/yunzai.png" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="云崽" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                                            <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding YunzaiInstalled}">
+                                                <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="原神机器人" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+
+                            <!-- ZeroBot-Plugin：固定左列最后一行，不会再掉到底部 -->
+                            <Button Grid.Row="6" Grid.Column="0"
+                                    Classes="framework-card"
+                                    Command="{Binding SelectFrameworkCommand}"
+                                    CommandParameter="zbp"
+                                    IsVisible="{Binding ShowZeroBotPlugin}">
+                                <Grid Width="350" Height="82" ColumnDefinitions="92,*">
+                                    <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Image Source="/Assets/Icons/zbp.png" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="ZeroBot-Plugin" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                            <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding ZeroBotPluginInstalled}">
+                                                <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="基于 ZeroBot 的多功能群管/娱乐插件集" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </Grid>
                     </StackPanel>
 
-                    <!-- 固定双列布局：不使用 UniformGrid，避免最后一项错位 -->
-                    <Grid ColumnDefinitions="350,64,350"
-                          RowDefinitions="82,18,82,18,82,18,82"
-                          HorizontalAlignment="Center">
+                    <!-- 安装进度 -->
+                    <StackPanel Spacing="16" IsVisible="{Binding IsInstalling}">
+                        <TextBlock Text="安装进度" FontSize="20" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center"/>
 
-                        <!-- OpenClaw -->
-                        <Button Grid.Row="0" Grid.Column="0"
-                                Classes="framework-card"
-                                Command="{Binding SelectFrameworkCommand}"
-                                CommandParameter="openclaw">
-                            <Grid Width="350" Height="82" ColumnDefinitions="92,*">
-                                <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/openclaw.jpg" Stretch="UniformToFill"/>
-                                </Border>
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="OpenClaw" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
-                                        <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding OpenClawInstalled}">
-                                            <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
-                                        </Border>
-                                    </StackPanel>
-                                    <TextBlock Text="支持多种大模型的自动化 AI 助手" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding CurrentStep, StringFormat='步骤 {0}'}" FontSize="14"
+                                       Foreground="{DynamicResource PrimaryBrush}"/>
+                            <TextBlock Text="/" FontSize="14" Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding TotalSteps}" FontSize="14" Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="-" FontSize="14" Foreground="{DynamicResource TextSecondary}" Margin="8,0"/>
+                            <TextBlock Text="{Binding CurrentStepName}" FontSize="14" FontWeight="Medium"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
 
-                        <!-- Koishi -->
-                        <Button Grid.Row="0" Grid.Column="2"
-                                Classes="framework-card"
-                                Command="{Binding SelectFrameworkCommand}"
-                                CommandParameter="koishi">
-                            <Grid Width="350" Height="82" ColumnDefinitions="92,*">
-                                <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/koishi.png" Stretch="UniformToFill"/>
-                                </Border>
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Koishi" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
-                                        <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding KoishiInstalled}">
-                                            <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
-                                        </Border>
-                                    </StackPanel>
-                                    <TextBlock Text="跨平台、可扩展的聊天机器人框架" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
+                        <ProgressBar Value="{Binding ProgressPercentage}" Minimum="0" Maximum="100" Height="8" CornerRadius="4"/>
+                        <TextBlock Text="{Binding StatusText}" FontSize="13"
+                                   Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center"/>
 
-                        <!-- AstrBot -->
-                        <Button Grid.Row="2" Grid.Column="0"
-                                Classes="framework-card"
-                                Command="{Binding SelectFrameworkCommand}"
-                                CommandParameter="astrbot">
-                            <Grid Width="350" Height="82" ColumnDefinitions="92,*">
-                                <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/astrbot.png" Stretch="UniformToFill"/>
-                                </Border>
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="AstrBot" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
-                                        <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding AstrBotInstalled}">
-                                            <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
-                                        </Border>
-                                    </StackPanel>
-                                    <TextBlock Text="基于大语言模型的聊天机器人" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
+                        <Border Background="#FEE2E2" CornerRadius="14" Padding="12" IsVisible="{Binding HasError}">
+                            <TextBlock Text="{Binding ErrorMessage}" Foreground="#DC2626" TextWrapping="Wrap"/>
+                        </Border>
 
-                        <!-- 真寻Bot -->
-                        <Button Grid.Row="2" Grid.Column="2"
-                                Classes="framework-card"
-                                Command="{Binding SelectFrameworkCommand}"
-                                CommandParameter="zhenxun">
-                            <Grid Width="350" Height="82" ColumnDefinitions="92,*">
-                                <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/zhenxun.png" Stretch="UniformToFill"/>
-                                </Border>
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="真寻Bot" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
-                                        <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding ZhenxunInstalled}">
-                                            <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
-                                        </Border>
-                                    </StackPanel>
-                                    <TextBlock Text="基于 Nonebot2 的真寻机器人" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
+                        <Border Background="#DCFCE7" CornerRadius="14" Padding="12" IsVisible="{Binding IsCompleted}">
+                            <TextBlock Text="安装完成！" Foreground="#16A34A" FontWeight="Medium" HorizontalAlignment="Center"/>
+                        </Border>
 
-                        <!-- DDBot -->
-                        <Button Grid.Row="4" Grid.Column="0"
-                                Classes="framework-card"
-                                Command="{Binding SelectFrameworkCommand}"
-                                CommandParameter="ddbot">
-                            <Grid Width="350" Height="82" ColumnDefinitions="92,*">
-                                <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/ddbot.png" Stretch="UniformToFill"/>
-                                </Border>
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="DDBot" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
-                                        <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding DDBotInstalled}">
-                                            <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
-                                        </Border>
-                                    </StackPanel>
-                                    <TextBlock Text="各种直播/状态推送框架" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
-
-                        <!-- 云崽 -->
-                        <Button Grid.Row="4" Grid.Column="2"
-                                Classes="framework-card"
-                                Command="{Binding SelectFrameworkCommand}"
-                                CommandParameter="yunzai">
-                            <Grid Width="350" Height="82" ColumnDefinitions="92,*">
-                                <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/yunzai.png" Stretch="UniformToFill"/>
-                                </Border>
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="云崽" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
-                                        <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding YunzaiInstalled}">
-                                            <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
-                                        </Border>
-                                    </StackPanel>
-                                    <TextBlock Text="原神机器人" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
-
-                        <!-- ZeroBot-Plugin：固定左列最后一行，不会再掉到底部 -->
-                        <Button Grid.Row="6" Grid.Column="0"
-                                Classes="framework-card"
-                                Command="{Binding SelectFrameworkCommand}"
-                                CommandParameter="zbp"
-                                IsVisible="{Binding ShowZeroBotPlugin}">
-                            <Grid Width="350" Height="82" ColumnDefinitions="92,*">
-                                <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/zbp.png" Stretch="UniformToFill"/>
-                                </Border>
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="ZeroBot-Plugin" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                        <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding ZeroBotPluginInstalled}">
-                                            <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
-                                        </Border>
-                                    </StackPanel>
-                                    <TextBlock Text="基于 ZeroBot 的多功能群管/娱乐插件集" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
-                    </Grid>
-                </StackPanel>
-
-                <!-- 安装进度 -->
-                <StackPanel Spacing="16" IsVisible="{Binding IsInstalling}">
-                    <TextBlock Text="安装进度" FontSize="20" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center"/>
-
-                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                        <TextBlock Text="{Binding CurrentStep, StringFormat='步骤 {0}'}" FontSize="14"
-                                   Foreground="{DynamicResource PrimaryBrush}"/>
-                        <TextBlock Text="/" FontSize="14" Foreground="{DynamicResource TextSecondary}"/>
-                        <TextBlock Text="{Binding TotalSteps}" FontSize="14" Foreground="{DynamicResource TextSecondary}"/>
-                        <TextBlock Text="-" FontSize="14" Foreground="{DynamicResource TextSecondary}" Margin="8,0"/>
-                        <TextBlock Text="{Binding CurrentStepName}" FontSize="14" FontWeight="Medium"
-                                   Foreground="{DynamicResource TextPrimary}"/>
+                        <Button Content="取消安装" Command="{Binding CancelInstallCommand}"
+                                HorizontalAlignment="Center" IsVisible="{Binding !IsCompleted}"
+                                Foreground="{DynamicResource DangerColor}"/>
                     </StackPanel>
-
-                    <ProgressBar Value="{Binding ProgressPercentage}" Minimum="0" Maximum="100" Height="8" CornerRadius="4"/>
-                    <TextBlock Text="{Binding StatusText}" FontSize="13"
-                               Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center"/>
-
-                    <Border Background="#FEE2E2" CornerRadius="14" Padding="12" IsVisible="{Binding HasError}">
-                        <TextBlock Text="{Binding ErrorMessage}" Foreground="#DC2626" TextWrapping="Wrap"/>
-                    </Border>
-
-                    <Border Background="#DCFCE7" CornerRadius="14" Padding="12" IsVisible="{Binding IsCompleted}">
-                        <TextBlock Text="安装完成！" Foreground="#16A34A" FontWeight="Medium" HorizontalAlignment="Center"/>
-                    </Border>
-
-                    <Button Content="取消安装" Command="{Binding CancelInstallCommand}"
-                            HorizontalAlignment="Center" IsVisible="{Binding !IsCompleted}"
-                            Foreground="{DynamicResource DangerColor}"/>
-                </StackPanel>
-            </Panel>
+                </Panel>
+            </ScrollViewer>
         </Border>
     </Grid>
 </UserControl>
