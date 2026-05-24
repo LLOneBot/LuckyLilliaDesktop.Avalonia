@@ -32,6 +32,9 @@ public class AppConfig
     [JsonPropertyName("headless")]
     public bool Headless { get; set; } = false;
 
+    [JsonPropertyName("debug")]
+    public bool Debug { get; set; } = false;
+
     [JsonPropertyName("minimize_to_tray_on_start")]
     public bool MinimizeToTrayOnStart { get; set; } = false;
 
