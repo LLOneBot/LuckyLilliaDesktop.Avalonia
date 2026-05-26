@@ -7,6 +7,89 @@
              x:Class="LuckyLilliaDesktop.Views.Pages.ConfigPage"
              x:DataType="vm:ConfigViewModel">
 
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="MainBackground" Color="#FFF4FA"/>
+                    <SolidColorBrush x:Key="SidebarBackground" Color="#FFFFFBFE"/>
+                    <SolidColorBrush x:Key="CardBackground" Color="#FDF7FE"/>
+                    <SolidColorBrush x:Key="CardBackgroundStrong" Color="#FFFFFFFF"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#F3C4DE"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FF5D72"/>
+                    <SolidColorBrush x:Key="SuccessColor" Color="#22C55E"/>
+                    <SolidColorBrush x:Key="WarningColor" Color="#F59E0B"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#8D6E82"/>
+                    <SolidColorBrush x:Key="TitleBarBackground" Color="#FFF9FD"/>
+                    <SolidColorBrush x:Key="WindowButtonHover" Color="#10E84D9C"/>
+                    <SolidColorBrush x:Key="CloseButtonHover" Color="#FFE6EC"/>
+                    <SolidColorBrush x:Key="WindowButtonStroke" Color="#7A6274"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#FDF7FE"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#8D6E82"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#F3C4DE"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="MainBackground" Color="#141018"/>
+                    <SolidColorBrush x:Key="SidebarBackground" Color="#1A131C"/>
+                    <SolidColorBrush x:Key="CardBackground" Color="#201722"/>
+                    <SolidColorBrush x:Key="CardBackgroundStrong" Color="#281C2B"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#241926"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#553648"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#3A2131"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FB7185"/>
+                    <SolidColorBrush x:Key="SuccessColor" Color="#34D399"/>
+                    <SolidColorBrush x:Key="WarningColor" Color="#FBBF24"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="TitleBarBackground" Color="#18111A"/>
+                    <SolidColorBrush x:Key="WindowButtonHover" Color="#342131"/>
+                    <SolidColorBrush x:Key="CloseButtonHover" Color="#4A1F2A"/>
+                    <SolidColorBrush x:Key="WindowButtonStroke" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#281C2B"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#3A2131"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#553648"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Button">
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="14,8"/>
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Opacity" Value="0.92"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="ComboBox">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="ListBoxItem:selected">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrushSoft}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+
     <Grid RowDefinitions="Auto,*">
         <!-- 未保存提示横幅 -->
         <Border Grid.Row="0"
@@ -28,7 +111,7 @@
         </Border>
 
         <ScrollViewer Grid.Row="1">
-            <StackPanel Spacing="20" Margin="28">
+            <StackPanel Spacing="20" Margin="30">
                 <!-- 标题 -->
                 <DockPanel>
                     <PathIcon DockPanel.Dock="Left"
@@ -37,7 +120,7 @@
                               Foreground="{DynamicResource PrimaryBrush}"
                               Margin="0,0,12,0"/>
                     <TextBlock Text="系统配置"
-                               FontSize="32"
+                               FontSize="34"
                                FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimary}"
                                VerticalAlignment="Center"/>
@@ -61,8 +144,9 @@
                 <Border Background="{DynamicResource CardBackground}"
                         BorderBrush="{DynamicResource BorderColor}"
                         BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="24">
+                        CornerRadius="20"
+                        Padding="24"
+                    BoxShadow="0 18 48 0 #18E84D9C">
                     <StackPanel Spacing="16">
                         <!-- 自动登录 QQ 号 -->
                         <StackPanel Spacing="8">
@@ -133,8 +217,9 @@
                 <Border Background="{DynamicResource CardBackground}"
                         BorderBrush="{DynamicResource BorderColor}"
                         BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="24">
+                        CornerRadius="20"
+                        Padding="24"
+                    BoxShadow="0 18 48 0 #18E84D9C">
                     <StackPanel Spacing="16">
                         <CheckBox Content="启用掉线邮件通知"
                                   IsChecked="{Binding EmailEnabled}"
@@ -258,8 +343,9 @@
                 <Border Background="{DynamicResource CardBackground}"
                         BorderBrush="{DynamicResource BorderColor}"
                         BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="24">
+                        CornerRadius="20"
+                        Padding="24"
+                    BoxShadow="0 18 48 0 #18E84D9C">
                     <StackPanel Spacing="16">
                         <CheckBox Content="保存日志到文件"
                                   IsChecked="{Binding LogSaveEnabled}"
@@ -297,8 +383,9 @@
                 <Border Background="{DynamicResource CardBackground}"
                         BorderBrush="{DynamicResource BorderColor}"
                         BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="24">
+                        CornerRadius="20"
+                        Padding="24"
+                    BoxShadow="0 18 48 0 #18E84D9C">
                     <StackPanel Spacing="16">
                         <!-- 工作目录（只读） -->
                         <StackPanel Spacing="8">

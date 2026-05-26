@@ -152,7 +152,7 @@ public class ProcessManager : IProcessManager, IDisposable
             var workingDir = Path.GetDirectoryName(pmhqPath) ?? Environment.CurrentDirectory;
 
             // 动态获取可用端口
-            PmhqPort = PortHelper.GetAvailablePort(13000);
+            PmhqPort = PortHelper.GetAvailablePort();
             _logger.LogInformation("PMHQ 使用端口: {Port}", PmhqPort);
 
             // 如果指定了 QQ 路径，更新 PMHQ 配置文件
