@@ -50,6 +50,7 @@ public class ConfigViewModel : ViewModelBase
             AutoLoginQQ != _savedConfig.AutoLoginQQ ||
             AutoStartBot != _savedConfig.AutoStartBot ||
             Headless != _savedConfig.Headless ||
+            Debug != _savedConfig.Debug ||
             MinimizeToTrayOnStart != _savedConfig.MinimizeToTrayOnStart ||
             StartupEnabled != _savedStartupEnabled ||
             StartupCommandEnabled != _savedConfig.StartupCommandEnabled ||
@@ -91,6 +92,7 @@ public class ConfigViewModel : ViewModelBase
     private string _autoLoginQQ = string.Empty;
     private bool _autoStartBot;
     private bool _headless;
+    private bool _debug;
     private bool _minimizeToTrayOnStart;
     private bool _startupEnabled;
     private bool _startupCommandEnabled;
@@ -112,6 +114,12 @@ public class ConfigViewModel : ViewModelBase
     {
         get => _headless;
         set { this.RaiseAndSetIfChanged(ref _headless, value); CheckUnsavedChanges(); }
+    }
+
+    public bool Debug
+    {
+        get => _debug;
+        set { this.RaiseAndSetIfChanged(ref _debug, value); CheckUnsavedChanges(); }
     }
 
     public bool MinimizeToTrayOnStart
@@ -530,6 +538,7 @@ public class ConfigViewModel : ViewModelBase
             AutoLoginQQ = config.AutoLoginQQ;
             AutoStartBot = config.AutoStartBot;
             Headless = config.Headless;
+            Debug = config.Debug;
             MinimizeToTrayOnStart = config.MinimizeToTrayOnStart;
             // 在后台线程执行注册表操作
             _startupEnabled = await Task.Run(() => Utils.StartupManager.IsStartupEnabled());
@@ -559,6 +568,7 @@ public class ConfigViewModel : ViewModelBase
                 AutoLoginQQ = AutoLoginQQ,
                 AutoStartBot = AutoStartBot,
                 Headless = Headless,
+                Debug = Debug,
                 MinimizeToTrayOnStart = MinimizeToTrayOnStart,
                 StartupCommandEnabled = StartupCommandEnabled,
                 StartupCommand = StartupCommand,
@@ -607,6 +617,7 @@ public class ConfigViewModel : ViewModelBase
                 AutoLoginQQ = AutoLoginQQ,
                 AutoStartBot = AutoStartBot,
                 Headless = Headless,
+                Debug = Debug,
                 MinimizeToTrayOnStart = MinimizeToTrayOnStart,
                 StartupCommandEnabled = StartupCommandEnabled,
                 StartupCommand = StartupCommand,

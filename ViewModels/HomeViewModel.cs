@@ -1188,7 +1188,8 @@ public class HomeViewModel : ViewModelBase
                 config.PmhqPath,
                 config.QQPath,
                 config.AutoLoginQQ,
-                config.Headless);
+                config.Headless,
+                config.Debug);
 
             if (pmhqSuccess)
             {

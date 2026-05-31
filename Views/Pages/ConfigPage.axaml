@@ -164,6 +164,9 @@
                         <CheckBox Content="无头模式（不显示 QQ 窗口，可能有掉线风险）"
                                   IsChecked="{Binding Headless}"
                                   Foreground="{DynamicResource TextPrimary}"/>
+                        <CheckBox Content="调试模式（显示 QQ 控制台和详细日志）"
+                                  IsChecked="{Binding Debug}"
+                                  Foreground="{DynamicResource TextPrimary}"/>
                         <CheckBox Content="启动后自动缩进托盘"
                                   IsChecked="{Binding MinimizeToTrayOnStart}"
                                   Foreground="{DynamicResource TextPrimary}"/>
