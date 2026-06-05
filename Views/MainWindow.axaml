@@ -142,11 +142,15 @@
         <Style Selector="Button.modern-window-button">
             <Setter Property="Width" Value="46"/>
             <Setter Property="Height" Value="32"/>
+            <Setter Property="MinWidth" Value="46"/>
+            <Setter Property="MinHeight" Value="32"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="0"/>
             <Setter Property="CornerRadius" Value="0"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Opacity" Value="0.92"/>
         </Style>
         <Style Selector="Button.modern-window-button:pointerover">
@@ -242,35 +246,39 @@
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 ToolTip.Tip="最小化">
-                            <Viewbox Width="16" Height="16">
+                            <Grid Width="16" Height="16"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center">
                                 <Path Data="M 4 8 L 12 8"/>
-                            </Viewbox>
+                            </Grid>
                         </Button>
                         <Button Classes="modern-window-button"
                                 Click="MaximizeButton_Click"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 ToolTip.Tip="最大化 / 还原">
-                            <Viewbox Width="16" Height="16">
-                                <Panel>
-                                    <!-- 普通状态：显示“最大化”图标 -->
-                                    <Path x:Name="MaximizeIconPath"
-                                          Data="M 4 4 L 12 4 L 12 12 L 4 12 Z"/>
-                                    <!-- 最大化状态：显示“还原/缩小”图标 -->
-                                    <Path x:Name="RestoreIconPath"
-                                          IsVisible="False"
-                                          Data="M 6 4 L 12 4 L 12 10 L 10 10 M 4 6 L 10 6 L 10 12 L 4 12 Z"/>
-                                </Panel>
-                            </Viewbox>
+                            <Grid Width="16" Height="16"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center">
+                                <!-- 普通状态：显示“最大化”图标 -->
+                                <Path x:Name="MaximizeIconPath"
+                                      Data="M 4 4 L 12 4 L 12 12 L 4 12 Z"/>
+                                <!-- 最大化状态：显示“还原/缩小”图标 -->
+                                <Path x:Name="RestoreIconPath"
+                                      IsVisible="False"
+                                      Data="M 6 4 L 12 4 L 12 10 L 10 10 M 4 6 L 10 6 L 10 12 L 4 12 Z"/>
+                            </Grid>
                         </Button>
                         <Button Classes="modern-window-button modern-close-button"
                                 Click="CloseButton_Click"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 ToolTip.Tip="关闭">
-                            <Viewbox Width="16" Height="16">
+                            <Grid Width="16" Height="16"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center">
                                 <Path Data="M 4.5 4.5 L 11.5 11.5 M 11.5 4.5 L 4.5 11.5"/>
-                            </Viewbox>
+                            </Grid>
                         </Button>
                     </StackPanel>
                 </Border>
