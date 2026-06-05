@@ -565,6 +565,11 @@ public class HomeViewModel : ViewModelBase
                             else
                                 openClaw.StartGateway();
                             break;
+                        case "redreply":
+                            var redReply = _serviceProvider.GetRequiredService<IRedReplyInstallService>();
+                            var redReplyWsUrl = redReply.EnsureOneBotWebSocketUrl(_selfInfoService.CurrentUin);
+                            redReply.StartRedReply(openWebUiIfRunning: false, openWebUiOnStart: false, oneBotWsUrl: redReplyWsUrl);
+                            break;
                     }
                     _logger.LogInformation("已自动启动框架: {Framework}", framework);
                 }
