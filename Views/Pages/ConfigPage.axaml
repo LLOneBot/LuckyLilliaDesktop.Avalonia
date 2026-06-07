@@ -19,6 +19,7 @@
                     <SolidColorBrush x:Key="BorderColor" Color="#F3C4DE"/>
                     <SolidColorBrush x:Key="PrimaryBrush" Color="#E84D9C"/>
                     <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="PrimarySelectionBrush" Color="#E84D9C" Opacity="0.72"/>
                     <SolidColorBrush x:Key="DangerColor" Color="#FF5D72"/>
                     <SolidColorBrush x:Key="SuccessColor" Color="#22C55E"/>
                     <SolidColorBrush x:Key="WarningColor" Color="#F59E0B"/>
@@ -33,6 +34,14 @@
                     <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#3B2434"/>
                     <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#8D6E82"/>
                     <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#F3C4DE"/>
+                    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#D83E8D"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#D83E8D"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#C93482"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#C93482"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="MainBackground" Color="#141018"/>
@@ -43,6 +52,7 @@
                     <SolidColorBrush x:Key="BorderColor" Color="#553648"/>
                     <SolidColorBrush x:Key="PrimaryBrush" Color="#F472B6"/>
                     <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#3A2131"/>
+                    <SolidColorBrush x:Key="PrimarySelectionBrush" Color="#F472B6" Opacity="0.72"/>
                     <SolidColorBrush x:Key="DangerColor" Color="#FB7185"/>
                     <SolidColorBrush x:Key="SuccessColor" Color="#34D399"/>
                     <SolidColorBrush x:Key="WarningColor" Color="#FBBF24"/>
@@ -57,6 +67,14 @@
                     <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#FFF1F8"/>
                     <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#D8B8CA"/>
                     <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#553648"/>
+                    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#EC5FAA"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#EC5FAA"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#DB4C99"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#DB4C99"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
@@ -76,12 +94,87 @@
             <Setter Property="Padding" Value="12,9"/>
             <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource PrimarySelectionBrush}"/>
+            <Setter Property="SelectionForegroundBrush" Value="White"/>
+        </Style>
+        <Style Selector="TextBox:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="TextBox:focus">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="NumericUpDown">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="NumericUpDown:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="NumericUpDown:focus">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="NumericUpDown /template/ Border#PART_BorderElement">
+            <Setter Property="CornerRadius" Value="14"/>
+        </Style>
+        <Style Selector="NumericUpDown /template/ Border#BorderElement">
+            <Setter Property="CornerRadius" Value="14"/>
+        </Style>
+        <Style Selector="NumericUpDown /template/ TextBox">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource PrimarySelectionBrush}"/>
+            <Setter Property="SelectionForegroundBrush" Value="White"/>
+        </Style>
+        <Style Selector="CheckBox:checked /template/ Border#NormalRectangle">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="CheckBox:checked:pointerover /template/ Border#NormalRectangle">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
         </Style>
         <Style Selector="ComboBox">
             <Setter Property="CornerRadius" Value="14"/>
             <Setter Property="Padding" Value="10,8"/>
             <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="ComboBox:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="ComboBox:focus">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="ComboBox /template/ Border#Background">
+            <Setter Property="CornerRadius" Value="14"/>
+        </Style>
+        <Style Selector="ComboBox /template/ Border#PART_PopupBorder">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="ComboBox /template/ Border#PopupBorder">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="ComboBoxItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+        <Style Selector="ComboBoxItem:pointerover">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrushSoft}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="ComboBoxItem:selected">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrushSoft}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="ComboBoxItem:selected:pointerover">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrushSoft}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
         </Style>
         <Style Selector="ListBoxItem:selected">
             <Setter Property="Background" Value="{DynamicResource PrimaryBrushSoft}"/>

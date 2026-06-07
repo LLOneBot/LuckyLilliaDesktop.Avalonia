@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
@@ -233,7 +234,7 @@ public class HomeViewModel : ViewModelBase
             using var httpClient = new System.Net.Http.HttpClient();
             var bytes = await httpClient.GetByteArrayAsync(url);
             using var stream = new MemoryStream(bytes);
-            AvatarBitmap = new Avalonia.Media.Imaging.Bitmap(stream);
+            AvatarBitmap = BitmapLoader.DecodeToWidth(stream, 56, 2);
         }
         catch (Exception ex)
         {

@@ -109,13 +109,13 @@ class Program
         }
     }
 
-    public static AppBuilder BuildAvaloniaApp()
+    private static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .With(new Win32PlatformOptions
             {
-                // 使用软件渲染，避免低配机器GPU加速导致高CPU占用
-                RenderingMode = new[] { Win32RenderingMode.Software }
+                // 优先使用硬件渲染，软件渲染作为兜底；软件渲染在拖动/动画/阴影场景下帧率很低。
+                RenderingMode = [Win32RenderingMode.AngleEgl, Win32RenderingMode.Software]
             })
             .WithInterFont()
             .LogToTrace()

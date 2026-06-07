@@ -37,6 +37,11 @@
         <Setter Property="CornerRadius" Value="14"/>
     </Style>
 
+    <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource SelectedBackground}"/>
+        <Setter Property="CornerRadius" Value="14"/>
+    </Style>
+
     <!-- PathIcon 样式 -->
     <Style Selector="PathIcon">
         <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>

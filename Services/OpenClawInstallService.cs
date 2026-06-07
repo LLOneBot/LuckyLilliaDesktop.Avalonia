@@ -745,9 +745,9 @@ public class OpenClawInstallService : IOpenClawInstallService
 
         var outputTask = Task.Run(async () =>
         {
-            while (!process.StandardOutput.EndOfStream)
+            string? line;
+            while ((line = await process.StandardOutput.ReadLineAsync(ct)) != null)
             {
-                var line = await process.StandardOutput.ReadLineAsync(ct);
                 if (!string.IsNullOrEmpty(line))
                 {
                     _logger.LogDebug("{Output}", line);
@@ -758,9 +758,9 @@ public class OpenClawInstallService : IOpenClawInstallService
 
         var errorTask = Task.Run(async () =>
         {
-            while (!process.StandardError.EndOfStream)
+            string? line;
+            while ((line = await process.StandardError.ReadLineAsync(ct)) != null)
             {
-                var line = await process.StandardError.ReadLineAsync(ct);
                 if (!string.IsNullOrEmpty(line))
                     _logger.LogWarning("{Error}", line);
             }

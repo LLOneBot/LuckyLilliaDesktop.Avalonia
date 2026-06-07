@@ -197,9 +197,9 @@ public class GitHubCLIHelper : IGitHubCLIHelper
 
             var outputTask = Task.Run(async () =>
             {
-                while (!process.StandardOutput.EndOfStream)
+                string? line;
+                while ((line = await process.StandardOutput.ReadLineAsync(ct).ConfigureAwait(false)) != null)
                 {
-                    var line = await process.StandardOutput.ReadLineAsync(ct).ConfigureAwait(false);
                     if (!string.IsNullOrEmpty(line))
                         _logger.LogDebug("Git: {Output}", line);
                 }
@@ -207,9 +207,9 @@ public class GitHubCLIHelper : IGitHubCLIHelper
 
             var errorTask = Task.Run(async () =>
             {
-                while (!process.StandardError.EndOfStream)
+                string? line;
+                while ((line = await process.StandardError.ReadLineAsync(ct).ConfigureAwait(false)) != null)
                 {
-                    var line = await process.StandardError.ReadLineAsync(ct).ConfigureAwait(false);
                     if (!string.IsNullOrEmpty(line))
                         _logger.LogDebug("Git: {Error}", line);
                 }

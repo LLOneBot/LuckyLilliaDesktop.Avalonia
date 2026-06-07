@@ -22,7 +22,7 @@ public class MainWindowViewModel : ViewModelBase
 
     private int _selectedIndex;
     private string _title = "LLBot";
-    private bool _isDarkTheme = true;
+    private string _themeMode = "system";
     private bool _isMonitoringPaused;
 
     public string Title
@@ -37,11 +37,30 @@ public class MainWindowViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _selectedIndex, value);
     }
 
-    public bool IsDarkTheme
+    public string ThemeMode
     {
-        get => _isDarkTheme;
-        set => this.RaiseAndSetIfChanged(ref _isDarkTheme, value);
+        get => _themeMode;
+        set
+        {
+            if (_themeMode == value) return;
+            this.RaiseAndSetIfChanged(ref _themeMode, value);
+            this.RaisePropertyChanged(nameof(IsSystemTheme));
+            this.RaisePropertyChanged(nameof(IsDarkTheme));
+            this.RaisePropertyChanged(nameof(IsLightTheme));
+            this.RaisePropertyChanged(nameof(ThemeToggleTooltip));
+        }
     }
+
+    public bool IsSystemTheme => ThemeMode == "system";
+    public bool IsDarkTheme => ThemeMode == "dark";
+    public bool IsLightTheme => ThemeMode == "light";
+    public string ThemeToggleTooltip => ThemeMode switch
+    {
+        "system" => "主题：跟随系统，点击切换为深色",
+        "dark" => "主题：深色，点击切换为浅色",
+        "light" => "主题：浅色，点击切换为跟随系统",
+        _ => "切换主题"
+    };
 
     // 子页面 ViewModels
     public HomeViewModel HomeVM { get; }
@@ -111,8 +130,7 @@ public class MainWindowViewModel : ViewModelBase
             // 先确保配置已加载
             await _configManager.LoadConfigAsync();
 
-            var themeMode = _configManager.GetSetting("theme_mode", "dark");
-            IsDarkTheme = themeMode == "dark";
+            ThemeMode = NormalizeThemeMode(_configManager.GetSetting("theme_mode", "system"));
             ApplyTheme();
         }
         catch (Exception ex)
@@ -123,25 +141,40 @@ public class MainWindowViewModel : ViewModelBase
 
     private void ToggleTheme()
     {
-        IsDarkTheme = !IsDarkTheme;
+        ThemeMode = ThemeMode switch
+        {
+            "system" => "dark",
+            "dark" => "light",
+            _ => "system"
+        };
 
         ApplyTheme();
 
         // 保存主题设置
-        _ = _configManager.SetSettingAsync("theme_mode", IsDarkTheme ? "dark" : "light");
+        _ = _configManager.SetSettingAsync("theme_mode", ThemeMode);
 
-        _logger.LogInformation("主题切换为: {Theme}", IsDarkTheme ? "深色" : "浅色");
+        _logger.LogInformation("主题切换为: {Theme}", ThemeMode);
     }
 
     private void ApplyTheme()
     {
         if (Application.Current != null)
         {
-            Application.Current.RequestedThemeVariant = IsDarkTheme
-                ? ThemeVariant.Dark
-                : ThemeVariant.Light;
+            Application.Current.RequestedThemeVariant = ThemeMode switch
+            {
+                "dark" => ThemeVariant.Dark,
+                "light" => ThemeVariant.Light,
+                _ => ThemeVariant.Default
+            };
         }
     }
+
+    private static string NormalizeThemeMode(string? themeMode) => themeMode switch
+    {
+        "dark" => "dark",
+        "light" => "light",
+        _ => "system"
+    };
 
     /// <summary>
     /// 暂停监控以节省 CPU（窗口隐藏时调用）

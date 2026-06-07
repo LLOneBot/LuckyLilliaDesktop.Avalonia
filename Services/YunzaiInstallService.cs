@@ -610,24 +610,24 @@ public class YunzaiInstallService : IYunzaiInstallService
         using var process = Process.Start(psi);
         if (process == null) return false;
 
+        // 关键：提前取出来，避免 lambda 捕获 process
+        var standardOutput = process.StandardOutput;
+        var standardError = process.StandardError;
+
         var outputTask = Task.Run(async () =>
         {
-            while (!process.StandardOutput.EndOfStream)
+            while (await standardOutput.ReadLineAsync(ct) is { } line)
             {
-                var line = await process.StandardOutput.ReadLineAsync(ct);
-                if (!string.IsNullOrEmpty(line))
-                {
-                    _logger.LogDebug("{Output}", line);
-                    onOutput?.Invoke(line);
-                }
+                if (string.IsNullOrEmpty(line)) continue;
+                _logger.LogDebug("{Output}", line);
+                onOutput?.Invoke(line);
             }
         }, ct);
 
         var errorTask = Task.Run(async () =>
         {
-            while (!process.StandardError.EndOfStream)
+            while (await standardError.ReadLineAsync(ct) is { } line)
             {
-                var line = await process.StandardError.ReadLineAsync(ct);
                 if (!string.IsNullOrEmpty(line))
                     _logger.LogWarning("{Error}", line);
             }
@@ -638,6 +638,7 @@ public class YunzaiInstallService : IYunzaiInstallService
 
         return process.ExitCode == 0;
     }
+
 
     private static void Report(IProgress<InstallProgress>? progress, int step, int totalSteps,
         string stepName, string status, double pct = 0, bool completed = false)

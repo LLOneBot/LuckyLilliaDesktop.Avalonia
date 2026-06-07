@@ -9,11 +9,9 @@
         WindowStartupLocation="CenterOwner"
         CanResize="False"
         ShowInTaskbar="False"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
-        ExtendClientAreaTitleBarHeightHint="-1"
         SystemDecorations="None"
         TransparencyLevelHint="Transparent"
+        TransparencyBackgroundFallback="Transparent"
         Background="Transparent">
 
     <Window.Resources>
@@ -76,7 +74,6 @@
             Background="{DynamicResource CardBackground}"
             BorderBrush="{DynamicResource BorderColor}"
             BorderThickness="1"
-            BoxShadow="0 24 70 0 #2DE84D9C"
             Padding="28,24">
         <Grid RowDefinitions="Auto,*">
             <!-- 标题栏 -->

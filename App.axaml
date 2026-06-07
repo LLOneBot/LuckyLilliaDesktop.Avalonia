@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:converters="using:LuckyLilliaDesktop.Converters"
              x:Class="LuckyLilliaDesktop.App"
-             RequestedThemeVariant="Dark">
+             RequestedThemeVariant="Default">
     <Application.Resources>
         <ResourceDictionary>
             <converters:EqualToIntConverter x:Key="EqualToIntConverter"/>
@@ -21,8 +21,8 @@
                     <SolidColorBrush x:Key="TextPrimary">#f8fafc</SolidColorBrush>
                     <SolidColorBrush x:Key="TextSecondary">#cbd5e1</SolidColorBrush>
                     <SolidColorBrush x:Key="BorderColor">#23314e</SolidColorBrush>
-                    <SolidColorBrush x:Key="HoverBackground">#1f2937</SolidColorBrush>
-                    <SolidColorBrush x:Key="SelectedBackground">#29354f</SolidColorBrush>
+                    <SolidColorBrush x:Key="HoverBackground">#342131</SolidColorBrush>
+                    <SolidColorBrush x:Key="SelectedBackground">#3A2131</SolidColorBrush>
                     <SolidColorBrush x:Key="SuccessColor">#22c55e</SolidColorBrush>
                     <SolidColorBrush x:Key="DangerColor">#fb7185</SolidColorBrush>
                 </ResourceDictionary>
@@ -40,8 +40,8 @@
                     <SolidColorBrush x:Key="TextPrimary">#0f172a</SolidColorBrush>
                     <SolidColorBrush x:Key="TextSecondary">#475569</SolidColorBrush>
                     <SolidColorBrush x:Key="BorderColor">#e2e8f0</SolidColorBrush>
-                    <SolidColorBrush x:Key="HoverBackground">#f1f5f9</SolidColorBrush>
-                    <SolidColorBrush x:Key="SelectedBackground">#e2e8f0</SolidColorBrush>
+                    <SolidColorBrush x:Key="HoverBackground">#FFF0F8</SolidColorBrush>
+                    <SolidColorBrush x:Key="SelectedBackground">#FFF0F8</SolidColorBrush>
                     <SolidColorBrush x:Key="SuccessColor">#16a34a</SolidColorBrush>
                     <SolidColorBrush x:Key="DangerColor">#dc2626</SolidColorBrush>
                 </ResourceDictionary>
@@ -65,6 +65,39 @@
         </Style>
         <Style Selector="ComboBox">
             <Setter Property="FontFamily" Value="Microsoft YaHei,Segoe UI Emoji"/>
+        </Style>
+        <Style Selector="ComboBox /template/ Border#PART_PopupBorder">
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="ComboBox /template/ Border#PopupBorder">
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="ComboBoxItem">
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        <Style Selector="ComboBoxItem /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        <Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        <Style Selector="ComboBoxItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SelectedBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        <Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SelectedBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+            <Setter Property="CornerRadius" Value="8"/>
         </Style>
         <Style Selector="TabItem">
             <Setter Property="FontFamily" Value="Microsoft YaHei,Segoe UI Emoji"/>

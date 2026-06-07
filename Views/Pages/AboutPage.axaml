@@ -117,7 +117,9 @@
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <Border Width="56" Height="56"
                                 CornerRadius="20">
-                            <Image Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
+                            <Image x:Name="AppIconImage"
+                                   Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
+                                   RenderOptions.BitmapInterpolationMode="HighQuality"
                                    Width="56" Height="56"/>
                         </Border>
                         <StackPanel Spacing="4" VerticalAlignment="Center">

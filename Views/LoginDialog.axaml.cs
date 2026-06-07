@@ -5,6 +5,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Utils;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -228,9 +229,10 @@ public partial class LoginDialog : Window
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             var bytes = await http.GetByteArrayAsync(url);
             using var stream = new MemoryStream(bytes);
+            var bitmap = BitmapLoader.DecodeToWidth(stream, 48, 2);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                targetImage.Source = new Bitmap(stream);
+                targetImage.Source = bitmap;
                 if (defaultIcon != null) defaultIcon.IsVisible = false;
             });
         }

@@ -1,10 +1,18 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Input;
+using Avalonia.Layout;
+using Avalonia.Platform;
+using Avalonia.Threading;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Utils;
 using LuckyLilliaDesktop.ViewModels;
 using Microsoft.Extensions.Logging;
 using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,10 +26,21 @@ public partial class MainWindow : Window
     private bool _windowPositionLoaded;
     private bool _minimizeToTrayOnStartChecked;
     private IResourceMonitor? _resourceMonitor;
+    private Win32Properties.CustomWndProcHookCallback? _snapLayoutHook;
+    private MainWindowViewModel? _viewModel;
+    private CancellationTokenSource? _pageAnimationCts;
+    private int _animatedPageIndex = -1;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            SystemDecorations = SystemDecorations.None;
+            AddResizeGripsForLinux();
+        }
+
         Closing += OnWindowClosing;
         PositionChanged += OnPositionChanged;
         SizeChanged += OnSizeChanged;
@@ -29,6 +48,8 @@ public partial class MainWindow : Window
         // 监听窗口可见性和窗口状态变化以优化性能/更新最大化按钮图标
         PropertyChanged += OnWindowPropertyChanged;
         UpdateMaximizeRestoreIcon();
+        UpdateWindowFrameMargin();
+        EnableWindowsSnapLayout();
     }
 
     private void TitleBar_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -83,7 +104,134 @@ public partial class MainWindow : Window
         else if (e.Property.Name == nameof(WindowState))
         {
             UpdateMaximizeRestoreIcon();
+            UpdateWindowFrameMargin();
         }
+    }
+
+    private void UpdateWindowFrameMargin()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
+
+        // 扩展客户区后，最大化时保留系统不可见边框，避免内容被屏幕边缘裁掉。
+        Margin = new Thickness(WindowState == WindowState.Maximized ? 7 : 0);
+    }
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    private static bool IsLeftMouseButtonDown()
+    {
+        const int VK_LBUTTON = 1;
+        return RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            && (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+    }
+
+    private void EnableWindowsSnapLayout()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
+
+        const int HTCLIENT = 1;
+        const int HTMAXBUTTON = 9;
+        const uint WM_NCHITTEST = 0x0084;
+
+        var pointerOnButton = false;
+        var pointerOverSetter = typeof(Button).GetProperty(nameof(IsPointerOver));
+        if (pointerOverSetter is null) return;
+
+        nint ProcHookCallback(nint hWnd, uint msg, nint wParam, nint lParam, ref bool handled)
+        {
+            if (!MaximizeButton.IsVisible || msg != WM_NCHITTEST) return 0;
+
+            var point = new PixelPoint((short)(ToInt32(lParam) & 0xffff), (short)(ToInt32(lParam) >> 16));
+            var buttonSize = MaximizeButton.DesiredSize;
+            var buttonLeftTop = MaximizeButton.PointToScreen(FlowDirection == Avalonia.Media.FlowDirection.LeftToRight
+                ? new Point(buttonSize.Width, 0)
+                : new Point(0, 0));
+
+            var x = (buttonLeftTop.X - point.X) / RenderScaling;
+            var y = (point.Y - buttonLeftTop.Y) / RenderScaling;
+
+            if (new Rect(default, buttonSize).Contains(new Point(x, y)))
+            {
+                handled = true;
+
+                if (!pointerOnButton)
+                {
+                    pointerOnButton = true;
+                    pointerOverSetter.SetValue(MaximizeButton, true);
+                }
+
+                return IsLeftMouseButtonDown() ? HTCLIENT : HTMAXBUTTON;
+            }
+
+            if (pointerOnButton)
+            {
+                pointerOnButton = false;
+                pointerOverSetter.SetValue(MaximizeButton, false);
+            }
+
+            return 0;
+        }
+
+        static int ToInt32(IntPtr ptr) => IntPtr.Size == 4 ? ptr.ToInt32() : (int)(ptr.ToInt64() & 0xffffffff);
+
+        _snapLayoutHook = new Win32Properties.CustomWndProcHookCallback(ProcHookCallback);
+        Win32Properties.AddWndProcHookCallback(this, _snapLayoutHook);
+    }
+
+    private void AddResizeGripsForLinux()
+    {
+        var resizeBorders = new[]
+        {
+            new { Tag = "North", Horizontal = HorizontalAlignment.Stretch, Vertical = VerticalAlignment.Top, Width = double.NaN, Height = 6d, Cursor = StandardCursorType.SizeNorthSouth },
+            new { Tag = "South", Horizontal = HorizontalAlignment.Stretch, Vertical = VerticalAlignment.Bottom, Width = double.NaN, Height = 6d, Cursor = StandardCursorType.SizeNorthSouth },
+            new { Tag = "West", Horizontal = HorizontalAlignment.Left, Vertical = VerticalAlignment.Stretch, Width = 6d, Height = double.NaN, Cursor = StandardCursorType.SizeWestEast },
+            new { Tag = "East", Horizontal = HorizontalAlignment.Right, Vertical = VerticalAlignment.Stretch, Width = 6d, Height = double.NaN, Cursor = StandardCursorType.SizeWestEast },
+            new { Tag = "NorthWest", Horizontal = HorizontalAlignment.Left, Vertical = VerticalAlignment.Top, Width = 12d, Height = 12d, Cursor = StandardCursorType.TopLeftCorner },
+            new { Tag = "NorthEast", Horizontal = HorizontalAlignment.Right, Vertical = VerticalAlignment.Top, Width = 12d, Height = 12d, Cursor = StandardCursorType.TopRightCorner },
+            new { Tag = "SouthWest", Horizontal = HorizontalAlignment.Left, Vertical = VerticalAlignment.Bottom, Width = 12d, Height = 12d, Cursor = StandardCursorType.BottomLeftCorner },
+            new { Tag = "SouthEast", Horizontal = HorizontalAlignment.Right, Vertical = VerticalAlignment.Bottom, Width = 12d, Height = 12d, Cursor = StandardCursorType.BottomRightCorner },
+        };
+
+        foreach (var borderInfo in resizeBorders)
+        {
+            var border = new Border
+            {
+                Tag = borderInfo.Tag,
+                Width = borderInfo.Width,
+                Height = borderInfo.Height,
+                Background = Avalonia.Media.Brushes.Transparent,
+                Cursor = new Cursor(borderInfo.Cursor),
+                HorizontalAlignment = borderInfo.Horizontal,
+                VerticalAlignment = borderInfo.Vertical,
+                IsHitTestVisible = true,
+            };
+
+            border.PointerPressed += ResizeGrip_PointerPressed;
+            RootPanel.Children.Add(border);
+        }
+    }
+
+    private void ResizeGrip_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!CanResize || WindowState != WindowState.Normal) return;
+        if (sender is not Border { Tag: string edge }) return;
+
+        var windowEdge = edge switch
+        {
+            "North" => WindowEdge.North,
+            "South" => WindowEdge.South,
+            "West" => WindowEdge.West,
+            "East" => WindowEdge.East,
+            "NorthWest" => WindowEdge.NorthWest,
+            "NorthEast" => WindowEdge.NorthEast,
+            "SouthWest" => WindowEdge.SouthWest,
+            "SouthEast" => WindowEdge.SouthEast,
+            _ => throw new ArgumentOutOfRangeException(nameof(edge), edge, null)
+        };
+
+        BeginResizeDrag(windowEdge, e);
+        e.Handled = true;
     }
     
     private void HandleVisibilityChanged(bool isVisible)
@@ -106,8 +254,37 @@ public partial class MainWindow : Window
     protected override async void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
+        LoadScaledDefaultAvatars();
         await LoadWindowPositionAsync();
         await CheckMinimizeToTrayOnStartAsync();
+    }
+
+    private void LoadScaledDefaultAvatars()
+    {
+        const string iconUri = "avares://LuckyLilliaDesktop/Assets/Icons/icon.png";
+        TitleDefaultAvatarIcon.Source = BitmapLoader.DecodeAssetToWidth(iconUri, 34, RenderScaling);
+        DefaultAvatarIcon.Source = BitmapLoader.DecodeAssetToWidth(iconUri, 56, RenderScaling);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _pageAnimationCts?.Cancel();
+        _pageAnimationCts?.Dispose();
+        _pageAnimationCts = null;
+
+        if (_viewModel is not null)
+        {
+            _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            _viewModel = null;
+        }
+
+        if (_snapLayoutHook is not null)
+        {
+            Win32Properties.RemoveWndProcHookCallback(this, _snapLayoutHook);
+            _snapLayoutHook = null;
+        }
+
+        base.OnClosed(e);
     }
 
     private async Task CheckMinimizeToTrayOnStartAsync()
@@ -322,8 +499,19 @@ public partial class MainWindow : Window
     {
         base.OnDataContextChanged(e);
 
+        if (_viewModel is not null)
+        {
+            _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            _viewModel = null;
+        }
+
         if (DataContext is MainWindowViewModel vm)
         {
+            _viewModel = vm;
+            _animatedPageIndex = vm.SelectedIndex;
+            vm.PropertyChanged += ViewModel_PropertyChanged;
+            SetVisiblePage(vm.SelectedIndex);
+
             var app = Application.Current as App;
             _configManager = app?.Services?.GetService(typeof(IConfigManager)) as IConfigManager;
             _loginDialogLogger = app?.Services?.GetService(typeof(ILogger<LoginDialog>)) as ILogger<LoginDialog>;
@@ -340,6 +528,118 @@ public partial class MainWindow : Window
             vm.AboutVM.ConfirmDialog = ShowConfirmDialogAsync;
             vm.LLBotConfigVM.ShowAlertDialog = ShowAlertDialogAsync;
         }
+    }
+
+    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MainWindowViewModel.SelectedIndex) || sender is not MainWindowViewModel vm) return;
+        _ = AnimateSelectedPageAsync(vm.SelectedIndex);
+    }
+
+    private Control? GetPageByIndex(int index) => index switch
+    {
+        0 => HomePageView,
+        1 => LogPageView,
+        2 => ConfigPageView,
+        3 => LLBotConfigPageView,
+        4 => IntegrationWizardPageView,
+        5 => AboutPageView,
+        _ => null
+    };
+
+    private void SetVisiblePage(int selectedIndex)
+    {
+        for (var i = 0; i < 6; i++)
+        {
+            var page = GetPageByIndex(i);
+            if (page is null) continue;
+
+            page.Transitions = null;
+            page.RenderTransform = null;
+            page.Opacity = 1;
+            page.IsVisible = i == selectedIndex;
+        }
+    }
+
+    private async Task AnimateSelectedPageAsync(int selectedIndex)
+    {
+        var oldIndex = _animatedPageIndex;
+        if (oldIndex == selectedIndex) return;
+        _animatedPageIndex = selectedIndex;
+
+        _pageAnimationCts?.Cancel();
+        _pageAnimationCts?.Dispose();
+        _pageAnimationCts = new CancellationTokenSource();
+        var token = _pageAnimationCts.Token;
+
+        await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            await Task.Yield();
+
+            var oldPage = GetPageByIndex(oldIndex);
+            var newPage = GetPageByIndex(selectedIndex);
+            if (newPage is null || token.IsCancellationRequested) return;
+
+            for (var i = 0; i < 6; i++)
+            {
+                if (i == oldIndex || i == selectedIndex) continue;
+
+                var page = GetPageByIndex(i);
+                if (page is null) continue;
+                page.Transitions = null;
+                page.Opacity = 1;
+                page.IsVisible = false;
+            }
+
+            oldPage?.Transitions = null;
+            newPage.Transitions = null;
+            if (oldPage is not null) oldPage.Opacity = 1;
+            newPage.Opacity = 0;
+            newPage.IsVisible = true;
+
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+            if (token.IsCancellationRequested) return;
+
+            if (oldPage is not null)
+            {
+                oldPage.Transitions = new Transitions
+                {
+                    new DoubleTransition
+                    {
+                        Property = OpacityProperty,
+                        Duration = TimeSpan.FromMilliseconds(160),
+                        Easing = new CubicEaseOut()
+                    }
+                };
+                oldPage.Opacity = 0;
+            }
+
+            newPage.Transitions = new Transitions
+            {
+                new DoubleTransition
+                {
+                    Property = OpacityProperty,
+                    Duration = TimeSpan.FromMilliseconds(160),
+                    Easing = new CubicEaseOut()
+                }
+            };
+            newPage.Opacity = 1;
+
+            try
+            {
+                await Task.Delay(170, token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (oldPage is not null)
+            {
+                oldPage.IsVisible = false;
+                oldPage.Opacity = 1;
+            }
+        });
     }
 
     private async Task ShowAlertDialogAsync(string title, string message)
