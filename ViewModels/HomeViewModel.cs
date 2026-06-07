@@ -379,16 +379,16 @@ public class HomeViewModel : ViewModelBase
 
         // 订阅资源监控流
         _resourceMonitor.ResourceStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(OnResourceUpdate);
 
         // 订阅可用内存流
         _resourceMonitor.AvailableMemoryStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(mem => AvailableMemory = mem);
 
         _selfInfoService.UinStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(uin =>
             {
                 QQUin = uin ?? string.Empty;
@@ -398,7 +398,7 @@ public class HomeViewModel : ViewModelBase
             });
 
         _selfInfoService.NicknameStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(nickname =>
             {
                 QQNickname = nickname ?? string.Empty;
@@ -407,7 +407,7 @@ public class HomeViewModel : ViewModelBase
             });
 
         _resourceMonitor.QQVersionStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(version => QQVersion = version);
 
         // 订阅进程状态变化
@@ -415,19 +415,22 @@ public class HomeViewModel : ViewModelBase
 
         // 订阅更新状态变化
         _updateStateService.StateChanged
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(OnUpdateStateChanged);
 
         // 订阅日志流（最近10条），批量处理避免 UI 卡顿
         _logCollector.LogStream
             .Buffer(TimeSpan.FromMilliseconds(100))
             .Where(batch => batch.Count > 0)
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(OnLogBatchReceived);
 
-        // 全局启动/停止命令
-        var canExecute = this.WhenAnyValue(x => x.IsButtonEnabled);
-        GlobalStartStopCommand = ReactiveCommand.Create(() => { _ = GlobalStartStopAsync(); }, canExecute);
+        // 全局启动/停止命令；按钮启用状态由 IsButtonEnabled 绑定控制，避免 ReactiveCommand 的 CanExecuteChanged 跨线程触发 Avalonia 控件访问。
+        GlobalStartStopCommand = ReactiveCommand.Create(() =>
+        {
+            if (!IsButtonEnabled) return;
+            _ = GlobalStartStopAsync();
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 查看全部日志命令
         ViewAllLogsCommand = ReactiveCommand.Create(() =>

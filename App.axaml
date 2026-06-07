@@ -14,9 +14,12 @@
                         <GradientStop Offset="1" Color="#f472b6"/>
                     </LinearGradientBrush>
                     <SolidColorBrush x:Key="PrimaryBrush">#ec4899</SolidColorBrush>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft">#3A2131</SolidColorBrush>
+                    <SolidColorBrush x:Key="PrimarySelectionBrush" Color="#F472B6" Opacity="0.72"/>
                     <SolidColorBrush x:Key="SidebarBackground">#0b1220</SolidColorBrush>
                     <SolidColorBrush x:Key="MainBackground">#090b17</SolidColorBrush>
                     <SolidColorBrush x:Key="CardBackground">#111827</SolidColorBrush>
+                    <SolidColorBrush x:Key="CardBackgroundStrong">#281C2B</SolidColorBrush>
                     <SolidColorBrush x:Key="CardBackgroundSecondary">#151d33</SolidColorBrush>
                     <SolidColorBrush x:Key="TextPrimary">#f8fafc</SolidColorBrush>
                     <SolidColorBrush x:Key="TextSecondary">#cbd5e1</SolidColorBrush>
@@ -25,6 +28,14 @@
                     <SolidColorBrush x:Key="SelectedBackground">#3A2131</SolidColorBrush>
                     <SolidColorBrush x:Key="SuccessColor">#22c55e</SolidColorBrush>
                     <SolidColorBrush x:Key="DangerColor">#fb7185</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#EC5FAA"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#EC5FAA"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#DB4C99"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#DB4C99"/>
                 </ResourceDictionary>
                 <!-- 浅色主题 -->
                 <ResourceDictionary x:Key="Light">
@@ -33,9 +44,12 @@
                         <GradientStop Offset="1" Color="#f97316"/>
                     </LinearGradientBrush>
                     <SolidColorBrush x:Key="PrimaryBrush">#f43f5e</SolidColorBrush>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft">#FFF0F8</SolidColorBrush>
+                    <SolidColorBrush x:Key="PrimarySelectionBrush" Color="#E84D9C" Opacity="0.72"/>
                     <SolidColorBrush x:Key="SidebarBackground">#f8fafc</SolidColorBrush>
                     <SolidColorBrush x:Key="MainBackground">#f8fafc</SolidColorBrush>
                     <SolidColorBrush x:Key="CardBackground">#ffffff</SolidColorBrush>
+                    <SolidColorBrush x:Key="CardBackgroundStrong">#FFFFFFFF</SolidColorBrush>
                     <SolidColorBrush x:Key="CardBackgroundSecondary">#f1f5f9</SolidColorBrush>
                     <SolidColorBrush x:Key="TextPrimary">#0f172a</SolidColorBrush>
                     <SolidColorBrush x:Key="TextSecondary">#475569</SolidColorBrush>
@@ -44,6 +58,14 @@
                     <SolidColorBrush x:Key="SelectedBackground">#FFF0F8</SolidColorBrush>
                     <SolidColorBrush x:Key="SuccessColor">#16a34a</SolidColorBrush>
                     <SolidColorBrush x:Key="DangerColor">#dc2626</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#D83E8D"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#D83E8D"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#C93482"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#C93482"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>

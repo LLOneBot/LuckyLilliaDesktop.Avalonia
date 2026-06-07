@@ -2,8 +2,10 @@ using ReactiveUI;
 using Avalonia;
 using Avalonia.Styling;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 using System;
+using System.ComponentModel;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
@@ -99,14 +101,19 @@ public class MainWindowViewModel : ViewModelBase
         _ = LoadThemeSettingsAsync();
 
         // 监听 QQ 信息变化更新标题
-        homeViewModel.WhenAnyValue(x => x.QQUin, x => x.QQNickname)
-            .Where(tuple => !string.IsNullOrEmpty(tuple.Item1))
-            .Select(tuple => $"LLBot - {tuple.Item2}({tuple.Item1})")
-            .ObserveOn(RxApp.MainThreadScheduler)
+        Observable.FromEventPattern<PropertyChangedEventHandler, PropertyChangedEventArgs>(
+                handler => homeViewModel.PropertyChanged += handler,
+                handler => homeViewModel.PropertyChanged -= handler)
+            .Where(args => args.EventArgs.PropertyName is nameof(HomeViewModel.QQUin) or nameof(HomeViewModel.QQNickname))
+            .Select(_ => (homeViewModel.QQUin, homeViewModel.QQNickname))
+            .StartWith((homeViewModel.QQUin, homeViewModel.QQNickname))
+            .Where(info => !string.IsNullOrEmpty(info.QQUin))
+            .Select(info => $"LLBot - {info.QQNickname}({info.QQUin})")
+            .ObserveOnUiThread()
             .Subscribe(newTitle => Title = newTitle);
 
         // 主题切换命令
-        ToggleThemeCommand = ReactiveCommand.Create(ToggleTheme);
+        ToggleThemeCommand = ReactiveCommand.Create(ToggleTheme, outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 设置导航到日志页面的回调
         homeViewModel.NavigateToLogs = () => SelectedIndex = 1;

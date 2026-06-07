@@ -1,5 +1,4 @@
 using Avalonia;
-using Avalonia.ReactiveUI;
 using System;
 using System.Text;
 
@@ -118,6 +117,5 @@ class Program
                 RenderingMode = [Win32RenderingMode.AngleEgl, Win32RenderingMode.Software]
             })
             .WithInterFont()
-            .LogToTrace()
-            .UseReactiveUI();
+            .LogToTrace();
 }

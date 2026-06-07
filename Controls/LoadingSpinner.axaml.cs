@@ -9,7 +9,7 @@ public partial class LoadingSpinner : UserControl
     public static readonly StyledProperty<double> SpinnerSizeProperty =
         AvaloniaProperty.Register<LoadingSpinner, double>(nameof(SpinnerSize), 32);
 
-    public static readonly StyledProperty<IBrush?> SpinnerBrushProperty =
+    private static readonly StyledProperty<IBrush?> SpinnerBrushProperty =
         AvaloniaProperty.Register<LoadingSpinner, IBrush?>(nameof(SpinnerBrush));
 
     public double SpinnerSize

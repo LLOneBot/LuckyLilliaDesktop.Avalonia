@@ -443,7 +443,7 @@ public class OpenClawInstallService : IOpenClawInstallService
             if (configFiles.Length == 0) return 3001;
 
             var json = File.ReadAllText(configFiles[0]);
-            var config = JsonSerializer.Deserialize<LLBotConfig>(json);
+            var config = JsonSerializer.Deserialize(json, AppJsonContext.Default.LLBotConfig);
             if (config == null) return 3001;
 
             // 1. 查找名为 OpenClaw 的正向 ws

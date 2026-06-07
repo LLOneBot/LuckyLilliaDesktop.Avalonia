@@ -168,6 +168,10 @@
             <Setter Property="Background" Value="{DynamicResource WindowButtonHover}"/>
             <Setter Property="Opacity" Value="1"/>
         </Style>
+        <Style Selector="Button.modern-window-button.snap-hover">
+            <Setter Property="Background" Value="{DynamicResource WindowButtonHover}"/>
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
         <Style Selector="Button.modern-window-button Path">
             <Setter Property="Stroke" Value="{DynamicResource WindowButtonStroke}"/>
             <Setter Property="StrokeThickness" Value="1.35"/>
@@ -175,6 +179,9 @@
             <Setter Property="Fill" Value="Transparent"/>
         </Style>
         <Style Selector="Button.modern-window-button:pointerover Path">
+            <Setter Property="Stroke" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="Button.modern-window-button.snap-hover Path">
             <Setter Property="Stroke" Value="{DynamicResource PrimaryBrush}"/>
         </Style>
         <Style Selector="Button.modern-close-button:pointerover">
@@ -213,27 +220,15 @@
                             BorderThickness="1"
                             ClipToBounds="True"
                             BoxShadow="0 8 24 0 #18E84D9C">
-                        <Panel>
-                            <Image x:Name="TitleDefaultAvatarIcon"
-                                   Width="34" Height="34"
-                                   Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
-                                   RenderOptions.BitmapInterpolationMode="HighQuality"
-                                   Stretch="UniformToFill"
-                                   IsVisible="{Binding !HomeVM.HasQQInfo}">
-                                <Image.Clip>
-                                    <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
-                                </Image.Clip>
-                            </Image>
-                            <Image Width="34" Height="34"
-                                   Source="{Binding HomeVM.AvatarBitmap}"
-                                   RenderOptions.BitmapInterpolationMode="HighQuality"
-                                   Stretch="UniformToFill"
-                                   IsVisible="{Binding HomeVM.HasQQInfo}">
-                                <Image.Clip>
-                                    <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
-                                </Image.Clip>
-                            </Image>
-                        </Panel>
+                        <Image x:Name="TitleDefaultAvatarIcon"
+                               Width="34" Height="34"
+                               Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
+                               RenderOptions.BitmapInterpolationMode="HighQuality"
+                               Stretch="UniformToFill">
+                            <Image.Clip>
+                                <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
+                            </Image.Clip>
+                        </Image>
                     </Border>
                     <TextBlock Text="LLBot"
                                FontSize="16"
@@ -479,24 +474,18 @@
                     BorderThickness="1"
                     BoxShadow="0 18 70 0 #18E84D9C">
                 <!-- 页面切换容器 -->
-                <Panel x:Name="PageHost" x:CompileBindings="False">
+                <Panel x:Name="PageHost">
                     <views:HomePage x:Name="HomePageView"
-                                    DataContext="{Binding HomeVM}"
                                     IsVisible="True"/>
                     <views:LogPage x:Name="LogPageView"
-                                   DataContext="{Binding LogVM}"
                                    IsVisible="False"/>
                     <views:ConfigPage x:Name="ConfigPageView"
-                                      DataContext="{Binding ConfigVM}"
                                       IsVisible="False"/>
                     <views:LLBotConfigPage x:Name="LLBotConfigPageView"
-                                           DataContext="{Binding LLBotConfigVM}"
                                            IsVisible="False"/>
                     <views:IntegrationWizardPage x:Name="IntegrationWizardPageView"
-                                                 DataContext="{Binding IntegrationWizardVM}"
                                                   IsVisible="False"/>
                     <views:AboutPage x:Name="AboutPageView"
-                                     DataContext="{Binding AboutVM}"
                                      IsVisible="False"/>
                 </Panel>
             </Border>

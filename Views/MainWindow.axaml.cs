@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     private MainWindowViewModel? _viewModel;
     private CancellationTokenSource? _pageAnimationCts;
     private int _animatedPageIndex = -1;
+    private bool _isBackgroundMode;
 
     public MainWindow()
     {
@@ -105,6 +106,7 @@ public partial class MainWindow : Window
         {
             UpdateMaximizeRestoreIcon();
             UpdateWindowFrameMargin();
+            SetBackgroundMode(WindowState == WindowState.Minimized || !IsVisible);
         }
     }
 
@@ -118,6 +120,9 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
+
+    [DllImport("psapi.dll")]
+    private static extern bool EmptyWorkingSet(IntPtr hProcess);
 
     private static bool IsLeftMouseButtonDown()
     {
@@ -135,8 +140,6 @@ public partial class MainWindow : Window
         const uint WM_NCHITTEST = 0x0084;
 
         var pointerOnButton = false;
-        var pointerOverSetter = typeof(Button).GetProperty(nameof(IsPointerOver));
-        if (pointerOverSetter is null) return;
 
         nint ProcHookCallback(nint hWnd, uint msg, nint wParam, nint lParam, ref bool handled)
         {
@@ -158,7 +161,7 @@ public partial class MainWindow : Window
                 if (!pointerOnButton)
                 {
                     pointerOnButton = true;
-                    pointerOverSetter.SetValue(MaximizeButton, true);
+                    MaximizeButton.Classes.Add("snap-hover");
                 }
 
                 return IsLeftMouseButtonDown() ? HTCLIENT : HTMAXBUTTON;
@@ -167,7 +170,7 @@ public partial class MainWindow : Window
             if (pointerOnButton)
             {
                 pointerOnButton = false;
-                pointerOverSetter.SetValue(MaximizeButton, false);
+                MaximizeButton.Classes.Remove("snap-hover");
             }
 
             return 0;
@@ -236,18 +239,51 @@ public partial class MainWindow : Window
     
     private void HandleVisibilityChanged(bool isVisible)
     {
+        SetBackgroundMode(!isVisible || WindowState == WindowState.Minimized);
+    }
+
+    private void SetBackgroundMode(bool enabled)
+    {
+        if (_isBackgroundMode == enabled) return;
+        _isBackgroundMode = enabled;
+
         if (DataContext is MainWindowViewModel vm)
         {
-            if (isVisible)
+            if (enabled)
             {
-                // 窗口显示时恢复监控
-                vm.ResumeMonitoring();
+                vm.PauseMonitoring();
             }
             else
             {
-                // 窗口隐藏时暂停监控以节省 CPU
-                vm.PauseMonitoring();
+                vm.ResumeMonitoring();
             }
+        }
+
+        if (enabled)
+        {
+            _pageAnimationCts?.Cancel();
+            _ = TrimBackgroundMemoryAsync();
+        }
+    }
+
+    private static async Task TrimBackgroundMemoryAsync()
+    {
+        try
+        {
+            await Task.Delay(250);
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                using var process = System.Diagnostics.Process.GetCurrentProcess();
+                EmptyWorkingSet(process.Handle);
+            }
+        }
+        catch
+        {
+            // Best-effort memory trim when the UI is hidden/minimized.
         }
     }
 
@@ -508,6 +544,12 @@ public partial class MainWindow : Window
         if (DataContext is MainWindowViewModel vm)
         {
             _viewModel = vm;
+            HomePageView.DataContext = vm.HomeVM;
+            LogPageView.DataContext = vm.LogVM;
+            ConfigPageView.DataContext = vm.ConfigVM;
+            LLBotConfigPageView.DataContext = vm.LLBotConfigVM;
+            IntegrationWizardPageView.DataContext = vm.IntegrationWizardVM;
+            AboutPageView.DataContext = vm.AboutVM;
             _animatedPageIndex = vm.SelectedIndex;
             vm.PropertyChanged += ViewModel_PropertyChanged;
             SetVisiblePage(vm.SelectedIndex);
@@ -766,6 +808,7 @@ public partial class MainWindow : Window
     {
         // 隐藏窗口
         Hide();
+        SetBackgroundMode(true);
     }
 
     public void RestoreFromTray()
@@ -773,6 +816,7 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
+        SetBackgroundMode(false);
         
         // 恢复监控
         if (DataContext is MainWindowViewModel vm)

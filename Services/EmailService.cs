@@ -41,7 +41,7 @@ public class EmailService : IEmailService
             }
 
             var json = await File.ReadAllTextAsync(_configPath, Encoding.UTF8);
-            var config = JsonSerializer.Deserialize<EmailConfig>(json);
+            var config = JsonSerializer.Deserialize(json, AppJsonContext.Default.EmailConfig);
             return config ?? new EmailConfig();
         }
         catch (Exception ex)
@@ -67,7 +67,7 @@ public class EmailService : IEmailService
                 Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
 
-            var json = JsonSerializer.Serialize(config, options);
+            var json = JsonSerializer.Serialize(config, new AppJsonContext(options).EmailConfig);
             await File.WriteAllTextAsync(_configPath, json, new UTF8Encoding(false));
 
             _logger.LogInformation("邮件配置已保存到 {Path}", _configPath);

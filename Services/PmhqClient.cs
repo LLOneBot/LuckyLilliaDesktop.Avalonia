@@ -3,8 +3,9 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
-using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -78,13 +79,26 @@ public class PmhqClient : IPmhqClient, IDisposable
         }
 
         var url = $"http://127.0.0.1:{_port.Value}";
-        var payload = new
+        var argArray = new JsonArray();
+        foreach (var arg in args ?? Array.Empty<object>())
         {
-            type = "call",
-            data = new
+            ((IList<JsonNode?>)argArray).Add(arg switch
             {
-                func,
-                args = args ?? Array.Empty<object>()
+                null => null,
+                string stringValue => JsonValue.Create(stringValue),
+                int intValue => JsonValue.Create(intValue),
+                bool boolValue => JsonValue.Create(boolValue),
+                _ => JsonValue.Create(arg.ToString())
+            });
+        }
+
+        var payload = new JsonObject
+        {
+            ["type"] = "call",
+            ["data"] = new JsonObject
+            {
+                ["func"] = func,
+                ["args"] = argArray
             }
         };
 
@@ -94,14 +108,17 @@ public class PmhqClient : IPmhqClient, IDisposable
         try
         {
             _logger.LogDebug("调用 PMHQ API: {Func}, URL: {Url}", func, url);
-            var response = await _httpClient.PostAsJsonAsync(url, payload, linkedCts.Token);
+            using var content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync(url, content, linkedCts.Token);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("PMHQ API 返回 HTTP {StatusCode}: {Func}", response.StatusCode, func);
                 return null;
             }
 
-            var json = await response.Content.ReadFromJsonAsync<JsonElement>(linkedCts.Token);
+            var responseJson = await response.Content.ReadAsStringAsync(linkedCts.Token);
+            using var document = JsonDocument.Parse(responseJson);
+            var json = document.RootElement;
 
             if (json.TryGetProperty("type", out var typeElem) && typeElem.GetString() == "call" &&
                 json.TryGetProperty("data", out var dataElem))
@@ -112,13 +129,14 @@ public class PmhqClient : IPmhqClient, IDisposable
                     if (!string.IsNullOrEmpty(dataStr))
                     {
                         _logger.LogDebug("PMHQ API 调用成功: {Func}", func);
-                        return JsonSerializer.Deserialize<JsonElement>(dataStr);
+                        using var dataDocument = JsonDocument.Parse(dataStr);
+                        return dataDocument.RootElement.Clone();
                     }
                 }
                 else if (dataElem.ValueKind == JsonValueKind.Object)
                 {
                     _logger.LogDebug("PMHQ API 调用成功: {Func}", func);
-                    return dataElem;
+                    return dataElem.Clone();
                 }
             }
 
