@@ -175,6 +175,7 @@
 </Window.Styles>
 
 
+    <Panel>
     <Border Background="{DynamicResource MainBackground}"
             CornerRadius="0"
             ClipToBounds="True">
@@ -289,7 +290,8 @@
             <!-- 左侧导航栏 -->
             <Border Grid.Column="0"
                     Background="{DynamicResource SidebarBackground}"
-                    CornerRadius="30,0,0,30"
+                    CornerRadius="12,0,0,12"
+                    Margin="0,8,0,10"
                     BorderBrush="{DynamicResource BorderColor}"
                     BorderThickness="1"
                     BoxShadow="0 18 60 0 #22E84D9C">
@@ -441,7 +443,7 @@
             <!-- 右侧内容区域 -->
             <Border Grid.Column="1"
                     Background="{DynamicResource MainBackground}"
-                    CornerRadius="0,30,30,0"
+                    CornerRadius="0,12,12,0"
                     Margin="0,8,10,10"
                     BorderBrush="{DynamicResource BorderColor}"
                     BorderThickness="1"
@@ -465,4 +467,27 @@
             </Grid>
         </Grid>
     </Border>
+
+    <!-- 无边框窗口自定义 resize 边缘: 9 宫格, 边缘 6px 透明区拦截 resize, 中间留空穿透到内容 -->
+    <Grid IsHitTestVisible="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="6"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="6"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="6"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="6"/>
+        </Grid.ColumnDefinitions>
+        <Border Grid.Row="0" Grid.Column="0" Background="Transparent" Cursor="TopLeftCorner" Tag="NorthWest" PointerPressed="ResizeBorder_PointerPressed"/>
+        <Border Grid.Row="0" Grid.Column="1" Background="Transparent" Cursor="SizeNorthSouth" Tag="North" PointerPressed="ResizeBorder_PointerPressed"/>
+        <Border Grid.Row="0" Grid.Column="2" Background="Transparent" Cursor="TopRightCorner" Tag="NorthEast" PointerPressed="ResizeBorder_PointerPressed"/>
+        <Border Grid.Row="1" Grid.Column="0" Background="Transparent" Cursor="SizeWestEast" Tag="West" PointerPressed="ResizeBorder_PointerPressed"/>
+        <Border Grid.Row="1" Grid.Column="2" Background="Transparent" Cursor="SizeWestEast" Tag="East" PointerPressed="ResizeBorder_PointerPressed"/>
+        <Border Grid.Row="2" Grid.Column="0" Background="Transparent" Cursor="BottomLeftCorner" Tag="SouthWest" PointerPressed="ResizeBorder_PointerPressed"/>
+        <Border Grid.Row="2" Grid.Column="1" Background="Transparent" Cursor="SizeNorthSouth" Tag="South" PointerPressed="ResizeBorder_PointerPressed"/>
+        <Border Grid.Row="2" Grid.Column="2" Background="Transparent" Cursor="BottomRightCorner" Tag="SouthEast" PointerPressed="ResizeBorder_PointerPressed"/>
+    </Grid>
+    </Panel>
 </Window>

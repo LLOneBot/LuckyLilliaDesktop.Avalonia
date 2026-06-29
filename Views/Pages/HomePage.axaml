@@ -139,21 +139,6 @@
                     </DockPanel>
                 </Border>
 
-                <!-- 标题 -->
-                <DockPanel>
-                    <PathIcon DockPanel.Dock="Left"
-                              Data="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"
-                              Width="36" Height="36"
-                              Foreground="{DynamicResource PrimaryBrush}"
-                              Margin="0,0,12,0"/>
-                    <TextBlock Text="{Binding Title}"
-                               FontSize="34"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource TextPrimary}"
-                               VerticalAlignment="Center"/>
-                </DockPanel>
-                <Border Height="2" Background="{DynamicResource PrimaryBrush}" CornerRadius="1"/>
-
                 <!-- 进程资源监控标题 -->
                 <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
                     <PathIcon Data="M15 9H9v6h6V9zm-2 4h-2v-2h2v2zm8-2V9h-2V7c0-1.1-.9-2-2-2h-2V3h-2v2h-2V3H9v2H7c-1.1 0-2 .9-2 2v2H3v2h2v2H3v2h2v2c0 1.1.9 2 2 2h2v2h2v-2h2v2h2v-2h2c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2zm-4 6H7V7h10v10z"
@@ -165,13 +150,51 @@
                                Foreground="{DynamicResource TextPrimary}"/>
                 </StackPanel>
 
-                <!-- 进程卡片：Bot占用 和 QQ -->
-                <UniformGrid Columns="2">
+                <!-- 进程卡片: 无头 [LLBot信息 + Bot占用], 非无头 [Bot占用 + QQ占用], 恒 2 列 -->
+                <UniformGrid Columns="{Binding ProcessCardColumns}">
+                    <!-- LLBot 信息卡 (无头模式显示: 版本 + 已运行时长) -->
+                    <Border Background="{DynamicResource CardBackground}"
+                            BorderBrush="{DynamicResource BorderColor}"
+                            BorderThickness="1"
+                            CornerRadius="20" Padding="16" Margin="8,0"
+                            IsVisible="{Binding IsHeadless}"
+                            BoxShadow="0 18 48 0 #18E84D9C">
+                        <!-- 标题固定顶部, 2x2 信息网格撑满剩余高度 -->
+                        <Grid RowDefinitions="Auto,Auto,*">
+                            <!-- 标题行 -->
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10">
+                                <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+                                          Width="20" Height="20"
+                                          Foreground="{DynamicResource PrimaryBrush}"/>
+                                <TextBlock Text="LLBot 信息"
+                                           FontSize="16"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                            </StackPanel>
+                            <Border Grid.Row="1" Height="1" Margin="0,12" Background="{DynamicResource BorderColor}"/>
+                            <!-- 信息网格: 2 列 2 行, 每格统一 14 Medium 单行 (与 Bot 卡字号一致), 平分剩余高度 -->
+                            <Grid Grid.Row="2" ColumnDefinitions="*,*" RowDefinitions="*,*">
+                                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
+                                           Text="{Binding LLBotVersion, StringFormat='版本: v{0}'}"
+                                           FontSize="14" FontWeight="Medium" Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" VerticalAlignment="Center"
+                                           Text="{Binding NodeVersion, StringFormat='Node: {0}'}"
+                                           FontSize="14" FontWeight="Medium" Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center"
+                                           Text="{Binding StartedAt, StringFormat='启动于: {0}'}"
+                                           FontSize="14" FontWeight="Medium" Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" VerticalAlignment="Center"
+                                           Text="{Binding Uptime, StringFormat='已运行: {0}'}"
+                                           FontSize="14" FontWeight="Medium" Foreground="{DynamicResource TextPrimary}"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
                     <!-- Bot占用 卡片（整合 Manager、PMHQ、LLBot） -->
                     <Border Background="{DynamicResource CardBackground}"
                             BorderBrush="{DynamicResource BorderColor}"
                             BorderThickness="1"
-                            CornerRadius="20" Padding="16" Margin="0,0,8,0"
+                            CornerRadius="20" Padding="16" Margin="8,0"
                     BoxShadow="0 18 48 0 #18E84D9C">
                         <StackPanel Spacing="12">
                             <!-- 标题行 -->
@@ -179,7 +202,7 @@
                                 <PathIcon Data="M17.5 15.5c0 1.61-1.39 3-3 3-.49 0-.97-.13-1.39-.35L7.5 21l.75-3.75C7.49 16.57 7 15.59 7 14.5c0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 .5-.09.97-.26 1.4l2.82-2.82c.28.48.44 1.03.44 1.62zM12 6c2.76 0 5 2.24 5 5 0 .51-.08 1-.22 1.46l1.71-1.71c.01-.25.01-.5.01-.75 0-3.86-3.14-7-7-7-1.93 0-3.68.79-4.94 2.06l1.42 1.42C8.95 5.55 10.4 5 12 5zm0 1c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.37l5.59-5.59C13.71 7.29 12.89 7 12 7z"
                                           Width="20" Height="20"
                                           Foreground="{DynamicResource PrimaryBrush}"/>
-                                <TextBlock Text="Bot占用"
+                                <TextBlock Text="LLBot 占用"
                                            FontSize="16"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource TextPrimary}"/>
@@ -220,11 +243,12 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- QQ 卡片 -->
+                    <!-- QQ 卡片 (无头模式隐藏) -->
                     <Border Background="{DynamicResource CardBackground}"
                             BorderBrush="{DynamicResource BorderColor}"
                             BorderThickness="1"
-                            CornerRadius="20" Padding="16" Margin="8,0,0,0"
+                            CornerRadius="20" Padding="16" Margin="8,0"
+                            IsVisible="{Binding !IsHeadless}"
                     BoxShadow="0 18 48 0 #18E84D9C">
                         <StackPanel Spacing="12">
                             <!-- 标题行 -->

@@ -2,6 +2,7 @@ using LuckyLilliaDesktop.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -24,12 +25,30 @@ public interface IPmhqClient
     void CancelAll();
 }
 
-public class LoginAccount
+public class LoginAccount : INotifyPropertyChanged
 {
     public string Uin { get; set; } = "";
     public string NickName { get; set; } = "";
     public string FaceUrl { get; set; } = "";
     public bool IsQuickLogin { get; set; }
+
+    // 列表显示用: 有昵称显昵称, 否则显 QQ 号
+    public string DisplayName => string.IsNullOrEmpty(NickName) ? Uin : NickName;
+    public bool HasNick => !string.IsNullOrEmpty(NickName);
+
+    // 头像异步下载后填充, 通知 UI 更新
+    private Avalonia.Media.Imaging.Bitmap? _avatar;
+    public Avalonia.Media.Imaging.Bitmap? Avatar
+    {
+        get => _avatar;
+        set
+        {
+            _avatar = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Avatar)));
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
 
 public class PmhqClient : IPmhqClient, IDisposable
@@ -152,112 +171,49 @@ public class PmhqClient : IPmhqClient, IDisposable
         }
     }
 
-    public async Task<SelfInfo?> FetchSelfInfoAsync(CancellationToken ct = default)
+    // PMHQ 不再提供 getSelfInfo 查询 QQ 账号信息, uin/昵称改走 LLBot IPC. 直接返回 null 避免无效请求/刷日志.
+    public Task<SelfInfo?> FetchSelfInfoAsync(CancellationToken ct = default)
     {
+        return Task.FromResult<SelfInfo?>(null);
+    }
+
+    // PMHQ /health (GET) 返回 qq_pid + qq_version, 取代旧的 getDeviceInfo / getProcessInfo
+    private async Task<(int? Pid, string? Version)?> FetchHealthAsync(CancellationToken ct = default)
+    {
+        if (!_port.HasValue) return null;
+        var url = $"http://127.0.0.1:{_port.Value}/health";
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, ct);
         try
         {
-            var data = await CallAsync("getSelfInfo", ct: ct);
-            if (data == null)
-                return null;
-
-            var dataElem = data.Value;
-            if (!dataElem.TryGetProperty("result", out var result))
-                return null;
-
-            if (result.ValueKind != JsonValueKind.Object)
-                return null;
-
-            var uin = "";
-            if (result.TryGetProperty("uin", out var uinElem))
-            {
-                uin = uinElem.ValueKind == JsonValueKind.Number
-                    ? uinElem.GetInt64().ToString()
-                    : uinElem.GetString() ?? "";
-            }
-
-            if (string.IsNullOrEmpty(uin))
-                return null;
-
-            var nickname = "";
-            if (result.TryGetProperty("nickName", out var nickElem) ||
-                result.TryGetProperty("nickname", out nickElem) ||
-                result.TryGetProperty("nick", out nickElem))
-            {
-                nickname = nickElem.GetString() ?? "";
-            }
-
-            return new SelfInfo { Uin = uin, Nickname = nickname };
+            var json = await _httpClient.GetFromJsonAsync<JsonElement>(url, linkedCts.Token);
+            int? pid = null;
+            if (json.TryGetProperty("qq_pid", out var pidElem) && pidElem.ValueKind == JsonValueKind.Number)
+                pid = pidElem.GetInt32();
+            string? version = null;
+            if (json.TryGetProperty("qq_version", out var verElem) && verElem.ValueKind == JsonValueKind.String)
+                version = verElem.GetString();
+            return (pid, version);
         }
+        catch (OperationCanceledException) { return null; }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "解析 SelfInfo 失败");
+            _logger.LogDebug("PMHQ /health 调用失败: {Message}", ex.Message);
             return null;
         }
     }
 
     public async Task<DeviceInfo?> FetchDeviceInfoAsync(CancellationToken ct = default)
     {
-        try
-        {
-            var data = await CallAsync("getDeviceInfo", ct: ct);
-            if (data == null)
-                return null;
-
-            var dataElem = data.Value;
-            if (!dataElem.TryGetProperty("result", out var result))
-                return null;
-
-            if (result.ValueKind != JsonValueKind.Object)
-                return null;
-
-            var buildVer = "";
-            if (result.TryGetProperty("buildVer", out var buildVerElem))
-            {
-                buildVer = buildVerElem.GetString() ?? "";
-            }
-
-            var model = "";
-            if (result.TryGetProperty("devType", out var modelElem))
-            {
-                model = modelElem.GetString() ?? "";
-            }
-
-            return new DeviceInfo { BuildVer = buildVer, Model = model };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "解析 DeviceInfo 失败");
+        var health = await FetchHealthAsync(ct);
+        if (string.IsNullOrEmpty(health?.Version))
             return null;
-        }
+        return new DeviceInfo { BuildVer = health.Value.Version!, Model = "" };
     }
 
     public async Task<int?> FetchQQPidAsync(CancellationToken ct = default)
     {
-        try
-        {
-            var data = await CallAsync("getProcessInfo", ct: ct);
-            if (data == null)
-                return null;
-
-            var dataElem = data.Value;
-            if (!dataElem.TryGetProperty("result", out var result))
-                return null;
-
-            if (result.ValueKind != JsonValueKind.Object)
-                return null;
-
-            if (result.TryGetProperty("pid", out var pidElem) && pidElem.ValueKind == JsonValueKind.Number)
-            {
-                return pidElem.GetInt32();
-            }
-
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "解析 QQ PID 失败");
-            return null;
-        }
+        var health = await FetchHealthAsync(ct);
+        return health?.Pid;
     }
 
     public async Task<List<LoginAccount>?> GetLoginListAsync(CancellationToken ct = default)

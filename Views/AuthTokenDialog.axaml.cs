@@ -7,7 +7,7 @@ namespace LuckyLilliaDesktop.Views;
 
 public partial class AuthTokenDialog : Window
 {
-    private const string AuthTokenUrl = "https://s.luckylillia.com";
+    private const string AuthTokenUrl = "https://auth.luckylillia.com";
 
     public AuthTokenDialog()
     {

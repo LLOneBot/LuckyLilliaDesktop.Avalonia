@@ -1,4 +1,5 @@
 using LuckyLilliaDesktop.Models;
+using System;
 using System.Threading.Tasks;
 
 namespace LuckyLilliaDesktop.Services;
@@ -8,6 +9,9 @@ namespace LuckyLilliaDesktop.Services;
 /// </summary>
 public interface IConfigManager
 {
+    /// <summary>配置保存成功后触发, 参数为最新配置. 供 UI 即时响应配置变化.</summary>
+    event Action<AppConfig>? ConfigSaved;
+
     Task<AppConfig> LoadConfigAsync();
     Task<bool> SaveConfigAsync(AppConfig config);
     T GetSetting<T>(string key, T defaultValue);

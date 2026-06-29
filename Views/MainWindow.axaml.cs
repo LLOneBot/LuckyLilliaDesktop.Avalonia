@@ -5,6 +5,7 @@ using LuckyLilliaDesktop.Services;
 using LuckyLilliaDesktop.ViewModels;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,7 +14,6 @@ namespace LuckyLilliaDesktop.Views;
 public partial class MainWindow : Window
 {
     private IConfigManager? _configManager;
-    private ILogger<LoginDialog>? _loginDialogLogger;
     private ILogger<MainWindow>? _logger;
     private bool _windowPositionLoaded;
     private bool _minimizeToTrayOnStartChecked;
@@ -42,6 +42,17 @@ public partial class MainWindow : Window
         }
 
         BeginMoveDrag(e);
+    }
+
+    // SystemDecorations=None 没有系统 resize 边框, 用窗口边缘的透明区 + BeginResizeDrag 自定义 resize
+    private void ResizeBorder_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized) return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (sender is Control c && c.Tag is string tag && Enum.TryParse<WindowEdge>(tag, out var edge))
+        {
+            BeginResizeDrag(edge, e);
+        }
     }
 
     private void MinimizeButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -326,18 +337,16 @@ public partial class MainWindow : Window
         {
             var app = Application.Current as App;
             _configManager = app?.Services?.GetService(typeof(IConfigManager)) as IConfigManager;
-            _loginDialogLogger = app?.Services?.GetService(typeof(ILogger<LoginDialog>)) as ILogger<LoginDialog>;
             _logger = app?.Services?.GetService(typeof(ILogger<MainWindow>)) as ILogger<MainWindow>;
-            var pmhqClient = app?.Services?.GetService(typeof(IPmhqClient)) as IPmhqClient;
             _resourceMonitor = app?.Services?.GetService(typeof(IResourceMonitor)) as IResourceMonitor;
 
             vm.HomeVM.ConfirmDialog = ShowConfirmDialogAsync;
             vm.HomeVM.ChoiceDialog = ShowChoiceDialogAsync;
-            vm.HomeVM.ShowLoginDialog = port => ShowLoginDialogAsync(pmhqClient!, port);
-            vm.HomeVM.ShowLoginDialogWithHeadless = (port, headless) => ShowLoginDialogAsync(pmhqClient!, port, headless);
             vm.HomeVM.ShowAlertDialog = ShowAlertDialogAsync;
             vm.HomeVM.ShowLoadingDialog = ShowLoadingDialogAsync;
             vm.HomeVM.ShowAuthTokenDialog = ShowAuthTokenDialogAsync;
+            vm.HomeVM.ShowQRLoginDialog = ShowQRLoginDialogAsync;
+            vm.HomeVM.ShowHeadlessLoginDialog = ShowHeadlessLoginDialogAsync;
             vm.AboutVM.ConfirmDialog = ShowConfirmDialogAsync;
             vm.LLBotConfigVM.ShowAlertDialog = ShowAlertDialogAsync;
         }
@@ -379,37 +388,33 @@ public partial class MainWindow : Window
         return await dialog.ShowDialog<string?>(this);
     }
 
+    private async Task<string?> ShowQRLoginDialogAsync()
+    {
+        var app = Application.Current as App;
+        if (app?.Services?.GetService(typeof(ILLBotIpcClient)) is not ILLBotIpcClient ipc)
+        {
+            return null;
+        }
+        var dialog = new QRLoginDialog(ipc);
+        return await dialog.ShowDialog<string?>(this);
+    }
+
+    private async Task<string?> ShowHeadlessLoginDialogAsync(List<LoginAccount> accounts, Func<string?, Task<bool>> onStart)
+    {
+        var app = Application.Current as App;
+        if (app?.Services?.GetService(typeof(ILLBotIpcClient)) is not ILLBotIpcClient ipc)
+        {
+            return null;
+        }
+        var dialog = new HeadlessLoginDialog(ipc, accounts, onStart);
+        return await dialog.ShowDialog<string?>(this);
+    }
+
     private async Task<int> ShowChoiceDialogAsync(string title, string message, string option1, string option2)
     {
         var dialog = new ChoiceDialog(title, message, option1, option2);
         var result = await dialog.ShowDialog<int?>(this);
         return result ?? -1;
-    }
-
-    private async Task<string?> ShowLoginDialogAsync(IPmhqClient pmhqClient, int port)
-    {
-        return await ShowLoginDialogAsync(pmhqClient, port, false);
-    }
-
-    private async Task<string?> ShowLoginDialogAsync(IPmhqClient pmhqClient, int port, bool isHeadlessMode)
-    {
-        while (true)
-        {
-            var dialog = new LoginDialog(pmhqClient, port, _loginDialogLogger, isHeadlessMode);
-            var result = await dialog.ShowDialog<bool?>(this);
-
-            if (result == true)
-                return dialog.LoggedInUin;
-
-            if (dialog.IsLoginFailed && isHeadlessMode)
-            {
-                var confirmDialog = new ConfirmDialog(dialog.LoginFailedReason ?? "登录失败");
-                await confirmDialog.ShowDialog<bool?>(this);
-                continue;
-            }
-
-            return null;
-        }
     }
 
     private bool _isClosingHandled;

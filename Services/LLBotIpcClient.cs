@@ -12,28 +12,49 @@ using System.Threading.Tasks;
 namespace LuckyLilliaDesktop.Services;
 
 /// <summary>
+/// LLBot 登录状态. State 取值由 LLBot 决定, Desktop 不强枚举, 约定:
+///   initializing    - 连接 / 加载 session 中
+///   need_qrcode     - 有二维码待扫 (QrCodeState.WaitingForScan)
+///   waiting_confirm - 已扫码, 等待手机确认 (QrCodeState.WaitingForConfirm)
+///   logged_in       - 已登录 (含 session 快速登录), 带 uin/nickname
+///   expired         - 二维码过期
+///   cancelled       - 用户取消
+/// </summary>
+public sealed record LoginStateInfo(string State, string? QrcodePngBase64, string Uin, string Nickname)
+{
+    public bool IsLoggedIn => State == "logged_in";
+    public bool HasQrCode => !string.IsNullOrEmpty(QrcodePngBase64);
+}
+
+/// <summary>
 /// LLBot IPC 客户端 (仅 Windows). LLBot 是 server, Desktop 是 client.
 ///
 /// 流程:
 ///   1. Desktop 生成管道名 luckylillia-llbot-{pid}-{guid}, 通过 env LL_IPC_PIPE 传给 LLBot.
 ///   2. LLBot 用 net.createServer().listen('\\\\.\\pipe\\' + name) 监听.
-///   3. Desktop 启 LLBot 后调用 StartAsync(pipeName): 重连循环 + 长连接内轮询 get_self_info.
+///   3. Desktop 启 LLBot 后调用 StartAsync(pipeName): 重连循环 + 长连接内轮询 get_login_state.
 ///
 /// 协议: JSON Lines, UTF-8, '\n' 分隔.
-///   Desktop -&gt; LLBot: {"type":"request","id":"1","method":"get_self_info"}
-///   LLBot   -&gt; Desktop: {"type":"response","id":"1","data":{"uin":"...","nickname":"..."}}
-///                        {"type":"response","id":"1","error":"..."}
+///   Desktop -&gt; LLBot: {"type":"request","id":"1","method":"get_login_state"}
+///   LLBot   -&gt; Desktop:
+///     {"type":"response","id":"1","data":{"state":"need_qrcode","qrcode_png_base64":"data:image/png;base64,..."}}
+///     {"type":"response","id":"1","data":{"state":"logged_in","uin":"...","nickname":"..."}}
+///     {"type":"response","id":"1","error":"..."}
 /// </summary>
 public interface ILLBotIpcClient
 {
     /// <summary>已经协商好的管道名, 没启动时为 null.</summary>
     string? PipeName { get; }
-    /// <summary>self_info 轮询结果流 (uin, nickname). 每次拿到新值都会推送.</summary>
+    /// <summary>self_info 流 (uin, nickname). 登录成功后推送, 兼容 HomeViewModel 现有订阅.</summary>
     IObservable<(string Uin, string Nickname)> SelfInfoStream { get; }
+    /// <summary>登录状态流. 每次轮询都推送, 供二维码登录对话框消费.</summary>
+    IObservable<LoginStateInfo> LoginStateStream { get; }
     /// <summary>当前 LLBot 是否在线 (已经连上一次, 还没断).</summary>
     bool IsConnected { get; }
     string? CurrentUin { get; }
     string? CurrentNickname { get; }
+    /// <summary>最近一次拿到的登录状态, 没有则 null. 供新订阅者立即读取当前值.</summary>
+    LoginStateInfo? CurrentLoginState { get; }
 
     /// <summary>生成一个管道名, 同时开始连接循环. 返回 pipe 名供调用方塞到 LLBot 的环境变量里.</summary>
     Task<string> StartAsync(CancellationToken ct = default);
@@ -45,6 +66,7 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
 {
     private readonly ILogger<LLBotIpcClient> _logger;
     private readonly Subject<(string Uin, string Nickname)> _selfInfoSubject = new();
+    private readonly Subject<LoginStateInfo> _loginStateSubject = new();
 
     private CancellationTokenSource? _cts;
     private Task? _runTask;
@@ -52,9 +74,10 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
     private volatile bool _connected;
     private string? _cachedUin;
     private string? _cachedNickname;
+    private LoginStateInfo? _currentLoginState;
     private long _nextId;
 
-    // 轮询间隔: 没有结果时频繁 (FastInterval), 拿到 uin/nickname 后拉长 (SlowInterval).
+    // 轮询间隔: 登录中频繁 (二维码状态要及时), 登录成功后拉长.
     private static readonly TimeSpan FastInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan SlowInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(1);
@@ -74,9 +97,11 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
 
     public string? PipeName => _pipeName;
     public IObservable<(string Uin, string Nickname)> SelfInfoStream => _selfInfoSubject;
+    public IObservable<LoginStateInfo> LoginStateStream => _loginStateSubject;
     public bool IsConnected => _connected;
     public string? CurrentUin => _cachedUin;
     public string? CurrentNickname => _cachedNickname;
+    public LoginStateInfo? CurrentLoginState => _currentLoginState;
 
     public Task<string> StartAsync(CancellationToken ct = default)
     {
@@ -118,6 +143,7 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
 
     private void ResetCache()
     {
+        _currentLoginState = null;
         if (_cachedUin != null || _cachedNickname != null)
         {
             _cachedUin = null;
@@ -173,24 +199,29 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
 
         while (!ct.IsCancellationRequested && pipe.IsConnected)
         {
-            var info = await RequestSelfInfoOnceAsync(writer, reader, ct);
+            var info = await RequestLoginStateOnceAsync(writer, reader, ct);
             if (info != null)
             {
-                ApplySelfInfo(info.Value.Uin, info.Value.Nickname);
+                _currentLoginState = info;
+                _loginStateSubject.OnNext(info);
+                if (info.IsLoggedIn)
+                {
+                    ApplySelfInfo(info.Uin, info.Nickname);
+                }
             }
 
-            // 拿到完整 uin+nickname 后用慢节奏, 否则用快节奏
-            var hasFull = !string.IsNullOrEmpty(_cachedUin) && !string.IsNullOrEmpty(_cachedNickname);
-            try { await Task.Delay(hasFull ? SlowInterval : FastInterval, ct); }
+            // 登录成功后用慢节奏, 登录中 (二维码状态) 用快节奏
+            var loggedIn = info?.IsLoggedIn ?? false;
+            try { await Task.Delay(loggedIn ? SlowInterval : FastInterval, ct); }
             catch (OperationCanceledException) { return; }
         }
     }
 
-    private async Task<(string Uin, string Nickname)?> RequestSelfInfoOnceAsync(
+    private async Task<LoginStateInfo?> RequestLoginStateOnceAsync(
         StreamWriter writer, StreamReader reader, CancellationToken ct)
     {
         var id = Interlocked.Increment(ref _nextId).ToString();
-        var payload = JsonSerializer.Serialize(new IpcRequest("request", id, "get_self_info"), JsonOpts);
+        var payload = JsonSerializer.Serialize(new IpcRequest("request", id, "get_login_state"), JsonOpts);
 
         try
         {
@@ -210,7 +241,7 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
                 var parsed = TryParseResponse(line, id, out var data);
                 if (parsed == ParseResult.MatchedSuccess) return data;
                 if (parsed == ParseResult.MatchedError) return null;
-                // 收到非匹配行, 继续读 (兼容未来的 event 推送)
+                // 收到非匹配行, 继续读
             }
             return null;
         }
@@ -220,9 +251,9 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
 
     private enum ParseResult { NotMatched, MatchedSuccess, MatchedError }
 
-    private static ParseResult TryParseResponse(string line, string expectedId, out (string Uin, string Nickname) data)
+    private static ParseResult TryParseResponse(string line, string expectedId, out LoginStateInfo? data)
     {
-        data = default;
+        data = null;
         try
         {
             using var doc = JsonDocument.Parse(line);
@@ -236,9 +267,11 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
             if (!root.TryGetProperty("data", out var d))
                 return ParseResult.MatchedError;
 
+            var state = d.TryGetProperty("state", out var s) ? (s.GetString() ?? "") : "";
+            var qrcode = d.TryGetProperty("qrcode_png_base64", out var q) ? q.GetString() : null;
             var uin = d.TryGetProperty("uin", out var u) ? (u.GetString() ?? "") : "";
             var nickname = d.TryGetProperty("nickname", out var n) ? (n.GetString() ?? "") : "";
-            data = (uin, nickname);
+            data = new LoginStateInfo(state, qrcode, uin, nickname);
             return ParseResult.MatchedSuccess;
         }
         catch (JsonException)
@@ -270,6 +303,7 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
     {
         try { StopAsync().GetAwaiter().GetResult(); } catch { }
         _selfInfoSubject.Dispose();
+        _loginStateSubject.Dispose();
         GC.SuppressFinalize(this);
     }
 
