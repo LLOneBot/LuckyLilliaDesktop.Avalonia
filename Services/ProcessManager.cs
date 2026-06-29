@@ -410,7 +410,7 @@ public class ProcessManager : IProcessManager, IDisposable
         }
     }
 
-    public async Task<bool> StartLLBotAsync(string nodePath, string scriptPath)
+    public async Task<bool> StartLLBotAsync(string nodePath, string scriptPath, string? ipcPipeName = null)
     {
         try
         {
@@ -452,6 +452,12 @@ public class ProcessManager : IProcessManager, IDisposable
 
             startInfo.Environment["NODE_SKIP_PLATFORM_CHECK"] = "1";
             startInfo.Environment["FORCE_COLOR"] = "3";
+
+            // LLBot 通过这个环境变量连接 Desktop 的命名管道 (仅 Windows)
+            if (!string.IsNullOrEmpty(ipcPipeName))
+            {
+                startInfo.Environment["LL_IPC_PIPE"] = ipcPipeName;
+            }
 
             // 添加 Node.js 参数
             startInfo.ArgumentList.Add("--enable-source-maps");

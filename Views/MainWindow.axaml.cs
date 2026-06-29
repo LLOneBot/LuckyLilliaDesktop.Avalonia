@@ -337,6 +337,7 @@ public partial class MainWindow : Window
             vm.HomeVM.ShowLoginDialogWithHeadless = (port, headless) => ShowLoginDialogAsync(pmhqClient!, port, headless);
             vm.HomeVM.ShowAlertDialog = ShowAlertDialogAsync;
             vm.HomeVM.ShowLoadingDialog = ShowLoadingDialogAsync;
+            vm.HomeVM.ShowAuthTokenDialog = ShowAuthTokenDialogAsync;
             vm.AboutVM.ConfirmDialog = ShowConfirmDialogAsync;
             vm.LLBotConfigVM.ShowAlertDialog = ShowAlertDialogAsync;
         }
@@ -370,6 +371,12 @@ public partial class MainWindow : Window
         var dialog = new ConfirmDialog(message);
         var result = await dialog.ShowDialog<bool?>(this);
         return result == true;
+    }
+
+    private async Task<string?> ShowAuthTokenDialogAsync()
+    {
+        var dialog = new AuthTokenDialog();
+        return await dialog.ShowDialog<string?>(this);
     }
 
     private async Task<int> ShowChoiceDialogAsync(string title, string message, string option1, string option2)

@@ -63,7 +63,10 @@ Tab-based navigation via `MainWindowViewModel.SelectedIndex` (Home → Log → C
 ### Process Management Rules
 
 - **PMHQ is a launcher** — it starts the QQ process and then exits. Always check QQ process status (not PMHQ) for login state: use `_processManager.GetProcessStatus("QQ")`, not `GetProcessStatus("PMHQ")`.
-- **SelfInfo timing** — UIN arrives before Nickname. `ISelfInfoService` exposes them as separate observable streams (`UinStream`, `NicknameStream`). Never gate logic on both being available simultaneously.
+- **Headless mode bypasses PMHQ** — when `config.Headless` is true, `HomeViewModel.StartAllServicesAsync` dispatches to `StartHeadlessServicesAsync`, which skips PMHQ/QQ entirely and launches only LLBot (LLBot handles the QQ protocol itself). No PMHQ port, no `PmhqClient` polling, no login dialog, no SSE listener. UIN / nickname come from LLBot over the IPC pipe (see below). The non-headless path still drives PMHQ + QQ + LLBot. `ProcessManager.StartLLBotAsync` skips the `--pmhq-port` arg when `PmhqPort` is null, so the same method serves both paths.
+- **LLBot IPC (Windows only)** — Desktop generates a pipe name (`luckylillia-llbot-{pid}-{guid}`) and passes it to LLBot via env `LL_IPC_PIPE`. **LLBot is the server (`net.createServer().listen`), Desktop is the client (`NamedPipeClientStream`) and polls.** Protocol is JSON Lines, UTF-8, `\n`-delimited; currently only request/response `get_self_info`. `ILLBotIpcClient` runs a reconnect + poll loop (fast 1s while uin/nickname unknown, then 5s). Non-Windows skips IPC silently. See [doc/llbot-ipc.md](doc/llbot-ipc.md).
+- **Auth Token** — LLBot reads `<llbot-dir>/data/auth_token.txt` on startup. `HomeViewModel.EnsureAuthTokenAsync` prompts via `AuthTokenDialog` and writes the file when missing; both the headless and non-headless start paths call it before launching LLBot.
+- **SelfInfo timing** — UIN arrives before Nickname. `ISelfInfoService` exposes them as separate observable streams (`UinStream`, `NicknameStream`). Never gate logic on both being available simultaneously. Headless mode does not populate these streams.
 - **Windows cleanup** — Windows Job Objects ensure the entire process tree is terminated. On macOS/Linux, relies on parent-child signal propagation.
 
 ### Platform-Specific Behavior
@@ -97,6 +100,14 @@ Exceptions: brand colors (e.g. `#6C7BFF`), QR code background (must be white), a
 ### Logging
 
 Serilog with console + file sinks. Log files are per-session (`logs/yyyyMMdd_HHmmss.log`), capped at 10MB with auto-roll, and cleaned up on startup (7-day retention, max 50 files).
+
+## Topic Docs
+
+| Doc | When to read |
+|-----|--------------|
+| [doc/job-object.md](doc/job-object.md) | Touching Windows Job Object subprocess cleanup in `ProcessManager`. |
+| [doc/koishi.md](doc/koishi.md) | Working on `KoishiInstallService` / Koishi auto-install flow. |
+| [doc/llbot-ipc.md](doc/llbot-ipc.md) | Anything touching the LLBot named-pipe IPC: message schema, env var, `ILLBotIpcServer` surface, LLBot Node.js side glue. |
 
 ## Release Process
 

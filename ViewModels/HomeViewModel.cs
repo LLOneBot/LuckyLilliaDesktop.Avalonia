@@ -26,6 +26,7 @@ public class HomeViewModel : ViewModelBase
     private readonly ISelfInfoService _selfInfoService;
     private readonly IConfigManager _configManager;
     private readonly IPmhqClient _pmhqClient;
+    private readonly ILLBotIpcClient _llbotIpc;
     private readonly ILogCollector _logCollector;
     private readonly IDownloadService _downloadService;
     private readonly IUpdateChecker _updateChecker;
@@ -42,6 +43,7 @@ public class HomeViewModel : ViewModelBase
     public Func<int, bool, Task<string?>>? ShowLoginDialogWithHeadless { get; set; }
     public Func<string, string, Task>? ShowAlertDialog { get; set; }
     public Func<string, Func<Task>, Task>? ShowLoadingDialog { get; set; }
+    public Func<Task<string?>>? ShowAuthTokenDialog { get; set; }
 
     // 标题
     private string _title = "控制面板";
@@ -357,6 +359,7 @@ public class HomeViewModel : ViewModelBase
         ISelfInfoService selfInfoService,
         IConfigManager configManager,
         IPmhqClient pmhqClient,
+        ILLBotIpcClient llbotIpc,
         ILogCollector logCollector,
         IDownloadService downloadService,
         IUpdateChecker updateChecker,
@@ -369,6 +372,7 @@ public class HomeViewModel : ViewModelBase
         _selfInfoService = selfInfoService;
         _configManager = configManager;
         _pmhqClient = pmhqClient;
+        _llbotIpc = llbotIpc;
         _logCollector = logCollector;
         _downloadService = downloadService;
         _updateChecker = updateChecker;
@@ -408,6 +412,26 @@ public class HomeViewModel : ViewModelBase
         _resourceMonitor.QQVersionStream
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(version => QQVersion = version);
+
+        // 无头模式: 从 LLBot 端命名管道轮询 UIN / 昵称
+        _llbotIpc.SelfInfoStream
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(info =>
+            {
+                if (!string.IsNullOrEmpty(info.Uin))
+                {
+                    QQUin = info.Uin;
+                    QQStatus = ProcessStatus.Running;
+                }
+                if (!string.IsNullOrEmpty(info.Nickname))
+                {
+                    QQNickname = info.Nickname;
+                }
+                if (!string.IsNullOrEmpty(info.Uin) || !string.IsNullOrEmpty(info.Nickname))
+                {
+                    _logger.LogInformation("LLBot IPC self_info: uin={Uin}, nickname={Nickname}", info.Uin, info.Nickname);
+                }
+            });
 
         // 订阅进程状态变化
         _processManager.ProcessStatusChanged += OnProcessStatusChanged;
@@ -790,6 +814,13 @@ public class HomeViewModel : ViewModelBase
             BotStatus = ProcessStatus.Starting;
 
             var config = await _configManager.LoadConfigAsync();
+
+            // 无头模式: 不启动 PMHQ / QQ, 直接启动 LLBot (LLBot 内部自行连 QQ)
+            if (config.Headless)
+            {
+                await StartHeadlessServicesAsync(config);
+                return;
+            }
 
             // 如果 QQ 路径为空，尝试自动检测
             if (string.IsNullOrEmpty(config.QQPath))
@@ -1182,6 +1213,12 @@ public class HomeViewModel : ViewModelBase
                 return;
             }
 
+            // 检查 LLBot 的 auth_token，缺失则提示用户输入并保存到 data/auth_token.txt
+            if (!await EnsureAuthTokenAsync(config))
+            {
+                return;
+            }
+
             // 启动 PMHQ
             _logger.LogInformation("正在启动 PMHQ...");
             var pmhqSuccess = await _processManager.StartPmhqAsync(
@@ -1296,6 +1333,254 @@ public class HomeViewModel : ViewModelBase
         }
     }
 
+    // 无头模式: 不启动 PMHQ/QQ, 只启动 LLBot. LLBot 自行处理 QQ 协议.
+    // 仍需要 Node.js + LLBot 脚本 + FFmpeg + auth_token, 但跳过 QQ 路径/PMHQ 下载与启动.
+    private async Task StartHeadlessServicesAsync(AppConfig config)
+    {
+        _logger.LogInformation("无头模式: 跳过 PMHQ, 直接启动 LLBot");
+
+        // 检查 / 解析 Node.js 路径(允许使用 PATH 或本地目录, 版本需 >= 24)
+        if (!await ResolveNodePathAsync(config))
+        {
+            return;
+        }
+
+        var llbotExists = !string.IsNullOrEmpty(config.LLBotPath) && File.Exists(config.LLBotPath);
+        var ffmpegExists = Utils.FFmpegHelper.CheckFFmpegExists();
+        var ffprobeExists = Utils.FFmpegHelper.CheckFFprobeExists();
+
+        if (!llbotExists || !ffmpegExists || !ffprobeExists)
+        {
+            _downloadCts = new CancellationTokenSource();
+            IsDownloading = true;
+
+            try
+            {
+                var progress = new Progress<DownloadProgress>(p =>
+                {
+                    DownloadProgress = p.Percentage;
+                    DownloadStatus = p.Status;
+                });
+
+                if (!llbotExists)
+                {
+                    DownloadingItem = "LLBot";
+                    _logger.LogInformation("下载 LLBot...");
+                    if (!await _downloadService.DownloadLLBotAsync(progress, _downloadCts.Token))
+                    {
+                        ErrorMessage = "LLBot 下载失败";
+                        BotStatus = ProcessStatus.Stopped;
+                        return;
+                    }
+                    config.LLBotPath = Utils.Constants.DefaultPaths.LLBotScript;
+                }
+
+                if (!ffmpegExists || !ffprobeExists)
+                {
+                    DownloadingItem = "FFmpeg";
+                    _logger.LogInformation("下载 FFmpeg...");
+                    if (!await _downloadService.DownloadFFmpegAsync(progress, _downloadCts.Token))
+                    {
+                        ErrorMessage = "FFmpeg 下载失败";
+                        BotStatus = ProcessStatus.Stopped;
+                        return;
+                    }
+                }
+
+                await _configManager.SaveConfigAsync(config);
+                if (OnDownloadCompleted != null)
+                {
+                    await OnDownloadCompleted();
+                }
+            }
+            finally
+            {
+                IsDownloading = false;
+                DownloadingItem = "";
+                _downloadCts = null;
+            }
+        }
+
+        if (!File.Exists(config.LLBotPath))
+        {
+            ErrorMessage = $"LLBot 脚本不存在: {config.LLBotPath}";
+            BotStatus = ProcessStatus.Stopped;
+            return;
+        }
+
+        if (!Utils.FFmpegHelper.CheckFFmpegExists() || !Utils.FFmpegHelper.CheckFFprobeExists())
+        {
+            ErrorMessage = "FFmpeg / FFprobe 不可用";
+            BotStatus = ProcessStatus.Stopped;
+            return;
+        }
+
+        if (!await EnsureAuthTokenAsync(config))
+        {
+            return;
+        }
+
+        _logger.LogInformation("正在启动 LLBot...");
+
+        // Windows 上先生成管道名传给 LLBot, LLBot 启动后会监听这个管道, Desktop 再去轮询
+        string? ipcPipe = null;
+        if (Utils.PlatformHelper.IsWindows)
+        {
+            try
+            {
+                ipcPipe = await _llbotIpc.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "启动 LLBot IPC 客户端失败, 将无法接收 UIN / 昵称");
+            }
+        }
+
+        var llbotSuccess = await _processManager.StartLLBotAsync(config.NodePath, config.LLBotPath, ipcPipe);
+        if (!llbotSuccess)
+        {
+            ErrorMessage = "LLBot 启动失败，请检查日志";
+            _logger.LogError("LLBot 启动失败");
+            BotStatus = ProcessStatus.Stopped;
+            await _llbotIpc.StopAsync();
+            return;
+        }
+
+        _logger.LogInformation("LLBot 启动成功");
+        IsServicesRunning = true;
+        BotStatus = ProcessStatus.Running;
+
+        // 无头模式下没有 QQ 信息可显示
+        QQUin = string.Empty;
+        QQNickname = string.Empty;
+        QQVersion = string.Empty;
+        AvatarBitmap = null;
+        QQStatus = ProcessStatus.Stopped;
+
+        await ExecuteStartupCommandAsync(config);
+        await StartAutoFrameworksAsync(config);
+    }
+
+    // 解析 Node.js: 配置 -> PATH -> 本地, 必要时下载. 成功时把路径写回 config.NodePath.
+    private async Task<bool> ResolveNodePathAsync(AppConfig config)
+    {
+        var nodeExists = false;
+        if (!string.IsNullOrEmpty(config.NodePath) && File.Exists(config.NodePath))
+        {
+            if (await Utils.NodeHelper.CheckNodeVersionValidAsync(config.NodePath, 24, _logger))
+            {
+                nodeExists = true;
+            }
+            else
+            {
+                config.NodePath = string.Empty;
+            }
+        }
+        else if (!string.IsNullOrEmpty(config.NodePath))
+        {
+            config.NodePath = string.Empty;
+        }
+
+        if (!nodeExists)
+        {
+            var systemNode = Utils.NodeHelper.FindNodeInPath();
+            if (!string.IsNullOrEmpty(systemNode)
+                && await Utils.NodeHelper.CheckNodeVersionValidAsync(systemNode, 24, _logger))
+            {
+                config.NodePath = systemNode;
+                nodeExists = true;
+            }
+        }
+
+        if (!nodeExists)
+        {
+            var localNodePath = Utils.Constants.DefaultPaths.NodeExe;
+            if (File.Exists(localNodePath)
+                && await Utils.NodeHelper.CheckNodeVersionValidAsync(localNodePath, 24, _logger))
+            {
+                config.NodePath = localNodePath;
+                nodeExists = true;
+            }
+        }
+
+        if (!nodeExists)
+        {
+            _downloadCts = new CancellationTokenSource();
+            IsDownloading = true;
+            DownloadingItem = "Node.js";
+            try
+            {
+                var progress = new Progress<DownloadProgress>(p =>
+                {
+                    DownloadProgress = p.Percentage;
+                    DownloadStatus = p.Status;
+                });
+                if (!await _downloadService.DownloadNodeAsync(progress, _downloadCts.Token))
+                {
+                    ErrorMessage = "Node.js 下载失败";
+                    BotStatus = ProcessStatus.Stopped;
+                    return false;
+                }
+                config.NodePath = Utils.Constants.DefaultPaths.NodeExe;
+            }
+            finally
+            {
+                IsDownloading = false;
+                DownloadingItem = "";
+                _downloadCts = null;
+            }
+        }
+
+        if (!File.Exists(config.NodePath))
+        {
+            ErrorMessage = $"Node.js 文件不存在: {config.NodePath}";
+            BotStatus = ProcessStatus.Stopped;
+            return false;
+        }
+        return true;
+    }
+
+    // LLBot data/auth_token.txt 缺失时弹窗让用户输入并落盘. 返回 false 表示用户取消或缺少弹窗注入.
+    private async Task<bool> EnsureAuthTokenAsync(AppConfig config)
+    {
+        var llbotDir = Path.GetDirectoryName(config.LLBotPath);
+        if (string.IsNullOrEmpty(llbotDir))
+        {
+            return true;
+        }
+
+        var dataDir = Path.Combine(llbotDir, "data");
+        var authTokenPath = Path.Combine(dataDir, "auth_token.txt");
+        var existingToken = File.Exists(authTokenPath)
+            ? (await File.ReadAllTextAsync(authTokenPath)).Trim()
+            : "";
+
+        if (!string.IsNullOrEmpty(existingToken))
+        {
+            return true;
+        }
+
+        if (ShowAuthTokenDialog == null)
+        {
+            ErrorMessage = "缺少 Auth Token，无法启动 LLBot";
+            BotStatus = ProcessStatus.Stopped;
+            return false;
+        }
+
+        var token = await ShowAuthTokenDialog();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            ErrorMessage = "未提供 Auth Token，已取消启动";
+            BotStatus = ProcessStatus.Stopped;
+            return false;
+        }
+
+        Directory.CreateDirectory(dataDir);
+        await File.WriteAllTextAsync(authTokenPath, token.Trim());
+        _logger.LogInformation("Auth Token 已保存到 {Path}", authTokenPath);
+        return true;
+    }
+
     private async Task StopAllServicesAsync()
     {
         try
@@ -1306,6 +1591,8 @@ public class HomeViewModel : ViewModelBase
             _infoPollingCts?.Cancel();
             _pmhqClient.CancelAll();
             _pmhqClient.ClearPort();
+
+            await _llbotIpc.StopAsync();
             
             var qqPid = _resourceMonitor.QQPid;
             _resourceMonitor.ResetState();
