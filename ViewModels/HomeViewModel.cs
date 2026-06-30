@@ -469,25 +469,8 @@ public class HomeViewModel : ViewModelBase
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(version => QQVersion = version);
 
-        // 无头模式: 从 LLBot 端命名管道轮询 UIN / 昵称
-        _llbotIpc.SelfInfoStream
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(info =>
-            {
-                if (!string.IsNullOrEmpty(info.Uin))
-                {
-                    QQUin = info.Uin;
-                    QQStatus = ProcessStatus.Running;
-                }
-                if (!string.IsNullOrEmpty(info.Nickname))
-                {
-                    QQNickname = info.Nickname;
-                }
-                if (!string.IsNullOrEmpty(info.Uin) || !string.IsNullOrEmpty(info.Nickname))
-                {
-                    _logger.LogInformation("LLBot IPC self_info: uin={Uin}, nickname={Nickname}", info.Uin, info.Nickname);
-                }
-            });
+        // uin/昵称统一经 SelfInfoService (数据源已切到 LLBot IPC), 上面 UinStream/NicknameStream
+        // 订阅即覆盖有头 / 无头两种模式, 这里不再单独订阅 _llbotIpc.SelfInfoStream.
 
         // 订阅进程状态变化
         _processManager.ProcessStatusChanged += OnProcessStatusChanged;
@@ -839,6 +822,40 @@ public class HomeViewModel : ViewModelBase
             }
         }
         catch { }
+        return null;
+    }
+
+    // 启动门槛: PMHQ / LLBot 主版本必须 >= 8.
+    private const int MinMajorVersion = 8;
+
+    // 取主版本号 (major). 兼容 "8.0.1" / "v8.0.1" / "8.0.0-beta". 解析不出返回 null.
+    private static int? ParseMajorVersion(string? version)
+    {
+        if (string.IsNullOrWhiteSpace(version)) return null;
+        var seg = version.Trim().TrimStart('v', 'V').Split('.', '-', '+')[0];
+        return int.TryParse(seg, out var major) ? major : null;
+    }
+
+    // LLBot (两种模式) + PMHQ (仅有头) 主版本必须 >= 8. 通过返回 null, 否则返回展示给用户的错误消息.
+    // 读不到版本也拦 (正常发布都带 package.json, 读不到说明安装异常 -> 让用户重装/更新).
+    private string? CheckVersionRequirement(AppConfig config)
+    {
+        var llbotVer = DetectLLBotVersion(config.LLBotPath);
+        var llbotMajor = ParseMajorVersion(llbotVer);
+        if (llbotMajor == null)
+            return $"无法确认 LLBot 版本, 请更新到 {MinMajorVersion}.0 或以上后再启动";
+        if (llbotMajor < MinMajorVersion)
+            return $"LLBot 版本过低 (当前 {llbotVer}), 需要 {MinMajorVersion}.0 或以上, 请更新后再启动";
+
+        if (!config.Headless)
+        {
+            var pmhqVer = DetectPmhqVersion(config.PmhqPath);
+            var pmhqMajor = ParseMajorVersion(pmhqVer);
+            if (pmhqMajor == null)
+                return $"无法确认 PMHQ 版本, 请更新到 {MinMajorVersion}.0 或以上后再启动";
+            if (pmhqMajor < MinMajorVersion)
+                return $"PMHQ 版本过低 (当前 {pmhqVer}), 需要 {MinMajorVersion}.0 或以上, 请更新后再启动";
+        }
         return null;
     }
 
@@ -1319,6 +1336,15 @@ public class HomeViewModel : ViewModelBase
                 return;
             }
 
+            // 版本门槛: 有头模式查 PMHQ + LLBot 主版本, 任一 < 8 (或读不到) 拦截并要求更新
+            var versionError = CheckVersionRequirement(config);
+            if (versionError != null)
+            {
+                ErrorMessage = versionError;
+                BotStatus = ProcessStatus.Stopped;
+                return;
+            }
+
             // auth_token: 读出内容, 既供 LLBot 读取又作为 --auth-token 传给 PMHQ
             var authToken = await EnsureAuthTokenAsync(config);
             if (authToken == null)
@@ -1511,6 +1537,15 @@ public class HomeViewModel : ViewModelBase
         if (!Utils.FFmpegHelper.CheckFFmpegExists() || !Utils.FFmpegHelper.CheckFFprobeExists())
         {
             ErrorMessage = "FFmpeg / FFprobe 不可用";
+            BotStatus = ProcessStatus.Stopped;
+            return;
+        }
+
+        // 版本门槛: 无头模式只启动 LLBot, 查 LLBot 主版本 (< 8 或读不到则拦截要求更新)
+        var versionError = CheckVersionRequirement(config);
+        if (versionError != null)
+        {
+            ErrorMessage = versionError;
             BotStatus = ProcessStatus.Stopped;
             return;
         }

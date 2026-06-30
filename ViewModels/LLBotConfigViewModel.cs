@@ -15,7 +15,6 @@ namespace LuckyLilliaDesktop.ViewModels;
 
 public class LLBotConfigViewModel : ViewModelBase, IDisposable
 {
-    private readonly IPmhqClient _pmhqClient;
     private readonly ISelfInfoService _selfInfoService;
     private readonly IProcessManager _processManager;
     private readonly ILogger<LLBotConfigViewModel> _logger;
@@ -285,12 +284,10 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<Unit, Unit> OpenSatoriDocsCommand { get; }
 
     public LLBotConfigViewModel(
-        IPmhqClient pmhqClient,
         ISelfInfoService selfInfoService,
         IProcessManager processManager,
         ILogger<LLBotConfigViewModel> logger)
     {
-        _pmhqClient = pmhqClient;
         _selfInfoService = selfInfoService;
         _processManager = processManager;
         _logger = logger;
@@ -388,21 +385,12 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            // 优先使用 SelfInfoService 已缓存的 UIN
+            // uin 统一来自 LLBot IPC (经 SelfInfoService 缓存). 进页面时读当前缓存值;
+            // 页面已打开时登录, 则靠 UinStream 订阅 (OnUinReceived) 实时刷新.
             var cachedUin = _selfInfoService.CurrentUin;
             if (!string.IsNullOrEmpty(cachedUin))
             {
                 _currentUin = cachedUin;
-                HasUin = true;
-                await LoadConfigAsync();
-                return;
-            }
-
-            // 缓存中没有，调用 API 获取
-            var selfInfo = await _pmhqClient.FetchSelfInfoAsync();
-            if (selfInfo != null && !string.IsNullOrEmpty(selfInfo.Uin))
-            {
-                _currentUin = selfInfo.Uin;
                 HasUin = true;
                 await LoadConfigAsync();
             }
@@ -413,7 +401,7 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "获取 UIN 失败，可能 PMHQ 未启动");
+            _logger.LogDebug(ex, "刷新 UIN 失败");
             HasUin = false;
         }
     }
