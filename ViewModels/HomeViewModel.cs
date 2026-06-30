@@ -1575,12 +1575,26 @@ public class HomeViewModel : ViewModelBase
         IsServicesRunning = true;
         BotStatus = ProcessStatus.Running;
 
-        // QQ 信息 (UIN/昵称) 登录成功后由 IPC 登录状态流喂给 SelfInfoStream 自动填充, 这里先清初始态
-        QQUin = string.Empty;
-        QQNickname = string.Empty;
-        QQVersion = string.Empty;
-        AvatarBitmap = null;
-        QQStatus = ProcessStatus.Stopped;
+        // QQ 信息: 登录成功后主动从 IPC 当前登录状态填一次, 不能只靠 SelfInfoStream 后续推送.
+        // LLBotIpcClient.ApplySelfInfo 带去重 (_cachedUin 不变就不再推); 登录框路径登录过程中
+        // 已经推过该 uin, 这里若清空 QQUin/QQNickname, IPC 慢轮询又因去重不再推, 就永远填不回来了.
+        // (QQUin setter 会顺带触发头像加载, 所以填对 uin 头像也跟着回来.)
+        QQVersion = string.Empty;   // 无头无 PMHQ /health, 不显示 QQ 版本
+        var loginState = _llbotIpc.CurrentLoginState;
+        if (!string.IsNullOrEmpty(loginState?.Uin))
+        {
+            QQNickname = loginState.Nickname ?? string.Empty;
+            QQUin = loginState.Uin;
+            QQStatus = ProcessStatus.Running;
+        }
+        else
+        {
+            // 还没登录 (自动登录号路径不等登录就走到这): 清初始态, 等 IPC 首次推 logged_in 填充
+            QQUin = string.Empty;
+            QQNickname = string.Empty;
+            AvatarBitmap = null;
+            QQStatus = ProcessStatus.Stopped;
+        }
 
         await ExecuteStartupCommandAsync(config);
         await StartAutoFrameworksAsync(config);
