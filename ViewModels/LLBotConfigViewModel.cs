@@ -308,17 +308,6 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             .ObserveOnUiThread()
             .Subscribe(OnUinReceived);
 
-        _processManager.ProcessStatusChanged += OnProcessStatusChanged;
-    }
-
-    private void OnProcessStatusChanged(object? sender, ProcessStatus status)
-    {
-        var qqStatus = _processManager.GetProcessStatus("QQ");
-        if (qqStatus != ProcessStatus.Running)
-        {
-            _currentUin = null;
-            HasUin = false;
-        }
     }
 
     private async void OnUinReceived(string uin)
@@ -678,7 +667,6 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _uinSubscription.Dispose();
-        _processManager.ProcessStatusChanged -= OnProcessStatusChanged;
     }
 }
 

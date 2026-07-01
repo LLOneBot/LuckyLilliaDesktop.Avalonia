@@ -222,8 +222,8 @@
                             BoxShadow="0 8 24 0 #18E84D9C">
                         <Image x:Name="TitleDefaultAvatarIcon"
                                Width="34" Height="34"
-                               Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
                                RenderOptions.BitmapInterpolationMode="HighQuality"
+                               UseLayoutRounding="True"
                                Stretch="UniformToFill">
                             <Image.Clip>
                                 <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
@@ -317,8 +317,8 @@
                                 <!-- 默认图标 -->
                                 <Image x:Name="DefaultAvatarIcon"
                                        Width="56" Height="56"
-                                       Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
                                        RenderOptions.BitmapInterpolationMode="HighQuality"
+                                       UseLayoutRounding="True"
                                        Stretch="UniformToFill"
                                        IsVisible="{Binding !HomeVM.HasQQInfo}">
                                     <Image.Clip>

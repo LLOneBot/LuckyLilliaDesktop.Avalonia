@@ -23,6 +23,7 @@ namespace LuckyLilliaDesktop.ViewModels;
 
 public class HomeViewModel : ViewModelBase
 {
+    private static readonly HttpClient HttpClient = new();
     private readonly IProcessManager _processManager;
     private readonly IResourceMonitor _resourceMonitor;
     private readonly ISelfInfoService _selfInfoService;
@@ -80,11 +81,13 @@ public class HomeViewModel : ViewModelBase
             var wasRunning = _botStatus == ProcessStatus.Running;
             this.RaiseAndSetIfChanged(ref _botStatus, value);
             this.RaisePropertyChanged(nameof(BotStatusText));
-            // 记录/清除运行起点, 用于"已运行时长"
-            if (value == ProcessStatus.Running && !wasRunning)
-                _botStartTime = DateTime.Now;
-            else if (value == ProcessStatus.Stopped)
-                _botStartTime = null;
+            _botStartTime = value switch
+            {
+                // 记录/清除运行起点, 用于"已运行时长"
+                ProcessStatus.Running when !wasRunning => DateTime.Now,
+                ProcessStatus.Stopped => null,
+                _ => _botStartTime
+            };
             UpdateUptime();
             UpdateButtonState();
         }
@@ -271,24 +274,24 @@ public class HomeViewModel : ViewModelBase
 
     public bool HasQQInfo => !string.IsNullOrEmpty(QQUin);
 
-    private Avalonia.Media.Imaging.Bitmap? _avatarBitmap;
     public Avalonia.Media.Imaging.Bitmap? AvatarBitmap
     {
-        get => _avatarBitmap;
-        set => this.RaiseAndSetIfChanged(ref _avatarBitmap, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     private async Task LoadAvatarAsync(string uin)
     {
-        if (string.IsNullOrEmpty(uin)) return;
+        if (!AccountInfoHelper.IsValidQQUin(uin)) return;
 
         try
         {
             var url = $"https://q1.qlogo.cn/g?b=qq&nk={uin}&s=640";
-            using var httpClient = new System.Net.Http.HttpClient();
-            var bytes = await httpClient.GetByteArrayAsync(url);
+            var bytes = await HttpClient.GetByteArrayAsync(url);
             using var stream = new MemoryStream(bytes);
-            AvatarBitmap = BitmapLoader.DecodeToWidth(stream, 56, 2);
+            var avatar = PicHelper.DecodeToWidth(stream, 56, 1);
+            if (QQUin == uin)
+                AvatarBitmap = avatar;
         }
         catch (Exception ex)
         {
@@ -451,6 +454,12 @@ public class HomeViewModel : ViewModelBase
             .ObserveOnUiThread()
             .Subscribe(uin =>
             {
+                if (!string.IsNullOrEmpty(uin) && !AccountInfoHelper.IsValidQQUin(uin))
+                {
+                    _logger.LogWarning("忽略无效 UIN: {Uin}", uin);
+                    return;
+                }
+
                 QQUin = uin ?? string.Empty;
                 QQStatus = string.IsNullOrEmpty(uin) ? ProcessStatus.Stopped : ProcessStatus.Running;
                 if (!string.IsNullOrEmpty(uin))
@@ -500,14 +509,14 @@ public class HomeViewModel : ViewModelBase
         {
             _logger.LogDebug("导航到日志页面");
             NavigateToLogs?.Invoke();
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 更新命令 - 导航到关于页面
         UpdateCommand = ReactiveCommand.Create(() =>
         {
             _logger.LogInformation("用户点击更新按钮，导航到关于页面");
             NavigateToAbout?.Invoke();
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 取消下载命令
         CancelDownloadCommand = ReactiveCommand.Create(() =>
@@ -516,7 +525,7 @@ public class HomeViewModel : ViewModelBase
             _downloadCts?.Cancel();
             IsDownloading = false;
             DownloadStatus = "下载已取消";
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 初始化时启动资源监控
         _ = _resourceMonitor.StartMonitoringAsync();
@@ -1625,10 +1634,10 @@ public class HomeViewModel : ViewModelBase
         // (QQUin setter 会顺带触发头像加载, 所以填对 uin 头像也跟着回来.)
         QQVersion = string.Empty;   // 无头无 PMHQ /health, 不显示 QQ 版本
         var loginState = _llbotIpc.CurrentLoginState;
-        if (!string.IsNullOrEmpty(loginState?.Uin))
+        if (loginState is { Uin: var loggedInUin } && AccountInfoHelper.IsValidQQUin(loggedInUin))
         {
             QQNickname = loginState.Nickname ?? string.Empty;
-            QQUin = loginState.Uin;
+            QQUin = loggedInUin;
             QQStatus = ProcessStatus.Running;
         }
         else

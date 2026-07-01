@@ -309,8 +309,8 @@ public partial class MainWindow : Window
     private void LoadScaledDefaultAvatars()
     {
         const string iconUri = "avares://LuckyLilliaDesktop/Assets/Icons/icon.png";
-        TitleDefaultAvatarIcon.Source = BitmapLoader.DecodeAssetToWidth(iconUri, 34, RenderScaling);
-        DefaultAvatarIcon.Source = BitmapLoader.DecodeAssetToWidth(iconUri, 56, RenderScaling);
+        TitleDefaultAvatarIcon.Source = PicHelper.DecodeAssetIconCropped(iconUri, 34, RenderScaling);
+        DefaultAvatarIcon.Source = PicHelper.DecodeAssetIconCropped(iconUri, 56, RenderScaling);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -615,6 +615,13 @@ public partial class MainWindow : Window
 
     private async Task AnimateSelectedPageAsync(int selectedIndex)
     {
+        if (RenderingPerformanceHelper.UseReducedMotion)
+        {
+            SetVisiblePage(selectedIndex);
+            _animatedPageIndex = selectedIndex;
+            return;
+        }
+
         var oldIndex = _animatedPageIndex;
         if (oldIndex == selectedIndex) return;
         _animatedPageIndex = selectedIndex;
@@ -738,7 +745,7 @@ public partial class MainWindow : Window
             return null;
         }
         var dialog = new QRLoginDialog(ipc);
-        return await dialog.ShowDialog<string?>(this);
+        return await ShowFloatingLoginWindowAsync(dialog, () => dialog.LoggedInUin);
     }
 
     private async Task<string?> ShowHeadlessLoginDialogAsync(List<LoginAccount> accounts, Func<string?, Task<bool>> onStart)
@@ -749,7 +756,48 @@ public partial class MainWindow : Window
             return null;
         }
         var dialog = new HeadlessLoginDialog(ipc, accounts, onStart);
-        return await dialog.ShowDialog<string?>(this);
+        return await ShowFloatingLoginWindowAsync(dialog, () => dialog.LoggedInUin);
+    }
+
+    private Task<string?> ShowFloatingLoginWindowAsync(Window dialog, Func<string?> getResult)
+    {
+        var tcs = new TaskCompletionSource<string?>();
+
+        void CenterDialog()
+        {
+            var width = dialog.Width;
+            var height = dialog.Height;
+            if (dialog.Bounds.Width > 0) width = dialog.Bounds.Width;
+            if (dialog.Bounds.Height > 0) height = dialog.Bounds.Height;
+
+            dialog.Position = new PixelPoint(
+                Position.X + Math.Max(0, (int)((Bounds.Width - width) / 2)),
+                Position.Y + 188);
+        }
+
+        void OwnerMoved(object? sender, PixelPointEventArgs e) => CenterDialog();
+        void OwnerResized(object? sender, SizeChangedEventArgs e) => CenterDialog();
+        void DialogResized(object? sender, SizeChangedEventArgs e) => CenterDialog();
+        void DialogOpened(object? sender, EventArgs e) => CenterDialog();
+        void DialogClosed(object? sender, EventArgs e)
+        {
+            PositionChanged -= OwnerMoved;
+            SizeChanged -= OwnerResized;
+            dialog.SizeChanged -= DialogResized;
+            dialog.Opened -= DialogOpened;
+            dialog.Closed -= DialogClosed;
+            tcs.TrySetResult(getResult());
+        }
+
+        PositionChanged += OwnerMoved;
+        SizeChanged += OwnerResized;
+        dialog.SizeChanged += DialogResized;
+        dialog.Opened += DialogOpened;
+        dialog.Closed += DialogClosed;
+        dialog.Show(this);
+        Dispatcher.UIThread.Post(CenterDialog, DispatcherPriority.Render);
+
+        return tcs.Task;
     }
 
     private async Task<int> ShowChoiceDialogAsync(string title, string message, string option1, string option2)

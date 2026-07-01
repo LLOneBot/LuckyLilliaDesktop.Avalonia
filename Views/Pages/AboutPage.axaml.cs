@@ -19,7 +19,7 @@ public partial class AboutPage : UserControl
         if (appIconImage is null) return;
 
         var scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
-        appIconImage.Source = BitmapLoader.DecodeAssetToWidth(
+        appIconImage.Source = PicHelper.DecodeAssetIconCropped(
             "avares://LuckyLilliaDesktop/Assets/Icons/icon.png",
             56,
             scaling);

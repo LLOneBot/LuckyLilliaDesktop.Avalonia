@@ -229,7 +229,7 @@ public partial class LoginDialog : Window
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             var bytes = await http.GetByteArrayAsync(url);
             using var stream = new MemoryStream(bytes);
-            var bitmap = BitmapLoader.DecodeToWidth(stream, 48, 2);
+            var bitmap = PicHelper.DecodeToWidth(stream, 48, 2);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 targetImage.Source = bitmap;

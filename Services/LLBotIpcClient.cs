@@ -1,4 +1,3 @@
-using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 using System;
@@ -216,7 +215,7 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
         StreamWriter writer, StreamReader reader, CancellationToken ct)
     {
         var id = Interlocked.Increment(ref _nextId).ToString();
-        var payload = JsonSerializer.Serialize(new IpcRequest("request", id, "get_login_state"), AppJsonContext.Default.IpcRequest);
+        var payload = JsonSerializer.Serialize(new IpcRequest("request", id, "get_login_state"), IpcJsonContext.Default.IpcRequest);
 
         try
         {
@@ -251,22 +250,17 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
         data = null;
         try
         {
-            using var doc = JsonDocument.Parse(line);
-            var root = doc.RootElement;
-            if (!root.TryGetProperty("type", out var typeProp) || typeProp.GetString() != "response")
+            var response = JsonSerializer.Deserialize(line, IpcJsonContext.Default.IpcResponse);
+            if (response?.Type != "response" || response.Id != expectedId)
                 return ParseResult.NotMatched;
-            if (!root.TryGetProperty("id", out var idProp) || idProp.GetString() != expectedId)
-                return ParseResult.NotMatched;
-            if (root.TryGetProperty("error", out _))
-                return ParseResult.MatchedError;
-            if (!root.TryGetProperty("data", out var d))
+            if (!string.IsNullOrEmpty(response.Error) || response.Data == null)
                 return ParseResult.MatchedError;
 
-            var state = d.TryGetProperty("state", out var s) ? (s.GetString() ?? "") : "";
-            var qrcode = d.TryGetProperty("qrcode_png_base64", out var q) ? q.GetString() : null;
-            var uin = d.TryGetProperty("uin", out var u) ? (u.GetString() ?? "") : "";
-            var nickname = d.TryGetProperty("nickname", out var n) ? (n.GetString() ?? "") : "";
-            data = new LoginStateInfo(state, qrcode, uin, nickname);
+            data = new LoginStateInfo(
+                response.Data.State ?? string.Empty,
+                response.Data.QrcodePngBase64,
+                response.Data.Uin ?? string.Empty,
+                response.Data.Nickname ?? string.Empty);
             return ParseResult.MatchedSuccess;
         }
         catch (JsonException)
@@ -277,6 +271,12 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
 
     private void ApplySelfInfo(string uin, string nickname)
     {
+        if (!string.IsNullOrEmpty(uin) && !AccountInfoHelper.IsValidQQUin(uin))
+        {
+            _logger.LogWarning("忽略无效 LLBot IPC UIN: {Uin}", uin);
+            return;
+        }
+
         var changed = false;
         if (!string.IsNullOrEmpty(uin) && _cachedUin != uin)
         {
@@ -303,7 +303,16 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
     }
 }
 
-public sealed record IpcRequest(
-    [property: JsonPropertyName("type")] string Type,
-    [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("method")] string Method);
+public sealed record IpcRequest(string Type, string Id, string Method);
+
+public sealed record IpcResponse(string Type, string Id, IpcLoginData? Data, string? Error);
+
+public sealed record IpcLoginData(string? State, string? QrcodePngBase64, string? Uin, string? Nickname);
+
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
+    PropertyNameCaseInsensitive = true,
+    GenerationMode = JsonSourceGenerationMode.Metadata)]
+[JsonSerializable(typeof(IpcRequest))]
+[JsonSerializable(typeof(IpcResponse))]
+internal partial class IpcJsonContext : JsonSerializerContext;

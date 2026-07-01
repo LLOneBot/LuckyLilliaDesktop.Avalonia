@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Reactive.Subjects;
+using LuckyLilliaDesktop.Utils;
 
 namespace LuckyLilliaDesktop.Services;
 
@@ -49,6 +50,13 @@ public class SelfInfoService : ISelfInfoService, IDisposable
             if (_cachedNickname != null) { _cachedNickname = null; _nicknameSubject.OnNext(string.Empty); }
             return;
         }
+
+        if (!AccountInfoHelper.IsValidQQUin(uin))
+        {
+            _logger.LogWarning("忽略无效 UIN (LLBot IPC): {Uin}", uin);
+            return;
+        }
+
         if (_cachedUin != uin)
         {
             _cachedUin = uin;

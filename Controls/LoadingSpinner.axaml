@@ -24,6 +24,6 @@
              StrokeThickness="3"
              StartAngle="0"
              SweepAngle="270"
-             Stroke="#2196F3"/>
+             Stroke="{DynamicResource PrimaryBrush}"/>
     </Border>
 </UserControl>

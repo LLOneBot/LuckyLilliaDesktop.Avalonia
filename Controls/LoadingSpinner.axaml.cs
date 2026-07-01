@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using LuckyLilliaDesktop.Utils;
 
 namespace LuckyLilliaDesktop.Controls;
 
@@ -27,6 +28,8 @@ public partial class LoadingSpinner : UserControl
     public LoadingSpinner()
     {
         InitializeComponent();
+        if (RenderingPerformanceHelper.UseReducedMotion)
+            Styles.Clear();
         UpdateSize();
     }
 
