@@ -310,6 +310,28 @@
                                     </StackPanel>
                                 </Grid>
                             </Button>
+
+                            <!-- 红色问答 -->
+                            <Button Grid.Row="6" Grid.Column="2"
+                                    Classes="framework-card"
+                                    Command="{Binding SelectFrameworkCommand}"
+                                    CommandParameter="redreply"
+                                    IsVisible="{Binding ShowRedReply}">
+                                <Grid Width="350" Height="82" ColumnDefinitions="92,*">
+                                    <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Image Source="/Assets/Icons/redreply.png" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="红色问答" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                                            <Border Background="{DynamicResource SuccessColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding RedReplyInstalled}">
+                                                <TextBlock Text="已安装" FontSize="10" Foreground="White"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="强大的聊天自定义问答系统" FontSize="13" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
                         </Grid>
                     </StackPanel>
 
