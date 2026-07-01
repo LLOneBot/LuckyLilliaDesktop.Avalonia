@@ -16,6 +16,8 @@ public class ConfigManager : IConfigManager
     private readonly ILogger<ConfigManager> _logger;
     private readonly object _lock = new();
 
+    public event Action<AppConfig>? ConfigSaved;
+
     public ConfigManager(ILogger<ConfigManager> logger)
     {
         _logger = logger;
@@ -58,6 +60,7 @@ public class ConfigManager : IConfigManager
             _cachedConfig = config;
             _rawJson = JsonNode.Parse(json)?.AsObject() ?? new JsonObject();
             _logger.LogInformation("配置保存成功");
+            ConfigSaved?.Invoke(config);
             return true;
         }
         catch (Exception ex)

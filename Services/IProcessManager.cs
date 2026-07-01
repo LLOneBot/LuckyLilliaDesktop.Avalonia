@@ -9,8 +9,9 @@ public interface IProcessManager
     int? PmhqPort { get; }
     bool IsAnyProcessRunning { get; }
 
-    Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, string autoLoginQQ, bool headless, bool debug = false);
-    Task<bool> StartLLBotAsync(string nodePath, string scriptPath);
+    Task<bool> StartQQAsync(string qqPath);
+    Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, string autoLoginQQ, string authToken, bool debug = false);
+    Task<bool> StartLLBotAsync(string nodePath, string scriptPath, string? ipcPipeName = null, string? loginUin = null);
     Task StopPmhqAsync();
     Task StopLLBotAsync();
     Task StopAllAsync(int? qqPid = null);

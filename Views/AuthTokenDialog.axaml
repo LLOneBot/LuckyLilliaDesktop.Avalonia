@@ -1,0 +1,100 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LuckyLilliaDesktop.Views.AuthTokenDialog"
+        Title=""
+        Width="400"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="CardBackground" Color="#FDF7FE"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#F3C4DE"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FF5D72"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#8D6E82"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="CardBackground" Color="#201722"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#553648"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FB7185"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#D8B8CA"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Border CornerRadius="12"
+            Background="{DynamicResource CardBackground}"
+            BorderBrush="{DynamicResource BorderColor}"
+            BorderThickness="1"
+            Padding="24">
+        <StackPanel Spacing="16">
+            <TextBlock Text="请输入 Auth Token"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"
+                       HorizontalAlignment="Center"/>
+
+            <TextBlock Text="启动 LLBot 需要 Auth Token。&#10;如果还没有，请点击下方链接获取："
+                       FontSize="13"
+                       Foreground="{DynamicResource TextSecondary}"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"/>
+
+            <TextBlock x:Name="LinkText"
+                       Text="https://auth.luckylillia.com"
+                       FontSize="14"
+                       Foreground="{DynamicResource PrimaryBrush}"
+                       TextDecorations="Underline"
+                       Cursor="Hand"
+                       HorizontalAlignment="Center"
+                       PointerPressed="OnLinkClick"/>
+
+            <TextBox x:Name="InputBox"
+                     Watermark="在此粘贴 Auth Token"
+                     FontSize="14"
+                     Padding="10,8"/>
+
+            <TextBlock x:Name="ErrorText"
+                       Text=""
+                       IsVisible="False"
+                       FontSize="12"
+                       Foreground="{DynamicResource DangerColor}"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"/>
+
+            <StackPanel Orientation="Horizontal"
+                        Spacing="12"
+                        HorizontalAlignment="Center">
+                <Button x:Name="OkButton"
+                        Content="确定"
+                        Width="100"
+                        Padding="0,10"
+                        Background="{DynamicResource PrimaryBrush}"
+                        Foreground="White"
+                        HorizontalContentAlignment="Center"
+                        Click="OnOkClick"/>
+                <Button x:Name="CancelButton"
+                        Content="取消"
+                        Width="100"
+                        Padding="0,10"
+                        HorizontalContentAlignment="Center"
+                        Click="OnCancelClick"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

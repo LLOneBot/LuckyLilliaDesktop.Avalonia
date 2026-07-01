@@ -88,6 +88,7 @@ public partial class App : Application
         services.AddSingleton<IResourceMonitor, ResourceMonitor>();
         services.AddSingleton<ISelfInfoService, SelfInfoService>();
         services.AddSingleton<IPmhqClient, PmhqClient>();
+        services.AddSingleton<ILLBotIpcClient, LLBotIpcClient>();
         services.AddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<IUpdateChecker, UpdateChecker>();
         services.AddSingleton<IUpdateStateService, UpdateStateService>();
@@ -102,6 +103,7 @@ public partial class App : Application
         services.AddSingleton<IYunzaiInstallService, YunzaiInstallService>();
         services.AddSingleton<IZeroBotPluginInstallService, ZeroBotPluginInstallService>();
         services.AddSingleton<IOpenClawInstallService, OpenClawInstallService>();
+        services.AddSingleton<IRedReplyInstallService, RedReplyInstallService>();
 
         // ViewModels（瞬态）
         services.AddTransient<MainWindowViewModel>();

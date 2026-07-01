@@ -26,6 +26,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     private readonly IYunzaiInstallService _yunzaiInstallService;
     private readonly IZeroBotPluginInstallService _zeroBotPluginInstallService;
     private readonly IOpenClawInstallService _openClawInstallService;
+    private readonly IRedReplyInstallService _redReplyInstallService;
     private readonly ISelfInfoService _selfInfoService;
     private readonly IConfigManager _configManager;
     private readonly IDisposable _uinSubscription;
@@ -60,7 +61,9 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
     public bool YunzaiInstalled => _yunzaiInstallService.IsInstalled;
     public bool ZeroBotPluginInstalled => _zeroBotPluginInstallService.IsInstalled;
     public bool OpenClawInstalled => _openClawInstallService.IsInstalled;
+    public bool RedReplyInstalled => _redReplyInstallService.IsInstalled;
     public bool ShowZeroBotPlugin => !PlatformHelper.IsMacOS;
+    public bool ShowRedReply => !PlatformHelper.IsMacOS;
 
     public ReactiveCommand<string, Unit> SelectFrameworkCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelInstallCommand { get; }
@@ -83,6 +86,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         IYunzaiInstallService yunzaiInstallService,
         IZeroBotPluginInstallService zeroBotPluginInstallService,
         IOpenClawInstallService openClawInstallService,
+        IRedReplyInstallService redReplyInstallService,
         ISelfInfoService selfInfoService,
         IConfigManager configManager,
         ILogger<IntegrationWizardViewModel> logger)
@@ -94,6 +98,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         _yunzaiInstallService = yunzaiInstallService;
         _zeroBotPluginInstallService = zeroBotPluginInstallService;
         _openClawInstallService = openClawInstallService;
+        _redReplyInstallService = redReplyInstallService;
         _selfInfoService = selfInfoService;
         _configManager = configManager;
         _logger = logger;
@@ -121,6 +126,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "yunzai" => "云崽",
             "zbp" => "ZeroBot-Plugin",
             "openclaw" => "OpenClaw",
+            "redreply" => "红色问答",
             _ => framework
         };
 
@@ -135,6 +141,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "yunzai" => _yunzaiInstallService.IsInstalled,
             "zbp" => _zeroBotPluginInstallService.IsInstalled,
             "openclaw" => _openClawInstallService.IsInstalled,
+            "redreply" => _redReplyInstallService.IsInstalled,
             _ => false
         };
 
@@ -230,6 +237,10 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 else
                     _openClawInstallService.StartGateway();
                 break;
+            case "redreply":
+                var wsUrl = _redReplyInstallService.EnsureOneBotWebSocketUrl(_currentUin);
+                _redReplyInstallService.StartRedReply(oneBotWsUrl: wsUrl);
+                break;
         }
     }
 
@@ -244,6 +255,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "yunzai" => "https://yunzai-bot.com/",
             "zbp" => "https://github.com/FloatTech/ZeroBot-Plugin",
             "openclaw" => "https://github.com/constansino/openclaw_qq",
+            "redreply" => "https://super1207.github.io/redreply",
             _ => ""
         };
 
@@ -275,6 +287,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             "yunzai" => Path.GetFullPath("bin/yunzai"),
             "zbp" => Path.GetFullPath("bin/ZeroBot-Plugin"),
             "openclaw" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw"),
+            "redreply" => Path.GetFullPath("bin/redreply"),
             _ => ""
         };
 
@@ -376,6 +389,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 "yunzai" => await _yunzaiInstallService.InstallAsync(progress, _cts.Token),
                 "zbp" => await _zeroBotPluginInstallService.InstallAsync(progress, _cts.Token),
                 "openclaw" => await _openClawInstallService.InstallAsync(progress, _cts.Token),
+                "redreply" => await _redReplyInstallService.InstallAsync(progress, _cts.Token),
                 _ => false
             };
 
@@ -389,6 +403,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 this.RaisePropertyChanged(nameof(YunzaiInstalled));
                 this.RaisePropertyChanged(nameof(ZeroBotPluginInstalled));
                 this.RaisePropertyChanged(nameof(OpenClawInstalled));
+                this.RaisePropertyChanged(nameof(RedReplyInstalled));
                 
                 if (framework == "koishi")
                     await OnKoishiInstallCompletedAsync();
@@ -404,6 +419,8 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                     await OnZeroBotPluginInstallCompletedAsync();
                 else if (framework == "openclaw")
                     await OnOpenClawInstallCompletedAsync();
+                else if (framework == "redreply")
+                    await OnRedReplyInstallCompletedAsync();
             }
         }
         catch (Exception ex)
@@ -741,6 +758,20 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         if (ShowAutoCloseAlertCallback != null)
             await ShowAutoCloseAlertCallback("ZeroBot-Plugin 安装完成",
                 $"安装路径: {installPath}\n\nZeroBot-Plugin 是一个基于 ZeroBot 的多功能群管/娱乐插件集\n\n3秒后将自动启动 ZeroBot-Plugin...", 3, startZbp);
+    }
+
+    private async Task OnRedReplyInstallCompletedAsync()
+    {
+        var installPath = _redReplyInstallService.RedReplyPath;
+        var wsUrl = _redReplyInstallService.EnsureOneBotWebSocketUrl(_currentUin);
+
+        CreateStartBat(installPath, PlatformHelper.IsWindows ? "redlang.exe" : "redlang");
+
+        Action startRedReply = () => _redReplyInstallService.StartRedReply(oneBotWsUrl: wsUrl);
+
+        if (ShowAutoCloseAlertCallback != null)
+            await ShowAutoCloseAlertCallback("红色问答安装完成",
+                $"安装路径: {installPath}\n\n启动时将配置 OneBot11 正向 WebSocket: {wsUrl}\nWeb UI 默认地址: http://127.0.0.1:1207\n\n3秒后将自动启动红色问答...", 3, startRedReply);
     }
 
     private async Task OnOpenClawInstallCompletedAsync()

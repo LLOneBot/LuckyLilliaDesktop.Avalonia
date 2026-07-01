@@ -62,8 +62,14 @@ Tab-based navigation via `MainWindowViewModel.SelectedIndex` (Home → Log → C
 
 ### Process Management Rules
 
-- **PMHQ is a launcher** — it starts the QQ process and then exits. Always check QQ process status (not PMHQ) for login state: use `_processManager.GetProcessStatus("QQ")`, not `GetProcessStatus("PMHQ")`.
-- **SelfInfo timing** — UIN arrives before Nickname. `ISelfInfoService` exposes them as separate observable streams (`UinStream`, `NicknameStream`). Never gate logic on both being available simultaneously.
+- **Non-headless startup order: QQ → PMHQ → LLBot.** Desktop launches QQ itself via WMI (`Win32_Process.Create` in `ProcessManager.StartQQAsync`), so QQ's parent is `WmiPrvSE.exe`, not Desktop — QQ is detached from Desktop (also not in Desktop's Job Object) without any parent-process spoofing. Desktop does **not** require admin (`app.manifest` is `asInvoker`); QQ then runs at the same integrity level, so PMHQ can inject without admin.
+- **PMHQ attaches, it is not passed `--pid`.** After Desktop starts QQ, `StartQQAsync` waits (`WaitForQQProcessAsync`, by process name + buffer) for QQ to come up, then `StartPmhqAsync` launches PMHQ with **no** `--pid` — PMHQ runs its own `find_existing_qq_pid()` to locate the QQ that loaded `wrapper.node`. Timing risk: if PMHQ starts before QQ's main process is ready, `find` misses and PMHQ spawns a *second* QQ. The buffer in `WaitForQQProcessAsync` mitigates this; the robust fix (if it recurs) is to make PMHQ's attach poll. Still check QQ status via `GetProcessStatus("QQ")` / `FetchQQPidAsync`, not PMHQ.
+- **auth_token feeds both PMHQ and LLBot.** `EnsureAuthTokenAsync` returns the token read from `<llbot>/data/auth_token.txt` (prompting via `AuthTokenDialog` + writing the file when missing). Non-headless passes the same value to PMHQ as `--auth-token` (PMHQ requires it — missing → it exits immediately); LLBot always reads the file itself. The headless path also calls `EnsureAuthTokenAsync` (to ensure the file exists for LLBot) but has no PMHQ to pass it to.
+- **LLBot PMHQ mode** — non-headless, `StartLLBotAsync` sets env `QQ_USE_PMHQ=1` and arg `--pmhq-port=<port>` (LLBot connects to PMHQ over HTTP/WS). It does both only when `PmhqPort` is set; headless leaves `PmhqPort` null, so neither is applied and LLBot runs its direct-protocol mode.
+- **Headless mode bypasses PMHQ** — when `config.Headless` is true, `HomeViewModel.StartAllServicesAsync` dispatches to `StartHeadlessServicesAsync`, which skips QQ + PMHQ entirely and launches only LLBot (LLBot handles the QQ protocol itself, direct-protocol mode). No PMHQ port, no `PmhqClient` polling. Login state + UIN / nickname come from LLBot over the IPC pipe (see below).
+- **Headless scan-to-login** — after starting LLBot, `StartHeadlessServicesAsync` calls `WaitFirstLoginStateAsync` (polls `ILLBotIpcClient.CurrentLoginState`, ≤15s). If the first definite state is `logged_in` (LLBot session quick-login), it proceeds with no dialog. Otherwise it shows `QRLoginDialog` (Windows-only), which subscribes `LoginStateStream`, renders the QR PNG, advances through `waiting_confirm`, and closes returning the uin on `logged_in`. User cancel → stop LLBot + IPC and abort. If IPC never reports a state (old LLBot without `get_login_state`), it logs a warning and proceeds without the dialog.
+- **LLBot IPC (Windows only)** — Desktop generates a pipe name (`luckylillia-llbot-{pid}-{guid}`) and passes it to LLBot via env `LL_IPC_PIPE`. **LLBot is the server (`net.createServer().listen`), Desktop is the client (`NamedPipeClientStream`) and polls.** JSON Lines, UTF-8, `\n`-delimited. Single method `get_login_state` covers the whole lifecycle: returns `{state, qrcode_png_base64}` while logging in, `{state:"logged_in", uin, nickname}` once online (states: `initializing`/`need_qrcode`/`waiting_confirm`/`logged_in`/`expired`/`cancelled`). `ILLBotIpcClient` exposes `LoginStateStream` (for `QRLoginDialog`) and `SelfInfoStream` (fed on `logged_in`); polls 1s while logging in, 5s after. LLBot must auto-refresh the QR on `expired`/`cancelled` (no refresh method in the protocol). Non-Windows skips IPC silently. See [doc/llbot-ipc.md](doc/llbot-ipc.md).
+- **SelfInfo timing** — UIN arrives before Nickname. `ISelfInfoService` exposes them as separate observable streams (`UinStream`, `NicknameStream`). Never gate logic on both being available simultaneously. Headless mode does not populate these streams.
 - **Windows cleanup** — Windows Job Objects ensure the entire process tree is terminated. On macOS/Linux, relies on parent-child signal propagation.
 
 ### Platform-Specific Behavior
@@ -94,9 +100,19 @@ Exceptions: brand colors (e.g. `#6C7BFF`), QR code background (must be white), a
 
 `app_settings.json` stores runtime configuration with snake_case JSON property names. The `ConfigManager` preserves unknown JSON properties when writing back (via `JsonNode`), so config files remain forward-compatible.
 
+`IConfigManager.ConfigSaved` (event, fired after a successful `SaveConfigAsync`) lets VMs react to config changes immediately. E.g. `HomeViewModel` subscribes to flip `IsHeadless` so the control panel hides/shows the QQ resource card the moment headless is toggled in `ConfigPage` — no restart or tab-switch needed.
+
 ### Logging
 
 Serilog with console + file sinks. Log files are per-session (`logs/yyyyMMdd_HHmmss.log`), capped at 10MB with auto-roll, and cleaned up on startup (7-day retention, max 50 files).
+
+## Topic Docs
+
+| Doc | When to read |
+|-----|--------------|
+| [doc/job-object.md](doc/job-object.md) | Touching Windows Job Object subprocess cleanup in `ProcessManager`. |
+| [doc/koishi.md](doc/koishi.md) | Working on `KoishiInstallService` / Koishi auto-install flow. |
+| [doc/llbot-ipc.md](doc/llbot-ipc.md) | Anything touching the LLBot named-pipe IPC: message schema, env var, `ILLBotIpcServer` surface, LLBot Node.js side glue. |
 
 ## Release Process
 

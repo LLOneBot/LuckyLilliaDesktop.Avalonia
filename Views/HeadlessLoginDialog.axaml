@@ -1,0 +1,169 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:services="using:LuckyLilliaDesktop.Services"
+        x:Class="LuckyLilliaDesktop.Views.HeadlessLoginDialog"
+        Title=""
+        Width="380"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="CardBackground" Color="#FDF7FE"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#F3C4DE"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#8D6E82"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="CardBackground" Color="#201722"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#241926"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#553648"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#3A2131"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#D8B8CA"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Border CornerRadius="12"
+            Background="{DynamicResource CardBackground}"
+            BorderBrush="{DynamicResource BorderColor}"
+            BorderThickness="1"
+            Padding="24">
+        <StackPanel Spacing="16">
+            <TextBlock x:Name="TitleText"
+                       Text="登录"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"
+                       HorizontalAlignment="Center"/>
+
+            <!-- 账号列表面板: 快速登录 (扫描 session 文件) -->
+            <StackPanel x:Name="AccountPanel" Spacing="12">
+                <TextBlock x:Name="AccountTip"
+                           Text="选择一个账号快速登录"
+                           FontSize="13"
+                           Foreground="{DynamicResource TextSecondary}"
+                           HorizontalAlignment="Center"/>
+                <ScrollViewer MaxHeight="260" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl x:Name="AccountList">
+                        <ItemsControl.Styles>
+                            <!-- 让每个账号项容器横向拉伸占满, 否则按内容宽度居中 -->
+                            <Style Selector="ContentPresenter">
+                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                            </Style>
+                        </ItemsControl.Styles>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="services:LoginAccount">
+                                <Border CornerRadius="8"
+                                        Padding="12,10"
+                                        Margin="0,2"
+                                        Background="{DynamicResource CardBackgroundSecondary}"
+                                        Tag="{Binding Uin}"
+                                        Cursor="Hand"
+                                        PointerPressed="OnAccountClick">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <!-- 圆形头像 (QQ 公开头像, 异步加载) -->
+                                        <Border Grid.Column="0"
+                                                Width="44" Height="44"
+                                                CornerRadius="22"
+                                                ClipToBounds="True"
+                                                Background="{DynamicResource PrimaryBrushSoft}">
+                                            <Image Source="{Binding Avatar}" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1"
+                                                    VerticalAlignment="Center"
+                                                    Margin="12,0,0,0">
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       FontSize="14"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimary}"/>
+                                            <TextBlock Text="{Binding Uin}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondary}"
+                                                       Margin="0,2,0,0"
+                                                       IsVisible="{Binding HasNick}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+
+            <!-- 登录中面板 (快速登录等待) -->
+            <StackPanel x:Name="WaitingPanel" Spacing="12" IsVisible="False" Margin="0,20">
+                <TextBlock x:Name="WaitingText"
+                           Text="正在登录..."
+                           FontSize="14"
+                           Foreground="{DynamicResource TextPrimary}"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- 二维码面板 -->
+            <StackPanel x:Name="QRPanel" Spacing="12" IsVisible="False">
+                <!-- 二维码区背景必须白色, 保证扫码对比度 -->
+                <Border Width="220"
+                        Height="220"
+                        CornerRadius="8"
+                        Background="White"
+                        HorizontalAlignment="Center">
+                    <Panel>
+                        <TextBlock x:Name="QRLoading"
+                                   Text="正在获取二维码..."
+                                   FontSize="13"
+                                   Foreground="#666666"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                        <Image x:Name="QRImage"
+                               IsVisible="False"
+                               Stretch="Uniform"
+                               Margin="8"/>
+                    </Panel>
+                </Border>
+                <TextBlock x:Name="QRTip"
+                           Text="请使用手机QQ扫描二维码登录"
+                           FontSize="13"
+                           Foreground="{DynamicResource TextSecondary}"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"/>
+            </StackPanel>
+
+            <!-- 底部纯文字操作: 左 扫码登录 (粉色), 右 取消 -->
+            <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                <TextBlock x:Name="ScanText" Grid.Column="0"
+                           Text="扫码登录"
+                           FontSize="14"
+                           Foreground="{DynamicResource PrimaryBrush}"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Center"
+                           Cursor="Hand"
+                           PointerPressed="OnScanClick"/>
+                <TextBlock Grid.Column="1"
+                           Text="取消"
+                           FontSize="14"
+                           Foreground="{DynamicResource TextSecondary}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Cursor="Hand"
+                           PointerPressed="OnCancelClick"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>

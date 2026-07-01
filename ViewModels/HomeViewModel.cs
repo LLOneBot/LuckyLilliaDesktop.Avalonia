@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
@@ -27,6 +28,7 @@ public class HomeViewModel : ViewModelBase
     private readonly ISelfInfoService _selfInfoService;
     private readonly IConfigManager _configManager;
     private readonly IPmhqClient _pmhqClient;
+    private readonly ILLBotIpcClient _llbotIpc;
     private readonly ILogCollector _logCollector;
     private readonly IDownloadService _downloadService;
     private readonly IUpdateChecker _updateChecker;
@@ -35,14 +37,15 @@ public class HomeViewModel : ViewModelBase
     private readonly ILogger<HomeViewModel> _logger;
     private CancellationTokenSource? _downloadCts;
     private CancellationTokenSource? _infoPollingCts;
-    private CancellationTokenSource? _sseCts;
 
     public Func<string, string, Task<bool>>? ConfirmDialog { get; set; }
     public Func<string, string, string, string, Task<int>>? ChoiceDialog { get; set; }
-    public Func<int, Task<string?>>? ShowLoginDialog { get; set; }
-    public Func<int, bool, Task<string?>>? ShowLoginDialogWithHeadless { get; set; }
     public Func<string, string, Task>? ShowAlertDialog { get; set; }
     public Func<string, Func<Task>, Task>? ShowLoadingDialog { get; set; }
+    public Func<Task<string?>>? ShowAuthTokenDialog { get; set; }
+    public Func<Task<string?>>? ShowQRLoginDialog { get; set; }
+    // 无头登录框: 传入 (session 账号列表, 启动 LLBot 的回调) -> 返回登录成功的 uin (取消/失败返回 null)
+    public Func<List<LoginAccount>, Func<string?, Task<bool>>, Task<string?>>? ShowHeadlessLoginDialog { get; set; }
 
     // 标题
     private string _title = "控制面板";
@@ -68,13 +71,21 @@ public class HomeViewModel : ViewModelBase
 
     // Bot 状态（整合 PMHQ + LLBot）
     private ProcessStatus _botStatus = ProcessStatus.Stopped;
+    private DateTime? _botStartTime;
     public ProcessStatus BotStatus
     {
         get => _botStatus;
         set
         {
+            var wasRunning = _botStatus == ProcessStatus.Running;
             this.RaiseAndSetIfChanged(ref _botStatus, value);
             this.RaisePropertyChanged(nameof(BotStatusText));
+            // 记录/清除运行起点, 用于"已运行时长"
+            if (value == ProcessStatus.Running && !wasRunning)
+                _botStartTime = DateTime.Now;
+            else if (value == ProcessStatus.Stopped)
+                _botStartTime = null;
+            UpdateUptime();
             UpdateButtonState();
         }
     }
@@ -87,6 +98,49 @@ public class HomeViewModel : ViewModelBase
         ProcessStatus.Stopped => "未启动",
         _ => "未知"
     };
+
+    // 无头模式: 不启动 QQ, 控制面板第二张卡从"QQ 占用"换成"LLBot 信息"(版本 + 运行时长)
+    private bool _isHeadless;
+    public bool IsHeadless
+    {
+        get => _isHeadless;
+        set => this.RaiseAndSetIfChanged(ref _isHeadless, value);
+    }
+
+    // 进程卡片恒 2 列: 无头 [Bot占用 + LLBot信息], 非无头 [Bot占用 + QQ占用]
+    public int ProcessCardColumns => 2;
+
+    // LLBot 版本号 (读 package.json), 无头模式 LLBot 信息卡显示
+    private string _llbotVersion = string.Empty;
+    public string LLBotVersion
+    {
+        get => _llbotVersion;
+        set => this.RaiseAndSetIfChanged(ref _llbotVersion, value);
+    }
+
+    // 已运行时长 (运行中才有值), 无头模式 LLBot 信息卡显示
+    private string _uptime = string.Empty;
+    public string Uptime
+    {
+        get => _uptime;
+        set => this.RaiseAndSetIfChanged(ref _uptime, value);
+    }
+
+    // Node.js 版本 (读 node --version), 无头模式 LLBot 信息卡显示
+    private string _nodeVersion = "—";
+    public string NodeVersion
+    {
+        get => _nodeVersion;
+        set => this.RaiseAndSetIfChanged(ref _nodeVersion, value);
+    }
+
+    // 启动时刻 (绝对时间 HH:mm), 无头模式 LLBot 信息卡显示
+    private string _startedAt = "—";
+    public string StartedAt
+    {
+        get => _startedAt;
+        set => this.RaiseAndSetIfChanged(ref _startedAt, value);
+    }
 
     // Bot 资源占用（PMHQ + LLBot 合计）
     private double _botCpu;
@@ -358,6 +412,7 @@ public class HomeViewModel : ViewModelBase
         ISelfInfoService selfInfoService,
         IConfigManager configManager,
         IPmhqClient pmhqClient,
+        ILLBotIpcClient llbotIpc,
         ILogCollector logCollector,
         IDownloadService downloadService,
         IUpdateChecker updateChecker,
@@ -370,6 +425,7 @@ public class HomeViewModel : ViewModelBase
         _selfInfoService = selfInfoService;
         _configManager = configManager;
         _pmhqClient = pmhqClient;
+        _llbotIpc = llbotIpc;
         _logCollector = logCollector;
         _downloadService = downloadService;
         _updateChecker = updateChecker;
@@ -382,10 +438,14 @@ public class HomeViewModel : ViewModelBase
             .ObserveOnUiThread()
             .Subscribe(OnResourceUpdate);
 
-        // 订阅可用内存流
+        // 订阅可用内存流 (顺便每次刷新已运行时长)
         _resourceMonitor.AvailableMemoryStream
             .ObserveOnUiThread()
-            .Subscribe(mem => AvailableMemory = mem);
+            .Subscribe(mem =>
+            {
+                AvailableMemory = mem;
+                UpdateUptime();
+            });
 
         _selfInfoService.UinStream
             .ObserveOnUiThread()
@@ -409,6 +469,9 @@ public class HomeViewModel : ViewModelBase
         _resourceMonitor.QQVersionStream
             .ObserveOnUiThread()
             .Subscribe(version => QQVersion = version);
+
+        // uin/昵称统一经 SelfInfoService (数据源已切到 LLBot IPC), 上面 UinStream/NicknameStream
+        // 订阅即覆盖有头 / 无头两种模式, 这里不再单独订阅 _llbotIpc.SelfInfoStream.
 
         // 订阅进程状态变化
         _processManager.ProcessStatusChanged += OnProcessStatusChanged;
@@ -466,6 +529,13 @@ public class HomeViewModel : ViewModelBase
 
         // 检查是否需要自动启动 Bot
         _ = CheckAutoStartBotAsync();
+
+        // 读取 headless 配置, 决定控制面板是否显示 QQ 占用卡片
+        _ = InitializeFromConfigAsync();
+
+        // 配置保存后即时同步 headless 状态 (控制面板 QQ 卡片显隐随配置变化)
+        _configManager.ConfigSaved += config =>
+            Dispatcher.UIThread.Post(() => IsHeadless = config.Headless);
     }
 
     private async Task CheckAutoStartBotAsync()
@@ -484,6 +554,47 @@ public class HomeViewModel : ViewModelBase
         {
             _logger.LogWarning(ex, "检查自动启动配置失败");
         }
+    }
+
+    private async Task InitializeFromConfigAsync()
+    {
+        try
+        {
+            var config = await _configManager.LoadConfigAsync();
+            var llbotVer = DetectLLBotVersion(config.LLBotPath) ?? "";
+            var nodeVer = await Utils.NodeHelper.GetNodeVersionAsync(config.NodePath, _logger);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsHeadless = config.Headless;
+                LLBotVersion = llbotVer;
+                NodeVersion = nodeVer.HasValue ? $"v{nodeVer.Value}" : "—";
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取配置失败");
+        }
+    }
+
+    // 已运行时长: 运行中按 _botStartTime 计算, 未运行显示"未运行"
+    private void UpdateUptime()
+    {
+        if (_botStartTime == null)
+        {
+            Uptime = "未运行";
+            StartedAt = "未启动";
+            return;
+        }
+        Uptime = FormatUptime(DateTime.Now - _botStartTime.Value);
+        StartedAt = _botStartTime.Value.ToString("HH:mm");
+    }
+
+    private static string FormatUptime(TimeSpan span)
+    {
+        if (span.TotalDays >= 1) return $"{(int)span.TotalDays}天{span.Hours}小时";
+        if (span.TotalHours >= 1) return $"{(int)span.TotalHours}小时{span.Minutes}分";
+        if (span.TotalMinutes >= 1) return $"{(int)span.TotalMinutes}分{span.Seconds}秒";
+        return $"{span.Seconds}秒";
     }
 
     private async Task ExecuteStartupCommandAsync(AppConfig config)
@@ -569,6 +680,11 @@ public class HomeViewModel : ViewModelBase
                             else
                                 openClaw.StartGateway();
                             break;
+                        case "redreply":
+                            var redReply = _serviceProvider.GetRequiredService<IRedReplyInstallService>();
+                            var redReplyWsUrl = redReply.EnsureOneBotWebSocketUrl(_selfInfoService.CurrentUin);
+                            redReply.StartRedReply(openWebUiIfRunning: false, openWebUiOnStart: false, oneBotWsUrl: redReplyWsUrl);
+                            break;
                     }
                     _logger.LogInformation("已自动启动框架: {Framework}", framework);
                 }
@@ -595,7 +711,8 @@ public class HomeViewModel : ViewModelBase
 
             var config = await _configManager.LoadConfigAsync();
             var appVersion = GetAppVersion();
-            var pmhqVersion = DetectPmhqVersion(config.PmhqPath);
+            // 无头模式不启动 PMHQ, 不检测它的版本/更新
+            var pmhqVersion = config.Headless ? null : DetectPmhqVersion(config.PmhqPath);
             var llbotVersion = DetectLLBotVersion(config.LLBotPath);
 
             var updateNames = new System.Collections.Generic.List<string>();
@@ -717,6 +834,40 @@ public class HomeViewModel : ViewModelBase
         return null;
     }
 
+    // 启动门槛: PMHQ / LLBot 主版本必须 >= 8.
+    private const int MinMajorVersion = 8;
+
+    // 取主版本号 (major). 兼容 "8.0.1" / "v8.0.1" / "8.0.0-beta". 解析不出返回 null.
+    private static int? ParseMajorVersion(string? version)
+    {
+        if (string.IsNullOrWhiteSpace(version)) return null;
+        var seg = version.Trim().TrimStart('v', 'V').Split('.', '-', '+')[0];
+        return int.TryParse(seg, out var major) ? major : null;
+    }
+
+    // LLBot (两种模式) + PMHQ (仅有头) 主版本必须 >= 8. 通过返回 null, 否则返回展示给用户的错误消息.
+    // 读不到版本也拦 (正常发布都带 package.json, 读不到说明安装异常 -> 让用户重装/更新).
+    private string? CheckVersionRequirement(AppConfig config)
+    {
+        var llbotVer = DetectLLBotVersion(config.LLBotPath);
+        var llbotMajor = ParseMajorVersion(llbotVer);
+        if (llbotMajor == null)
+            return $"无法确认 LLBot 版本, 请更新到 {MinMajorVersion}.0 或以上后再启动";
+        if (llbotMajor < MinMajorVersion)
+            return $"LLBot 版本过低 (当前 {llbotVer}), 需要 {MinMajorVersion}.0 或以上, 请更新后再启动";
+
+        if (!config.Headless)
+        {
+            var pmhqVer = DetectPmhqVersion(config.PmhqPath);
+            var pmhqMajor = ParseMajorVersion(pmhqVer);
+            if (pmhqMajor == null)
+                return $"无法确认 PMHQ 版本, 请更新到 {MinMajorVersion}.0 或以上后再启动";
+            if (pmhqMajor < MinMajorVersion)
+                return $"PMHQ 版本过低 (当前 {pmhqVer}), 需要 {MinMajorVersion}.0 或以上, 请更新后再启动";
+        }
+        return null;
+    }
+
     private void UpdateTitle()
     {
         // 标题固定为"控制面板"，不随登录状态改变
@@ -794,6 +945,14 @@ public class HomeViewModel : ViewModelBase
             BotStatus = ProcessStatus.Starting;
 
             var config = await _configManager.LoadConfigAsync();
+            IsHeadless = config.Headless;
+
+            // 无头模式: 不启动 PMHQ / QQ, 直接启动 LLBot (LLBot 内部自行连 QQ)
+            if (config.Headless)
+            {
+                await StartHeadlessServicesAsync(config);
+                return;
+            }
 
             // 如果 QQ 路径为空，尝试自动检测
             if (string.IsNullOrEmpty(config.QQPath))
@@ -1186,13 +1345,38 @@ public class HomeViewModel : ViewModelBase
                 return;
             }
 
-            // 启动 PMHQ
+            // 版本门槛: 有头模式查 PMHQ + LLBot 主版本, 任一 < 8 (或读不到) 拦截并要求更新
+            var versionError = CheckVersionRequirement(config);
+            if (versionError != null)
+            {
+                ErrorMessage = versionError;
+                BotStatus = ProcessStatus.Stopped;
+                return;
+            }
+
+            // auth_token: 读出内容, 既供 LLBot 读取又作为 --auth-token 传给 PMHQ
+            var authToken = await EnsureAuthTokenAsync(config);
+            if (authToken == null)
+            {
+                return;
+            }
+
+            // 先启动 QQ (WMI 启动, 父进程为系统宿主, 脱离 Desktop), 再让 PMHQ attach
+            _logger.LogInformation("正在启动 QQ...");
+            if (!await _processManager.StartQQAsync(config.QQPath))
+            {
+                ErrorMessage = "QQ 启动失败，请检查 QQ 路径";
+                BotStatus = ProcessStatus.Stopped;
+                return;
+            }
+
+            // 启动 PMHQ (attach 已启动的 QQ, 自行 find pid; auth-token 必传)
             _logger.LogInformation("正在启动 PMHQ...");
             var pmhqSuccess = await _processManager.StartPmhqAsync(
                 config.PmhqPath,
                 config.QQPath,
                 config.AutoLoginQQ,
-                config.Headless,
+                authToken,
                 config.Debug);
 
             if (pmhqSuccess)
@@ -1201,9 +1385,17 @@ public class HomeViewModel : ViewModelBase
 
                 // 先启动 LLBot，确保 WebSocket 服务就绪，避免错过 QQ 事件
                 _logger.LogInformation("正在启动 LLBot...");
+                // Windows 上启动 IPC 管道, Desktop 从 LLBot 拿 uin/昵称 (PMHQ 不再提供查询 QQ 信息的 API)
+                string? llbotIpcPipe = null;
+                if (Utils.PlatformHelper.IsWindows)
+                {
+                    try { llbotIpcPipe = await _llbotIpc.StartAsync(); }
+                    catch (Exception ex) { _logger.LogWarning(ex, "启动 LLBot IPC 客户端失败"); }
+                }
                 var llbotSuccess = await _processManager.StartLLBotAsync(
                     config.NodePath,
-                    config.LLBotPath);
+                    config.LLBotPath,
+                    llbotIpcPipe);
 
                 if (llbotSuccess)
                 {
@@ -1222,12 +1414,6 @@ public class HomeViewModel : ViewModelBase
                 if (_processManager.PmhqPort.HasValue)
                 {
                     _pmhqClient.SetPort(_processManager.PmhqPort.Value);
-
-                    // 如果设置了自动登录QQ号，启动 SSE 监听以捕获登录失败事件
-                    if (!string.IsNullOrEmpty(config.AutoLoginQQ) && config.Headless)
-                    {
-                        StartSSEListener(_processManager.PmhqPort.Value);
-                    }
                 }
 
                 // 等待 PMHQ API 可用
@@ -1257,24 +1443,6 @@ public class HomeViewModel : ViewModelBase
                     return;
                 }
 
-                // 无头模式且没有自动登录QQ号时，显示登录对话框
-                if (config.Headless && string.IsNullOrEmpty(config.AutoLoginQQ))
-                {
-                    _logger.LogInformation("无头模式，显示登录对话框");
-                    if (ShowLoginDialogWithHeadless != null && _processManager.PmhqPort.HasValue)
-                    {
-                        var loggedInUin = await ShowLoginDialogWithHeadless(_processManager.PmhqPort.Value, true);
-                        if (string.IsNullOrEmpty(loggedInUin))
-                        {
-                            _logger.LogWarning("用户取消登录");
-                            await _processManager.StopPmhqAsync();
-                            BotStatus = ProcessStatus.Stopped;
-                            return;
-                        }
-                        _logger.LogInformation("登录成功: {Uin}", loggedInUin);
-                    }
-                }
-
                 StartInfoPolling();
 
                 BotStatus = ProcessStatus.Running;
@@ -1300,6 +1468,345 @@ public class HomeViewModel : ViewModelBase
         }
     }
 
+    // 无头模式: 不启动 PMHQ/QQ, 只启动 LLBot. LLBot 自行处理 QQ 协议.
+    // 仍需要 Node.js + LLBot 脚本 + FFmpeg + auth_token, 但跳过 QQ 路径/PMHQ 下载与启动.
+    private async Task StartHeadlessServicesAsync(AppConfig config)
+    {
+        _logger.LogInformation("无头模式: 跳过 PMHQ, 直接启动 LLBot");
+
+        // 检查 / 解析 Node.js 路径(允许使用 PATH 或本地目录, 版本需 >= 24)
+        if (!await ResolveNodePathAsync(config))
+        {
+            return;
+        }
+
+        var llbotExists = !string.IsNullOrEmpty(config.LLBotPath) && File.Exists(config.LLBotPath);
+        var ffmpegExists = Utils.FFmpegHelper.CheckFFmpegExists();
+        var ffprobeExists = Utils.FFmpegHelper.CheckFFprobeExists();
+
+        if (!llbotExists || !ffmpegExists || !ffprobeExists)
+        {
+            _downloadCts = new CancellationTokenSource();
+            IsDownloading = true;
+
+            try
+            {
+                var progress = new Progress<DownloadProgress>(p =>
+                {
+                    DownloadProgress = p.Percentage;
+                    DownloadStatus = p.Status;
+                });
+
+                if (!llbotExists)
+                {
+                    DownloadingItem = "LLBot";
+                    _logger.LogInformation("下载 LLBot...");
+                    if (!await _downloadService.DownloadLLBotAsync(progress, _downloadCts.Token))
+                    {
+                        ErrorMessage = "LLBot 下载失败";
+                        BotStatus = ProcessStatus.Stopped;
+                        return;
+                    }
+                    config.LLBotPath = Utils.Constants.DefaultPaths.LLBotScript;
+                }
+
+                if (!ffmpegExists || !ffprobeExists)
+                {
+                    DownloadingItem = "FFmpeg";
+                    _logger.LogInformation("下载 FFmpeg...");
+                    if (!await _downloadService.DownloadFFmpegAsync(progress, _downloadCts.Token))
+                    {
+                        ErrorMessage = "FFmpeg 下载失败";
+                        BotStatus = ProcessStatus.Stopped;
+                        return;
+                    }
+                }
+
+                await _configManager.SaveConfigAsync(config);
+                if (OnDownloadCompleted != null)
+                {
+                    await OnDownloadCompleted();
+                }
+            }
+            finally
+            {
+                IsDownloading = false;
+                DownloadingItem = "";
+                _downloadCts = null;
+            }
+        }
+
+        if (!File.Exists(config.LLBotPath))
+        {
+            ErrorMessage = $"LLBot 脚本不存在: {config.LLBotPath}";
+            BotStatus = ProcessStatus.Stopped;
+            return;
+        }
+
+        if (!Utils.FFmpegHelper.CheckFFmpegExists() || !Utils.FFmpegHelper.CheckFFprobeExists())
+        {
+            ErrorMessage = "FFmpeg / FFprobe 不可用";
+            BotStatus = ProcessStatus.Stopped;
+            return;
+        }
+
+        // 版本门槛: 无头模式只启动 LLBot, 查 LLBot 主版本 (< 8 或读不到则拦截要求更新)
+        var versionError = CheckVersionRequirement(config);
+        if (versionError != null)
+        {
+            ErrorMessage = versionError;
+            BotStatus = ProcessStatus.Stopped;
+            return;
+        }
+
+        if (await EnsureAuthTokenAsync(config) == null)
+        {
+            return;
+        }
+
+        _logger.LogInformation("准备启动 LLBot (无头模式)...");
+
+        // 启动 LLBot 的本地函数: uin 非空走快速登录 (--qq=uin), null 走扫码; 同时拉起 IPC 管道
+        async Task<bool> StartLLBotWithUinAsync(string? uin)
+        {
+            string? pipe = null;
+            if (Utils.PlatformHelper.IsWindows)
+            {
+                try { pipe = await _llbotIpc.StartAsync(); }
+                catch (Exception ex) { _logger.LogWarning(ex, "启动 LLBot IPC 客户端失败"); }
+            }
+            return await _processManager.StartLLBotAsync(config.NodePath, config.LLBotPath, pipe, uin);
+        }
+
+        if (Utils.PlatformHelper.IsWindows && ShowHeadlessLoginDialog != null && string.IsNullOrEmpty(config.AutoLoginQQ))
+        {
+            // 未配自动登录号: 弹登录框 (快速登录账号列表 + 扫码), 框内管理启动 LLBot 并等待登录结果
+            var accounts = ScanSessionAccounts(config.LLBotPath);
+            _logger.LogInformation("无头登录: 扫描到 {Count} 个本地账号", accounts.Count);
+            var loggedUin = await ShowHeadlessLoginDialog(accounts, StartLLBotWithUinAsync);
+            if (string.IsNullOrEmpty(loggedUin))
+            {
+                _logger.LogWarning("无头登录已取消或失败, 停止服务");
+                await _llbotIpc.StopAsync();
+                await _processManager.StopLLBotAsync();
+                BotStatus = ProcessStatus.Stopped;
+                return;
+            }
+            _logger.LogInformation("无头登录成功: {Uin}", loggedUin);
+        }
+        else
+        {
+            // 配了自动登录号 -> 直接快速登录 (--qq=该号); 非 Windows -> 直接启动 (无 IPC/登录框)
+            var autoUin = string.IsNullOrEmpty(config.AutoLoginQQ) ? null : config.AutoLoginQQ;
+            if (!string.IsNullOrEmpty(autoUin))
+                _logger.LogInformation("配置了自动登录号, 直接快速登录: {Uin}", autoUin);
+            if (!await StartLLBotWithUinAsync(autoUin))
+            {
+                ErrorMessage = "LLBot 启动失败，请检查日志";
+                _logger.LogError("LLBot 启动失败");
+                BotStatus = ProcessStatus.Stopped;
+                await _llbotIpc.StopAsync();
+                return;
+            }
+        }
+
+        _logger.LogInformation("LLBot 启动成功");
+
+        // 启动后重新读 LLBot / Node 版本 (首次可能刚下载完)
+        LLBotVersion = DetectLLBotVersion(config.LLBotPath) ?? LLBotVersion;
+        var nodeVerOnStart = await Utils.NodeHelper.GetNodeVersionAsync(config.NodePath, _logger);
+        if (nodeVerOnStart.HasValue) NodeVersion = $"v{nodeVerOnStart.Value}";
+        IsServicesRunning = true;
+        BotStatus = ProcessStatus.Running;
+
+        // QQ 信息: 登录成功后主动从 IPC 当前登录状态填一次, 不能只靠 SelfInfoStream 后续推送.
+        // LLBotIpcClient.ApplySelfInfo 带去重 (_cachedUin 不变就不再推); 登录框路径登录过程中
+        // 已经推过该 uin, 这里若清空 QQUin/QQNickname, IPC 慢轮询又因去重不再推, 就永远填不回来了.
+        // (QQUin setter 会顺带触发头像加载, 所以填对 uin 头像也跟着回来.)
+        QQVersion = string.Empty;   // 无头无 PMHQ /health, 不显示 QQ 版本
+        var loginState = _llbotIpc.CurrentLoginState;
+        if (!string.IsNullOrEmpty(loginState?.Uin))
+        {
+            QQNickname = loginState.Nickname ?? string.Empty;
+            QQUin = loginState.Uin;
+            QQStatus = ProcessStatus.Running;
+        }
+        else
+        {
+            // 还没登录 (自动登录号路径不等登录就走到这): 清初始态, 等 IPC 首次推 logged_in 填充
+            QQUin = string.Empty;
+            QQNickname = string.Empty;
+            AvatarBitmap = null;
+            QQStatus = ProcessStatus.Stopped;
+        }
+
+        await ExecuteStartupCommandAsync(config);
+        await StartAutoFrameworksAsync(config);
+    }
+
+    // 扫描 LLBot data 目录下的 qq-session-{uin}.json, 提取 uin (文件名) + nick (文件内容), 供快速登录列表
+    private static List<LoginAccount> ScanSessionAccounts(string? llbotPath)
+    {
+        var result = new List<LoginAccount>();
+        var llbotDir = Path.GetDirectoryName(llbotPath);
+        if (string.IsNullOrEmpty(llbotDir)) return result;
+        var dataDir = Path.Combine(llbotDir, "data");
+        if (!Directory.Exists(dataDir)) return result;
+
+        foreach (var file in Directory.GetFiles(dataDir, "qq-session-*.json"))
+        {
+            try
+            {
+                var name = Path.GetFileNameWithoutExtension(file);
+                const string prefix = "qq-session-";
+                if (!name.StartsWith(prefix)) continue;
+                var uin = name.Substring(prefix.Length);
+                if (string.IsNullOrEmpty(uin) || !long.TryParse(uin, out _)) continue;
+
+                var nick = "";
+                try
+                {
+                    using var doc = JsonDocument.Parse(File.ReadAllText(file));
+                    if (doc.RootElement.TryGetProperty("nick", out var n)) nick = n.GetString() ?? "";
+                }
+                catch { }
+                result.Add(new LoginAccount
+                {
+                    Uin = uin,
+                    NickName = nick,
+                    IsQuickLogin = true,
+                    FaceUrl = $"https://q1.qlogo.cn/g?b=qq&nk={uin}&s=100",
+                });
+            }
+            catch { }
+        }
+        return result;
+    }
+
+    // 解析 Node.js: 配置 -> PATH -> 本地, 必要时下载. 成功时把路径写回 config.NodePath.
+    private async Task<bool> ResolveNodePathAsync(AppConfig config)
+    {
+        var nodeExists = false;
+        if (!string.IsNullOrEmpty(config.NodePath) && File.Exists(config.NodePath))
+        {
+            if (await Utils.NodeHelper.CheckNodeVersionValidAsync(config.NodePath, 24, _logger))
+            {
+                nodeExists = true;
+            }
+            else
+            {
+                config.NodePath = string.Empty;
+            }
+        }
+        else if (!string.IsNullOrEmpty(config.NodePath))
+        {
+            config.NodePath = string.Empty;
+        }
+
+        if (!nodeExists)
+        {
+            var systemNode = Utils.NodeHelper.FindNodeInPath();
+            if (!string.IsNullOrEmpty(systemNode)
+                && await Utils.NodeHelper.CheckNodeVersionValidAsync(systemNode, 24, _logger))
+            {
+                config.NodePath = systemNode;
+                nodeExists = true;
+            }
+        }
+
+        if (!nodeExists)
+        {
+            var localNodePath = Utils.Constants.DefaultPaths.NodeExe;
+            if (File.Exists(localNodePath)
+                && await Utils.NodeHelper.CheckNodeVersionValidAsync(localNodePath, 24, _logger))
+            {
+                config.NodePath = localNodePath;
+                nodeExists = true;
+            }
+        }
+
+        if (!nodeExists)
+        {
+            _downloadCts = new CancellationTokenSource();
+            IsDownloading = true;
+            DownloadingItem = "Node.js";
+            try
+            {
+                var progress = new Progress<DownloadProgress>(p =>
+                {
+                    DownloadProgress = p.Percentage;
+                    DownloadStatus = p.Status;
+                });
+                if (!await _downloadService.DownloadNodeAsync(progress, _downloadCts.Token))
+                {
+                    ErrorMessage = "Node.js 下载失败";
+                    BotStatus = ProcessStatus.Stopped;
+                    return false;
+                }
+                config.NodePath = Utils.Constants.DefaultPaths.NodeExe;
+            }
+            finally
+            {
+                IsDownloading = false;
+                DownloadingItem = "";
+                _downloadCts = null;
+            }
+        }
+
+        if (!File.Exists(config.NodePath))
+        {
+            ErrorMessage = $"Node.js 文件不存在: {config.NodePath}";
+            BotStatus = ProcessStatus.Stopped;
+            return false;
+        }
+        return true;
+    }
+
+    // 确保 LLBot data/auth_token.txt 存在 (缺则弹窗输入并落盘), 返回 token 内容.
+    // 该 token 既供 LLBot 读取, 又会作为 --auth-token 传给 PMHQ.
+    // 返回 null 表示用户取消或缺少弹窗注入 (ErrorMessage 已设).
+    private async Task<string?> EnsureAuthTokenAsync(AppConfig config)
+    {
+        var llbotDir = Path.GetDirectoryName(config.LLBotPath);
+        if (string.IsNullOrEmpty(llbotDir))
+        {
+            _logger.LogWarning("无法确定 LLBot 目录, 跳过 auth_token 处理");
+            return "";
+        }
+
+        var dataDir = Path.Combine(llbotDir, "data");
+        var authTokenPath = Path.Combine(dataDir, "auth_token.txt");
+        var existingToken = File.Exists(authTokenPath)
+            ? (await File.ReadAllTextAsync(authTokenPath)).Trim()
+            : "";
+
+        if (!string.IsNullOrEmpty(existingToken))
+        {
+            return existingToken;
+        }
+
+        if (ShowAuthTokenDialog == null)
+        {
+            ErrorMessage = "缺少 Auth Token，无法启动 LLBot";
+            BotStatus = ProcessStatus.Stopped;
+            return null;
+        }
+
+        var token = await ShowAuthTokenDialog();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            ErrorMessage = "未提供 Auth Token，已取消启动";
+            BotStatus = ProcessStatus.Stopped;
+            return null;
+        }
+
+        var trimmed = token.Trim();
+        Directory.CreateDirectory(dataDir);
+        await File.WriteAllTextAsync(authTokenPath, trimmed);
+        _logger.LogInformation("Auth Token 已保存到 {Path}", authTokenPath);
+        return trimmed;
+    }
+
     private async Task StopAllServicesAsync()
     {
         try
@@ -1310,6 +1817,8 @@ public class HomeViewModel : ViewModelBase
             _infoPollingCts?.Cancel();
             _pmhqClient.CancelAll();
             _pmhqClient.ClearPort();
+
+            await _llbotIpc.StopAsync();
             
             var qqPid = _resourceMonitor.QQPid;
             _resourceMonitor.ResetState();
@@ -1350,55 +1859,19 @@ public class HomeViewModel : ViewModelBase
         _infoPollingCts = new CancellationTokenSource();
         var ct = _infoPollingCts.Token;
 
+        // uin/昵称走 LLBot IPC (SelfInfoStream, 构造里已订阅); 这里只拉一次 QQ 版本 (PMHQ /health)
         _ = Task.Run(async () =>
         {
-            _logger.LogInformation("等待 PMHQ API 可用...");
             while (!ct.IsCancellationRequested)
-            {
-                var selfInfo = await _pmhqClient.FetchSelfInfoAsync(ct);
-                if (selfInfo != null)
-                {
-                    _logger.LogInformation("PMHQ API 已可用");
-                    if (!string.IsNullOrEmpty(selfInfo.Uin))
-                    {
-                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            QQUin = selfInfo.Uin;
-                            QQNickname = selfInfo.Nickname;
-                        });
-                    }
-                    break;
-                }
-
-                try { await Task.Delay(1000, ct); }
-                catch (OperationCanceledException) { return; }
-            }
-
-            // 获取 QQ 版本（只获取一次）
-            string? cachedVersion = null;
-            _logger.LogInformation("开始获取 QQ 版本...");
-            while (!ct.IsCancellationRequested && string.IsNullOrEmpty(cachedVersion))
             {
                 try
                 {
-                    _logger.LogDebug("正在调用 FetchDeviceInfoAsync...");
                     var deviceInfo = await _pmhqClient.FetchDeviceInfoAsync(ct);
-                    _logger.LogDebug("FetchDeviceInfoAsync 返回: {DeviceInfo}", deviceInfo != null ? $"BuildVer={deviceInfo.BuildVer}" : "null");
-
                     if (deviceInfo != null && !string.IsNullOrEmpty(deviceInfo.BuildVer))
                     {
-                        cachedVersion = deviceInfo.BuildVer;
-                        _logger.LogInformation("成功获取 QQ 版本: {Version}", cachedVersion);
-                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            QQVersion = cachedVersion;
-                            _logger.LogInformation("QQVersion 属性已设置为: {Version}", QQVersion);
-                        });
+                        var ver = deviceInfo.BuildVer;
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => QQVersion = ver);
                         break;
-                    }
-                    else
-                    {
-                        _logger.LogDebug("未获取到 QQ 版本，1秒后重试");
                     }
                 }
                 catch (Exception ex)
@@ -1409,8 +1882,6 @@ public class HomeViewModel : ViewModelBase
                 try { await Task.Delay(1000, ct); }
                 catch (OperationCanceledException) { return; }
             }
-
-            // 继续轮询 SelfInfo 已由 SelfInfoService 处理
         }, ct);
     }
 
@@ -1536,150 +2007,6 @@ public class HomeViewModel : ViewModelBase
             BotStatus = ProcessStatus.Stopped;
             IsServicesRunning = false;
         }
-    }
-
-    private void StartSSEListener(int port)
-    {
-        _sseCts?.Cancel();
-        _sseCts = new CancellationTokenSource();
-        var ct = _sseCts.Token;
-
-        _ = Task.Run(async () =>
-        {
-            var url = $"http://127.0.0.1:{port}";
-            Log.Information("[SSE] 开始监听: {Url}", url);
-
-            while (!ct.IsCancellationRequested)
-            {
-                try
-                {
-                    using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
-                    Log.Information("[SSE] 连接中...");
-
-                    using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-                    Log.Information("[SSE] 已连接, StatusCode={StatusCode}", response.StatusCode);
-
-                    await using var stream = await response.Content.ReadAsStreamAsync(ct);
-                    using var reader = new StreamReader(stream, Encoding.UTF8);
-
-                    var buffer = new StringBuilder();
-
-                    while (!ct.IsCancellationRequested)
-                    {
-                        var chunk = new char[4096];
-                        var read = await reader.ReadAsync(chunk, 0, chunk.Length);
-                        if (read == 0) break;
-
-                        buffer.Append(chunk, 0, read);
-                        var content = buffer.ToString();
-
-                        while (content.Contains("\n\n"))
-                        {
-                            var idx = content.IndexOf("\n\n", StringComparison.Ordinal);
-                            var message = content[..idx];
-                            content = content[(idx + 2)..];
-                            buffer.Clear();
-                            buffer.Append(content);
-
-                            ProcessSSEMessage(message);
-                        }
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "[SSE] 连接异常");
-                    if (!ct.IsCancellationRequested)
-                        await Task.Delay(1000, ct);
-                }
-            }
-            Log.Information("[SSE] 监听结束");
-        }, ct);
-    }
-
-    private void ProcessSSEMessage(string message)
-    {
-        foreach (var line in message.Split('\n'))
-        {
-            var trimmed = line.Trim();
-            if (!trimmed.StartsWith("data:")) continue;
-
-            var json = trimmed[5..].Trim();
-            if (string.IsNullOrEmpty(json)) continue;
-
-            Log.Information("[SSE] 收到: {Json}", json);
-
-            try
-            {
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                if (root.TryGetProperty("type", out var typeElem) &&
-                    typeElem.GetString() == "nodeIKernelLoginListener" &&
-                    root.TryGetProperty("data", out var dataElem) &&
-                    dataElem.TryGetProperty("sub_type", out var subType))
-                {
-                    var subTypeStr = subType.GetString();
-                    Log.Information("[SSE] 事件: {SubType}", subTypeStr);
-
-                    if (subTypeStr == "onQuickLoginFailed" &&
-                        dataElem.TryGetProperty("data", out var failData))
-                    {
-                        var errMsg = "登录失败";
-                        if (failData.TryGetProperty("loginErrorInfo", out var errorInfo) &&
-                            errorInfo.TryGetProperty("errMsg", out var errMsgElem))
-                        {
-                            errMsg = errMsgElem.GetString() ?? "登录失败";
-                        }
-
-                        Log.Warning("[SSE] 自动登录失败: {ErrMsg}", errMsg);
-                        _sseCts?.Cancel();
-
-                        Dispatcher.UIThread.Post(async () =>
-                        {
-                            await HandleAutoLoginFailedAsync(errMsg);
-                        });
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "[SSE] 解析失败");
-            }
-        }
-    }
-
-    private async Task HandleAutoLoginFailedAsync(string errMsg)
-    {
-        // 显示错误提示
-        if (ShowAlertDialog != null)
-        {
-            await ShowAlertDialog("登录失败", errMsg);
-        }
-
-        // 弹出登录对话框
-        if (ShowLoginDialogWithHeadless != null && _processManager.PmhqPort.HasValue)
-        {
-            var loggedInUin = await ShowLoginDialogWithHeadless(_processManager.PmhqPort.Value, true);
-            if (string.IsNullOrEmpty(loggedInUin))
-            {
-                _logger.LogWarning("用户取消登录");
-                await StopAllServicesAsync();
-            }
-            else
-            {
-                _logger.LogInformation("登录成功: {Uin}", loggedInUin);
-            }
-        }
-    }
-
-    private void StopSSEListener()
-    {
-        _sseCts?.Cancel();
-        _sseCts = null;
     }
 
     private bool _isUIUpdatesPaused;

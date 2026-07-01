@@ -128,7 +128,96 @@ public class ProcessManager : IProcessManager, IDisposable
         }
     }
 
-    public async Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, string autoLoginQQ, bool headless, bool debug = false)
+    // 用 CreateProcess + CREATE_BREAKAWAY_FROM_JOB 启动 QQ, 避免 QQ 进入 Desktop 的 Job Object.
+    // 不传 pid 给 PMHQ —— 随后 PMHQ 自行 find_existing_qq_pid attach.
+    public async Task<bool> StartQQAsync(string qqPath)
+    {
+        if (!PlatformHelper.IsWindows)
+        {
+            _logger.LogWarning("StartQQAsync 目前仅支持 Windows");
+            return false;
+        }
+
+        if (!File.Exists(qqPath))
+        {
+            _logger.LogError("QQ 可执行文件不存在: {Path}", qqPath);
+            return false;
+        }
+
+        try
+        {
+            var workingDir = Path.GetDirectoryName(qqPath) ?? Environment.CurrentDirectory;
+            var (success, pid) = await Task.Run<(bool Success, int Pid)>(() =>
+            {
+                var si = new STARTUPINFO { cb = Marshal.SizeOf<STARTUPINFO>() };
+                var commandLine = $"\"{qqPath}\"";
+                var created = CreateProcess(
+                    null,
+                    commandLine,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    false,
+                    CREATE_BREAKAWAY_FROM_JOB | CREATE_NEW_CONSOLE,
+                    IntPtr.Zero,
+                    workingDir,
+                    ref si,
+                    out var pi);
+
+                if (!created)
+                {
+                    _logger.LogError("CreateProcess 启动 QQ 失败, error={Error}", Marshal.GetLastWin32Error());
+                    return (false, 0);
+                }
+
+                CloseHandle(pi.hThread);
+                CloseHandle(pi.hProcess);
+                return (true, pi.dwProcessId);
+            });
+
+            if (!success)
+            {
+                _logger.LogError("启动 QQ 失败");
+                return false;
+            }
+
+            _logger.LogInformation("QQ 已启动: {Pid}", pid);
+
+            // 等 QQ 主进程就绪后再启动 PMHQ, 否则 PMHQ find_existing_qq_pid 找不到会自己再启一个 QQ
+            await WaitForQQProcessAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "启动 QQ 失败");
+            return false;
+        }
+    }
+
+    // best-effort 等到能枚举出 QQ.exe 进程, 再给 wrapper.node 加载留缓冲.
+    // 只看进程名 (不枚举模块), 时序不保证 100%; 若 PMHQ 偶发"找不到 QQ 又自己启一个", 需加长缓冲或让 PMHQ attach 改轮询.
+    private async Task WaitForQQProcessAsync(int maxWaitMs = 20000, int bufferMs = 3000)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < maxWaitMs)
+        {
+            var procs = Process.GetProcessesByName("QQ");
+            var found = procs.Length > 0;
+            foreach (var p in procs) p.Dispose();
+
+            if (found)
+            {
+                _logger.LogInformation("检测到 QQ 进程, 等待 {Ms}ms 让 QQ 主进程就绪", bufferMs);
+                await Task.Delay(bufferMs);
+                return;
+            }
+            await Task.Delay(500);
+        }
+        _logger.LogWarning("等待 QQ 进程超时 ({Ms}ms), 仍尝试启动 PMHQ", maxWaitMs);
+    }
+
+    // attach 模式: Desktop 已经先启动了 QQ, PMHQ 不传 --pid 自行 find_existing_qq_pid 后 attach.
+    // authToken 作为 --auth-token 传给 PMHQ (PMHQ 必填, 缺则启动即退).
+    public async Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, string autoLoginQQ, string authToken, bool debug = false)
     {
         try
         {
@@ -189,10 +278,10 @@ public class ProcessManager : IProcessManager, IDisposable
 
                 // 构建参数字符串
                 var args = new List<string> { $"--port={PmhqPort}" };
+                if (!string.IsNullOrEmpty(authToken))
+                    args.Add($"--auth-token={authToken}");
                 if (!string.IsNullOrEmpty(autoLoginQQ))
                     args.Add($"--qq={autoLoginQQ}");
-                if (headless)
-                    args.Add("--headless");
                 if (debug)
                 {
                     args.Add("--debug=true");
@@ -225,10 +314,10 @@ public class ProcessManager : IProcessManager, IDisposable
                     // 调试模式：用 cmd.exe 包装强制弹出控制台窗口，QQ 的输出会显示在这里
                     var absPmhqPath = Path.GetFullPath(pmhqPath);
                     var args = new List<string> { $"--port={PmhqPort}" };
+                    if (!string.IsNullOrEmpty(authToken))
+                        args.Add($"--auth-token={authToken}");
                     if (!string.IsNullOrEmpty(autoLoginQQ))
                         args.Add($"--qq={autoLoginQQ}");
-                    if (headless)
-                        args.Add("--headless");
                     args.Add("--debug=true");
                     args.Add("--qq-console");
 
@@ -263,16 +352,16 @@ public class ProcessManager : IProcessManager, IDisposable
                     // 添加端口参数
                     startInfo.ArgumentList.Add($"--port={PmhqPort}");
 
+                    // auth_token (PMHQ --auth-token 必填)
+                    if (!string.IsNullOrEmpty(authToken))
+                    {
+                        startInfo.ArgumentList.Add($"--auth-token={authToken}");
+                    }
+
                     // 如果指定了自动登录QQ号，添加 --qq 参数
                     if (!string.IsNullOrEmpty(autoLoginQQ))
                     {
                         startInfo.ArgumentList.Add($"--qq={autoLoginQQ}");
-                    }
-
-                    // 如果启用无头模式
-                    if (headless)
-                    {
-                        startInfo.ArgumentList.Add("--headless");
                     }
 
                     var fullCommand = $"{pmhqPath} {string.Join(" ", startInfo.ArgumentList)}";
@@ -410,7 +499,7 @@ public class ProcessManager : IProcessManager, IDisposable
         }
     }
 
-    public async Task<bool> StartLLBotAsync(string nodePath, string scriptPath)
+    public async Task<bool> StartLLBotAsync(string nodePath, string scriptPath, string? ipcPipeName = null, string? loginUin = null)
     {
         try
         {
@@ -453,15 +542,32 @@ public class ProcessManager : IProcessManager, IDisposable
             startInfo.Environment["NODE_SKIP_PLATFORM_CHECK"] = "1";
             startInfo.Environment["FORCE_COLOR"] = "3";
 
+            // LLBot 通过这个环境变量连接 Desktop 的命名管道 (仅 Windows)
+            if (!string.IsNullOrEmpty(ipcPipeName))
+            {
+                startInfo.Environment["LL_IPC_PIPE"] = ipcPipeName;
+            }
+
             // 添加 Node.js 参数
             startInfo.ArgumentList.Add("--enable-source-maps");
             startInfo.ArgumentList.Add(scriptFileName);
 
-            // 如果 PMHQ 端口已设置，传递给 LLBot
+            // 传给 LLBot 脚本的参数 (都放在 -- 之后)
+            // PmhqPort 有值 = 非 headless, 启用 PMHQ 模式; loginUin 有值 = headless 快速登录指定 QQ 号
+            var userArgs = new List<string>();
             if (PmhqPort.HasValue)
             {
+                startInfo.Environment["QQ_USE_PMHQ"] = "1";
+                userArgs.Add($"--pmhq-port={PmhqPort.Value}");
+            }
+            if (!string.IsNullOrEmpty(loginUin))
+            {
+                userArgs.Add($"--qq={loginUin}");
+            }
+            if (userArgs.Count > 0)
+            {
                 startInfo.ArgumentList.Add("--");
-                startInfo.ArgumentList.Add($"--pmhq-port={PmhqPort.Value}");
+                foreach (var arg in userArgs) startInfo.ArgumentList.Add(arg);
             }
 
             var fullCommand = $"{nodePath} {string.Join(" ", startInfo.ArgumentList)}";
@@ -514,6 +620,12 @@ public class ProcessManager : IProcessManager, IDisposable
 
     public async Task StopPmhqAsync()
     {
+        // PMHQ 端口随其生命周期, 停止即失效. 必须清空, 否则下次无头模式 StartLLBotAsync
+        // 会看到残留的 PmhqPort 而误给 LLBot 设 QQ_USE_PMHQ + --pmhq-port,
+        // 让 LLBot 去连根本没启动的 PMHQ, 卡在 initializing (直连登录流程不会执行).
+        // 放在 early-return 之前, 兜住"PMHQ 启动失败但 PmhqPort 已赋值"的残留.
+        PmhqPort = null;
+
         if (_pmhqStatus == ProcessStatus.Stopped)
             return;
 

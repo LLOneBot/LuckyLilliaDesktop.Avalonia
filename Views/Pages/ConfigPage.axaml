@@ -254,7 +254,7 @@
                         <CheckBox Content="启动软件后自动启动 Bot"
                                   IsChecked="{Binding AutoStartBot}"
                                   Foreground="{DynamicResource TextPrimary}"/>
-                        <CheckBox Content="无头模式（不显示 QQ 窗口，可能有掉线风险）"
+                        <CheckBox Content="无头模式（不依赖 QQ 本体，纯协议实现）"
                                   IsChecked="{Binding Headless}"
                                   Foreground="{DynamicResource TextPrimary}"/>
                         <CheckBox Content="调试模式（显示 QQ 控制台和详细日志）"

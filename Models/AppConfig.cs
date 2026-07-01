@@ -30,7 +30,7 @@ public class AppConfig
     public bool AutoStartBot { get; set; } = false;
 
     [JsonPropertyName("headless")]
-    public bool Headless { get; set; } = false;
+    public bool Headless { get; set; } = true;
 
     [JsonPropertyName("debug")]
     public bool Debug { get; set; } = false;

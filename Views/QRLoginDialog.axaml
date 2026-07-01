@@ -1,0 +1,120 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LuckyLilliaDesktop.Views.QRLoginDialog"
+        Title=""
+        Width="360"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="MainBackground" Color="#FFF4FA"/>
+                    <SolidColorBrush x:Key="SidebarBackground" Color="#FFFFFBFE"/>
+                    <SolidColorBrush x:Key="CardBackground" Color="#FDF7FE"/>
+                    <SolidColorBrush x:Key="CardBackgroundStrong" Color="#FFFFFFFF"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#F3C4DE"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FF5D72"/>
+                    <SolidColorBrush x:Key="SuccessColor" Color="#22C55E"/>
+                    <SolidColorBrush x:Key="WarningColor" Color="#F59E0B"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#8D6E82"/>
+                    <SolidColorBrush x:Key="TitleBarBackground" Color="#FFF9FD"/>
+                    <SolidColorBrush x:Key="WindowButtonHover" Color="#10E84D9C"/>
+                    <SolidColorBrush x:Key="CloseButtonHover" Color="#FFE6EC"/>
+                    <SolidColorBrush x:Key="WindowButtonStroke" Color="#7A6274"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#FDF7FE"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#FFF0F8"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#3B2434"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#8D6E82"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#F3C4DE"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="MainBackground" Color="#141018"/>
+                    <SolidColorBrush x:Key="SidebarBackground" Color="#1A131C"/>
+                    <SolidColorBrush x:Key="CardBackground" Color="#201722"/>
+                    <SolidColorBrush x:Key="CardBackgroundStrong" Color="#281C2B"/>
+                    <SolidColorBrush x:Key="CardBackgroundSecondary" Color="#241926"/>
+                    <SolidColorBrush x:Key="BorderColor" Color="#553648"/>
+                    <SolidColorBrush x:Key="PrimaryBrush" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="PrimaryBrushSoft" Color="#3A2131"/>
+                    <SolidColorBrush x:Key="DangerColor" Color="#FB7185"/>
+                    <SolidColorBrush x:Key="SuccessColor" Color="#34D399"/>
+                    <SolidColorBrush x:Key="WarningColor" Color="#FBBF24"/>
+                    <SolidColorBrush x:Key="TextPrimary" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="TextSecondary" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="TitleBarBackground" Color="#18111A"/>
+                    <SolidColorBrush x:Key="WindowButtonHover" Color="#342131"/>
+                    <SolidColorBrush x:Key="CloseButtonHover" Color="#4A1F2A"/>
+                    <SolidColorBrush x:Key="WindowButtonStroke" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#281C2B"/>
+                    <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#3A2131"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#FFF1F8"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#D8B8CA"/>
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#553648"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Border CornerRadius="12"
+            Background="{DynamicResource CardBackground}"
+            BorderBrush="{DynamicResource BorderColor}"
+            BorderThickness="1"
+            Padding="24">
+        <StackPanel Spacing="16">
+            <TextBlock Text="扫码登录"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"
+                       HorizontalAlignment="Center"/>
+
+            <!-- 二维码区背景必须白色, 保证扫码对比度 -->
+            <Border Width="220"
+                    Height="220"
+                    CornerRadius="8"
+                    Background="White"
+                    HorizontalAlignment="Center">
+                <Panel>
+                    <TextBlock x:Name="QRLoading"
+                               Text="正在获取二维码..."
+                               FontSize="13"
+                               Foreground="#666666"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                    <Image x:Name="QRImage"
+                           IsVisible="False"
+                           Stretch="Uniform"
+                           Margin="8"/>
+                </Panel>
+            </Border>
+
+            <TextBlock x:Name="StatusText"
+                       Text="请使用手机QQ扫描二维码登录"
+                       FontSize="13"
+                       Foreground="{DynamicResource TextSecondary}"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"/>
+
+            <Button x:Name="CancelButton"
+                    Content="取消"
+                    Width="100"
+                    Padding="0,10"
+                    HorizontalContentAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Click="OnCancelClick"/>
+        </StackPanel>
+    </Border>
+</Window>
