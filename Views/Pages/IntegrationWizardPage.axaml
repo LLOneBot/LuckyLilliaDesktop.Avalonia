@@ -170,7 +170,7 @@
                                     CommandParameter="openclaw">
                                 <Grid Width="350" Height="82" ColumnDefinitions="92,*">
                                     <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                        <Image Source="/Assets/Icons/openclaw.jpg" Stretch="UniformToFill"/>
+                                        <Image Source="/Assets/Icons/openclaw.jpg" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"/>
                                     </Border>
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -191,7 +191,7 @@
                                     CommandParameter="koishi">
                                 <Grid Width="350" Height="82" ColumnDefinitions="92,*">
                                     <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                        <Image Source="/Assets/Icons/koishi.png" Stretch="UniformToFill"/>
+                                        <Image Source="/Assets/Icons/koishi.png" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"/>
                                     </Border>
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -212,7 +212,7 @@
                                     CommandParameter="astrbot">
                                 <Grid Width="350" Height="82" ColumnDefinitions="92,*">
                                     <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                        <Image Source="/Assets/Icons/astrbot.png" Stretch="UniformToFill"/>
+                                        <Image Source="/Assets/Icons/astrbot.png" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"/>
                                     </Border>
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -233,7 +233,7 @@
                                     CommandParameter="zhenxun">
                                 <Grid Width="350" Height="82" ColumnDefinitions="92,*">
                                     <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                        <Image Source="/Assets/Icons/zhenxun.png" Stretch="UniformToFill"/>
+                                        <Image Source="/Assets/Icons/zhenxun.png" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"/>
                                     </Border>
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -254,7 +254,7 @@
                                     CommandParameter="ddbot">
                                 <Grid Width="350" Height="82" ColumnDefinitions="92,*">
                                     <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                        <Image Source="/Assets/Icons/ddbot.png" Stretch="UniformToFill"/>
+                                        <Image Source="/Assets/Icons/ddbot.png" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"/>
                                     </Border>
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -275,7 +275,7 @@
                                     CommandParameter="yunzai">
                                 <Grid Width="350" Height="82" ColumnDefinitions="92,*">
                                     <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                        <Image Source="/Assets/Icons/yunzai.png" Stretch="UniformToFill"/>
+                                        <Image Source="/Assets/Icons/yunzai.png" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"/>
                                     </Border>
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -297,7 +297,7 @@
                                     IsVisible="{Binding ShowZeroBotPlugin}">
                                 <Grid Width="350" Height="82" ColumnDefinitions="92,*">
                                     <Border Grid.Column="0" Width="56" Height="56" CornerRadius="16" ClipToBounds="True" VerticalAlignment="Center">
-                                        <Image Source="/Assets/Icons/zbp.png" Stretch="UniformToFill"/>
+                                        <Image Source="/Assets/Icons/zbp.png" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"/>
                                     </Border>
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
                                         <StackPanel Orientation="Horizontal" Spacing="8">

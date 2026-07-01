@@ -84,7 +84,7 @@
                                                 CornerRadius="22"
                                                 ClipToBounds="True"
                                                 Background="{DynamicResource PrimaryBrushSoft}">
-                                            <Image Source="{Binding Avatar}" Stretch="UniformToFill"/>
+                                            <Image Source="{Binding Avatar}" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"/>
                                         </Border>
                                         <StackPanel Grid.Column="1"
                                                     VerticalAlignment="Center"

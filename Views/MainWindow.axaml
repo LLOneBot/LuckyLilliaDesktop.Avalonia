@@ -207,6 +207,7 @@
                             <Image Width="34" Height="34"
                                    Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
                                    Stretch="UniformToFill"
+                                   RenderOptions.BitmapInterpolationMode="HighQuality"
                                    IsVisible="{Binding !HomeVM.HasQQInfo}">
                                 <Image.Clip>
                                     <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
@@ -215,6 +216,7 @@
                             <Image Width="34" Height="34"
                                    Source="{Binding HomeVM.AvatarBitmap}"
                                    Stretch="UniformToFill"
+                                   RenderOptions.BitmapInterpolationMode="HighQuality"
                                    IsVisible="{Binding HomeVM.HasQQInfo}">
                                 <Image.Clip>
                                     <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
@@ -310,6 +312,7 @@
                                        Width="56" Height="56"
                                        Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
                                        Stretch="UniformToFill"
+                                       RenderOptions.BitmapInterpolationMode="HighQuality"
                                        IsVisible="{Binding !HomeVM.HasQQInfo}">
                                     <Image.Clip>
                                         <EllipseGeometry Center="28,28" RadiusX="28" RadiusY="28"/>
@@ -319,6 +322,7 @@
                                 <Image x:Name="QQAvatarImage"
                                        Width="56" Height="56"
                                        Stretch="UniformToFill"
+                                       RenderOptions.BitmapInterpolationMode="HighQuality"
                                        Source="{Binding HomeVM.AvatarBitmap}"
                                        IsVisible="{Binding HomeVM.HasQQInfo}">
                                     <Image.Clip>

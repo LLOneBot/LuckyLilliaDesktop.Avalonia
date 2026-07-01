@@ -118,7 +118,8 @@
                         <Border Width="56" Height="56"
                                 CornerRadius="20">
                             <Image Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
-                                   Width="56" Height="56"/>
+                                   Width="56" Height="56"
+                                   RenderOptions.BitmapInterpolationMode="HighQuality"/>
                         </Border>
                         <StackPanel Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="{Binding AppName}"
