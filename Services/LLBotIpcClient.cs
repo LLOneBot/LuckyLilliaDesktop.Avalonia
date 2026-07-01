@@ -1,3 +1,4 @@
+using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 using System;
@@ -83,12 +84,6 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
     private static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(1);
     private const int ConnectTimeoutMs = 1500;
     private const int RequestTimeoutMs = 3000;
-
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-    };
 
     public LLBotIpcClient(ILogger<LLBotIpcClient> logger)
     {
@@ -221,7 +216,7 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
         StreamWriter writer, StreamReader reader, CancellationToken ct)
     {
         var id = Interlocked.Increment(ref _nextId).ToString();
-        var payload = JsonSerializer.Serialize(new IpcRequest("request", id, "get_login_state"), JsonOpts);
+        var payload = JsonSerializer.Serialize(new IpcRequest("request", id, "get_login_state"), AppJsonContext.Default.IpcRequest);
 
         try
         {
@@ -306,9 +301,9 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
         _loginStateSubject.Dispose();
         GC.SuppressFinalize(this);
     }
-
-    private sealed record IpcRequest(
-        [property: JsonPropertyName("type")] string Type,
-        [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("method")] string Method);
 }
+
+public sealed record IpcRequest(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("method")] string Method);
