@@ -1345,17 +1345,10 @@ public class HomeViewModel : ViewModelBase
                 return;
             }
 
-            // 先启动 QQ (WMI 启动, 父进程为系统宿主, 脱离 Desktop), 再让 PMHQ attach
-            _logger.LogInformation("正在启动 QQ...");
-            if (!await _processManager.StartQQAsync(config.QQPath))
-            {
-                ErrorMessage = "QQ 启动失败，请检查 QQ 路径";
-                BotStatus = ProcessStatus.Stopped;
-                return;
-            }
-
-            // 启动 PMHQ (attach 已启动的 QQ, 自行 find pid; auth-token 必传)
-            _logger.LogInformation("正在启动 PMHQ...");
+            // QQ 由 PMHQ 负责启动: QQ 路径已写入 pmhq_config.json 的 qq_path (见 StartPmhqAsync -> UpdatePmhqConfigAsync),
+            // PMHQ find_existing_qq_pid 找不到已运行的 QQ 时会按 qq_path 自行拉起. Desktop 不再单独启动 QQ.
+            // auth-token 必传给 PMHQ (缺则 PMHQ 启动即退).
+            _logger.LogInformation("正在启动 PMHQ (由其负责启动 QQ)...");
             var pmhqSuccess = await _processManager.StartPmhqAsync(
                 config.PmhqPath,
                 config.QQPath,
