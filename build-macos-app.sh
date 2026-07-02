@@ -43,6 +43,7 @@ mkdir -p "$APP_DIR/Contents/Resources"
 echo ""
 echo "步骤 3/5: 复制应用文件..."
 cp -r "bin/Release/net10.0/$RID/publish/"* "$APP_DIR/Contents/MacOS/"
+find "$APP_DIR" -name "*.dSYM" -type d -prune -exec rm -rf {} +
 
 # 4. 创建 Info.plist
 echo ""

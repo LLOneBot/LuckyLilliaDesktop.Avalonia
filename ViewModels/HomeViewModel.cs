@@ -1141,65 +1141,25 @@ public class HomeViewModel : ViewModelBase
             // 检查并下载缺失的文件
             var pmhqExists = !string.IsNullOrEmpty(config.PmhqPath) && File.Exists(config.PmhqPath);
 
-            // 检查 Node.js：先验证配置中的路径是否有效，如果无效则重置
-            var nodeExists = false;
-            if (!string.IsNullOrEmpty(config.NodePath) && File.Exists(config.NodePath))
+            var nodeExists = await TryUseNodeAsync(config.NodePath, "配置中的Node.js路径", "配置中的Node.js版本低于24，将重新检测");
+            if (!nodeExists && !string.IsNullOrEmpty(config.NodePath))
             {
-                if (await Utils.NodeHelper.CheckNodeVersionValidAsync(config.NodePath, 24, _logger))
-                {
-                    _logger.LogInformation("配置中的Node.js路径有效: {Path}", config.NodePath);
-                    nodeExists = true;
-                }
-                else
-                {
-                    _logger.LogWarning("配置中的Node.js版本低于24，将重新检测: {Path}", config.NodePath);
-                    config.NodePath = string.Empty; // 重置无效路径
-                }
-            }
-            else if (!string.IsNullOrEmpty(config.NodePath))
-            {
-                _logger.LogWarning("配置中的Node.js路径不存在，将重新检测: {Path}", config.NodePath);
-                config.NodePath = string.Empty; // 重置无效路径
+                _logger.LogWarning("配置中的Node.js路径无效，将重新检测: {Path}", config.NodePath);
+                config.NodePath = string.Empty;
             }
 
-            // 如果配置中的路径无效，优先使用 PATH 中的 Node.js（版本 >= 24）
-            if (!nodeExists)
-            // 如果配置中的路径无效，优先使用 PATH 中的 Node.js（版本 >= 24）
             if (!nodeExists)
             {
-                var systemNode = Utils.NodeHelper.FindNodeInPath();
-                if (!string.IsNullOrEmpty(systemNode))
-                {
-                    if (await Utils.NodeHelper.CheckNodeVersionValidAsync(systemNode, 24, _logger))
-                    {
-                        _logger.LogInformation("在系统PATH中找到Node.js (版本>=24): {Path}", systemNode);
-                        config.NodePath = systemNode;
-                        nodeExists = true;
-                    }
-                    else
-                    {
-                        _logger.LogWarning("系统PATH中的Node.js版本低于24: {Path}", systemNode);
-                    }
-                }
+                var systemNode = NodeHelper.FindNodeInPath();
+                nodeExists = await TryUseNodeAsync(systemNode, "在系统PATH中找到Node.js (版本>=24)", "系统PATH中的Node.js版本低于24");
+                if (nodeExists) config.NodePath = systemNode!;
             }
 
-            // 如果 PATH 中没有合适的 Node.js，检查本地 bin/llbot/node.exe
             if (!nodeExists)
             {
-                var localNodePath = Utils.Constants.DefaultPaths.NodeExe;
-                if (File.Exists(localNodePath))
-                {
-                    if (await Utils.NodeHelper.CheckNodeVersionValidAsync(localNodePath, 24, _logger))
-                    {
-                        _logger.LogInformation("在本地目录找到Node.js: {Path}", localNodePath);
-                        config.NodePath = localNodePath;
-                        nodeExists = true;
-                    }
-                    else
-                    {
-                        _logger.LogWarning("本地Node.js版本低于24: {Path}", localNodePath);
-                    }
-                }
+                var localNodePath = Constants.DefaultPaths.NodeExe;
+                nodeExists = await TryUseNodeAsync(localNodePath, "在本地目录找到Node.js", "本地Node.js版本低于24");
+                if (nodeExists) config.NodePath = localNodePath;
             }
 
             var llbotExists = !string.IsNullOrEmpty(config.LLBotPath) && File.Exists(config.LLBotPath);
@@ -1222,6 +1182,21 @@ public class HomeViewModel : ViewModelBase
             }
             _logger.LogInformation("FFmpeg可用: {Available}", ffmpegExists);
             _logger.LogInformation("FFprobe可用: {Available}", ffprobeExists);
+
+            async Task<bool> TryUseNodeAsync(string? path, string successMessage, string invalidVersionMessage)
+            {
+                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                    return false;
+
+                if (!await NodeHelper.CheckNodeVersionValidAsync(path, 24, _logger))
+                {
+                    _logger.LogWarning("{Message}: {Path}", invalidVersionMessage, path);
+                    return false;
+                }
+
+                _logger.LogInformation("{Message}: {Path}", successMessage, path);
+                return true;
+            }
 
             // 如果任何文件不存在，尝试下载
             if (!pmhqExists || !nodeExists || !llbotExists || !ffmpegExists || !ffprobeExists)

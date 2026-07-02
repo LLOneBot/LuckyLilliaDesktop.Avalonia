@@ -591,6 +591,7 @@ public class ProcessManager : IProcessManager, IDisposable
             if (_llbotProcess.HasExited)
             {
                 _logger.LogError("LLBot 进程立即退出，返回码: {ExitCode}", _llbotProcess.ExitCode);
+                await LogExitedProcessOutputAsync(_llbotProcess, "LLBot");
                 _llbotStatus = ProcessStatus.Error;
                 ProcessStatusChanged?.Invoke(this, _llbotStatus);
                 return false;
@@ -615,6 +616,28 @@ public class ProcessManager : IProcessManager, IDisposable
             _llbotStatus = ProcessStatus.Error;
             ProcessStatusChanged?.Invoke(this, _llbotStatus);
             return false;
+        }
+    }
+
+    private async Task LogExitedProcessOutputAsync(Process process, string processName)
+    {
+        try
+        {
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            await Task.WhenAll(stdoutTask, stderrTask);
+
+            var stdout = stdoutTask.Result.Trim();
+            var stderr = stderrTask.Result.Trim();
+
+            if (!string.IsNullOrEmpty(stdout))
+                _logger.LogError("{ProcessName} stdout: {Output}", processName, stdout);
+            if (!string.IsNullOrEmpty(stderr))
+                _logger.LogError("{ProcessName} stderr: {Error}", processName, stderr);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取 {ProcessName} 退出输出失败", processName);
         }
     }
 
