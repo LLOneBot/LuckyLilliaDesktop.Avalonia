@@ -82,89 +82,91 @@ jobs:
           tar -czf lucky-lillia-desktop-win-x64.tgz package
           npm publish lucky-lillia-desktop-win-x64.tgz --provenance --access public
 
-  release-macos:
-    runs-on: macos-latest
-    permissions:
-      contents: write
-      id-token: write
-    env:
-      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
-    strategy:
-      matrix:
-        arch: [arm64] # x64 暂时注释
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Build macOS app
-        run: |
-          chmod +x build-macos-app.sh
-          ./build-macos-app.sh ${{ matrix.arch }}
-
-      - name: Remove quarantine attributes
-        run: |
-          xattr -cr bin/Release/net10.0/osx-${{ matrix.arch }}/LuckyLilliaDesktop.app || true
-
-      - name: Create tar.gz package
-        run: |
-          cd bin/Release/net10.0/osx-${{ matrix.arch }}
-          tar -czf ../../../../lucky-lillia-desktop-macos-${{ matrix.arch }}.tar.gz LuckyLilliaDesktop.app
-          cd ../../../../
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: lucky-lillia-desktop-macos-${{ matrix.arch }}
-          path: lucky-lillia-desktop-macos-${{ matrix.arch }}.tar.gz
-
-      - name: Setup Node.js
-        if: github.event_name == 'push' && env.HAS_NPM_TOKEN == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Update npm
-        if: github.event_name == 'push' && env.HAS_NPM_TOKEN == 'true'
-        run: npm install -g npm@latest
-
-      - name: Prepare and publish npm package
-        if: github.event_name == 'push' && env.HAS_NPM_TOKEN == 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
-          mkdir -p package
-          cp -r bin/Release/net10.0/osx-${{ matrix.arch }}/LuckyLilliaDesktop.app package/
-          cat > package/package.json << EOF
-          {
-            "name": "lucky-lillia-desktop-macos-${{ matrix.arch }}",
-            "version": "$VERSION",
-            "repository": {
-              "type": "git",
-              "url": "https://github.com/LLOneBot/LuckyLilliaDesktop.Avalonia"
-            }
-          }
-          EOF
-          tar -czf lucky-lillia-desktop-macos-${{ matrix.arch }}.tgz package
-          npm publish lucky-lillia-desktop-macos-${{ matrix.arch }}.tgz --provenance --access public
+# macOS CI temporarily disabled (2026-07-02). To re-enable: uncomment this job,
+# restore "- release-macos" in create-release needs and the macos line in its files.
+# release-macos:
+#   runs-on: macos-latest
+#   permissions:
+#     contents: write
+#     id-token: write
+#   env:
+#     HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+#   strategy:
+#     matrix:
+#       arch: [arm64] # x64 暂时注释
+#
+#   steps:
+#     - name: Checkout code
+#       uses: actions/checkout@v4
+#
+#     - name: Setup .NET
+#       uses: actions/setup-dotnet@v4
+#       with:
+#         dotnet-version: '10.0.x'
+#
+#     - name: Restore dependencies
+#       run: dotnet restore
+#
+#     - name: Build macOS app
+#       run: |
+#         chmod +x build-macos-app.sh
+#         ./build-macos-app.sh ${{ matrix.arch }}
+#
+#     - name: Remove quarantine attributes
+#       run: |
+#         xattr -cr bin/Release/net10.0/osx-${{ matrix.arch }}/LuckyLilliaDesktop.app || true
+#
+#     - name: Create tar.gz package
+#       run: |
+#         cd bin/Release/net10.0/osx-${{ matrix.arch }}
+#         tar -czf ../../../../lucky-lillia-desktop-macos-${{ matrix.arch }}.tar.gz LuckyLilliaDesktop.app
+#         cd ../../../../
+#
+#     - name: Upload artifact
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: lucky-lillia-desktop-macos-${{ matrix.arch }}
+#         path: lucky-lillia-desktop-macos-${{ matrix.arch }}.tar.gz
+#
+#     - name: Setup Node.js
+#       if: github.event_name == 'push' && env.HAS_NPM_TOKEN == 'true'
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: '20'
+#         registry-url: 'https://registry.npmjs.org'
+#
+#     - name: Update npm
+#       if: github.event_name == 'push' && env.HAS_NPM_TOKEN == 'true'
+#       run: npm install -g npm@latest
+#
+#     - name: Prepare and publish npm package
+#       if: github.event_name == 'push' && env.HAS_NPM_TOKEN == 'true'
+#       env:
+#         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+#       run: |
+#         VERSION="${{ github.ref_name }}"
+#         VERSION="${VERSION#v}"
+#         mkdir -p package
+#         cp -r bin/Release/net10.0/osx-${{ matrix.arch }}/LuckyLilliaDesktop.app package/
+#         cat > package/package.json << EOF
+#         {
+#           "name": "lucky-lillia-desktop-macos-${{ matrix.arch }}",
+#           "version": "$VERSION",
+#           "repository": {
+#             "type": "git",
+#             "url": "https://github.com/LLOneBot/LuckyLilliaDesktop.Avalonia"
+#           }
+#         }
+#         EOF
+#         tar -czf lucky-lillia-desktop-macos-${{ matrix.arch }}.tgz package
+#         npm publish lucky-lillia-desktop-macos-${{ matrix.arch }}.tgz --provenance --access public
 
   create-release:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs:
       - release-windows
-      - release-macos
+      # - release-macos
     permissions:
       contents: write
 
@@ -184,6 +186,6 @@ jobs:
           overwrite_files: true
           files: |
             release-artifacts/lucky-lillia-desktop-win-x64/lucky-lillia-desktop-win-x64.zip
-            release-artifacts/lucky-lillia-desktop-macos-arm64/lucky-lillia-desktop-macos-arm64.tar.gz
+          # release-artifacts/lucky-lillia-desktop-macos-arm64/lucky-lillia-desktop-macos-arm64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
