@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
@@ -22,6 +23,7 @@ namespace LuckyLilliaDesktop.ViewModels;
 
 public class HomeViewModel : ViewModelBase
 {
+    private static readonly HttpClient HttpClient = new();
     private readonly IProcessManager _processManager;
     private readonly IResourceMonitor _resourceMonitor;
     private readonly ISelfInfoService _selfInfoService;
@@ -79,11 +81,13 @@ public class HomeViewModel : ViewModelBase
             var wasRunning = _botStatus == ProcessStatus.Running;
             this.RaiseAndSetIfChanged(ref _botStatus, value);
             this.RaisePropertyChanged(nameof(BotStatusText));
-            // 记录/清除运行起点, 用于"已运行时长"
-            if (value == ProcessStatus.Running && !wasRunning)
-                _botStartTime = DateTime.Now;
-            else if (value == ProcessStatus.Stopped)
-                _botStartTime = null;
+            _botStartTime = value switch
+            {
+                // 记录/清除运行起点, 用于"已运行时长"
+                ProcessStatus.Running when !wasRunning => DateTime.Now,
+                ProcessStatus.Stopped => null,
+                _ => _botStartTime
+            };
             UpdateUptime();
             UpdateButtonState();
         }
@@ -270,24 +274,24 @@ public class HomeViewModel : ViewModelBase
 
     public bool HasQQInfo => !string.IsNullOrEmpty(QQUin);
 
-    private Avalonia.Media.Imaging.Bitmap? _avatarBitmap;
     public Avalonia.Media.Imaging.Bitmap? AvatarBitmap
     {
-        get => _avatarBitmap;
-        set => this.RaiseAndSetIfChanged(ref _avatarBitmap, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     private async Task LoadAvatarAsync(string uin)
     {
-        if (string.IsNullOrEmpty(uin)) return;
+        if (!AccountInfoHelper.IsValidQQUin(uin)) return;
 
         try
         {
             var url = $"https://q1.qlogo.cn/g?b=qq&nk={uin}&s=640";
-            using var httpClient = new System.Net.Http.HttpClient();
-            var bytes = await httpClient.GetByteArrayAsync(url);
+            var bytes = await HttpClient.GetByteArrayAsync(url);
             using var stream = new MemoryStream(bytes);
-            AvatarBitmap = new Avalonia.Media.Imaging.Bitmap(stream);
+            var avatar = PicHelper.DecodeToWidth(stream, 56, 1);
+            if (QQUin == uin)
+                AvatarBitmap = avatar;
         }
         catch (Exception ex)
         {
@@ -434,12 +438,12 @@ public class HomeViewModel : ViewModelBase
 
         // 订阅资源监控流
         _resourceMonitor.ResourceStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(OnResourceUpdate);
 
         // 订阅可用内存流 (顺便每次刷新已运行时长)
         _resourceMonitor.AvailableMemoryStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(mem =>
             {
                 AvailableMemory = mem;
@@ -447,9 +451,15 @@ public class HomeViewModel : ViewModelBase
             });
 
         _selfInfoService.UinStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(uin =>
             {
+                if (!string.IsNullOrEmpty(uin) && !AccountInfoHelper.IsValidQQUin(uin))
+                {
+                    _logger.LogWarning("忽略无效 UIN: {Uin}", uin);
+                    return;
+                }
+
                 QQUin = uin ?? string.Empty;
                 QQStatus = string.IsNullOrEmpty(uin) ? ProcessStatus.Stopped : ProcessStatus.Running;
                 if (!string.IsNullOrEmpty(uin))
@@ -457,7 +467,7 @@ public class HomeViewModel : ViewModelBase
             });
 
         _selfInfoService.NicknameStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(nickname =>
             {
                 QQNickname = nickname ?? string.Empty;
@@ -466,7 +476,7 @@ public class HomeViewModel : ViewModelBase
             });
 
         _resourceMonitor.QQVersionStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(version => QQVersion = version);
 
         // uin/昵称统一经 SelfInfoService (数据源已切到 LLBot IPC), 上面 UinStream/NicknameStream
@@ -477,33 +487,36 @@ public class HomeViewModel : ViewModelBase
 
         // 订阅更新状态变化
         _updateStateService.StateChanged
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(OnUpdateStateChanged);
 
         // 订阅日志流（最近10条），批量处理避免 UI 卡顿
         _logCollector.LogStream
             .Buffer(TimeSpan.FromMilliseconds(100))
             .Where(batch => batch.Count > 0)
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(OnLogBatchReceived);
 
-        // 全局启动/停止命令
-        var canExecute = this.WhenAnyValue(x => x.IsButtonEnabled);
-        GlobalStartStopCommand = ReactiveCommand.Create(() => { _ = GlobalStartStopAsync(); }, canExecute);
+        // 全局启动/停止命令；按钮启用状态由 IsButtonEnabled 绑定控制，避免 ReactiveCommand 的 CanExecuteChanged 跨线程触发 Avalonia 控件访问。
+        GlobalStartStopCommand = ReactiveCommand.Create(() =>
+        {
+            if (!IsButtonEnabled) return;
+            _ = GlobalStartStopAsync();
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 查看全部日志命令
         ViewAllLogsCommand = ReactiveCommand.Create(() =>
         {
             _logger.LogDebug("导航到日志页面");
             NavigateToLogs?.Invoke();
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 更新命令 - 导航到关于页面
         UpdateCommand = ReactiveCommand.Create(() =>
         {
             _logger.LogInformation("用户点击更新按钮，导航到关于页面");
             NavigateToAbout?.Invoke();
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 取消下载命令
         CancelDownloadCommand = ReactiveCommand.Create(() =>
@@ -512,7 +525,7 @@ public class HomeViewModel : ViewModelBase
             _downloadCts?.Cancel();
             IsDownloading = false;
             DownloadStatus = "下载已取消";
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 初始化时启动资源监控
         _ = _resourceMonitor.StartMonitoringAsync();
@@ -1128,65 +1141,25 @@ public class HomeViewModel : ViewModelBase
             // 检查并下载缺失的文件
             var pmhqExists = !string.IsNullOrEmpty(config.PmhqPath) && File.Exists(config.PmhqPath);
 
-            // 检查 Node.js：先验证配置中的路径是否有效，如果无效则重置
-            var nodeExists = false;
-            if (!string.IsNullOrEmpty(config.NodePath) && File.Exists(config.NodePath))
+            var nodeExists = await TryUseNodeAsync(config.NodePath, "配置中的Node.js路径", "配置中的Node.js版本低于24，将重新检测");
+            if (!nodeExists && !string.IsNullOrEmpty(config.NodePath))
             {
-                if (await Utils.NodeHelper.CheckNodeVersionValidAsync(config.NodePath, 24, _logger))
-                {
-                    _logger.LogInformation("配置中的Node.js路径有效: {Path}", config.NodePath);
-                    nodeExists = true;
-                }
-                else
-                {
-                    _logger.LogWarning("配置中的Node.js版本低于24，将重新检测: {Path}", config.NodePath);
-                    config.NodePath = string.Empty; // 重置无效路径
-                }
-            }
-            else if (!string.IsNullOrEmpty(config.NodePath))
-            {
-                _logger.LogWarning("配置中的Node.js路径不存在，将重新检测: {Path}", config.NodePath);
-                config.NodePath = string.Empty; // 重置无效路径
+                _logger.LogWarning("配置中的Node.js路径无效，将重新检测: {Path}", config.NodePath);
+                config.NodePath = string.Empty;
             }
 
-            // 如果配置中的路径无效，优先使用 PATH 中的 Node.js（版本 >= 24）
-            if (!nodeExists)
-            // 如果配置中的路径无效，优先使用 PATH 中的 Node.js（版本 >= 24）
             if (!nodeExists)
             {
-                var systemNode = Utils.NodeHelper.FindNodeInPath();
-                if (!string.IsNullOrEmpty(systemNode))
-                {
-                    if (await Utils.NodeHelper.CheckNodeVersionValidAsync(systemNode, 24, _logger))
-                    {
-                        _logger.LogInformation("在系统PATH中找到Node.js (版本>=24): {Path}", systemNode);
-                        config.NodePath = systemNode;
-                        nodeExists = true;
-                    }
-                    else
-                    {
-                        _logger.LogWarning("系统PATH中的Node.js版本低于24: {Path}", systemNode);
-                    }
-                }
+                var systemNode = NodeHelper.FindNodeInPath();
+                nodeExists = await TryUseNodeAsync(systemNode, "在系统PATH中找到Node.js (版本>=24)", "系统PATH中的Node.js版本低于24");
+                if (nodeExists) config.NodePath = systemNode!;
             }
 
-            // 如果 PATH 中没有合适的 Node.js，检查本地 bin/llbot/node.exe
             if (!nodeExists)
             {
-                var localNodePath = Utils.Constants.DefaultPaths.NodeExe;
-                if (File.Exists(localNodePath))
-                {
-                    if (await Utils.NodeHelper.CheckNodeVersionValidAsync(localNodePath, 24, _logger))
-                    {
-                        _logger.LogInformation("在本地目录找到Node.js: {Path}", localNodePath);
-                        config.NodePath = localNodePath;
-                        nodeExists = true;
-                    }
-                    else
-                    {
-                        _logger.LogWarning("本地Node.js版本低于24: {Path}", localNodePath);
-                    }
-                }
+                var localNodePath = Constants.DefaultPaths.NodeExe;
+                nodeExists = await TryUseNodeAsync(localNodePath, "在本地目录找到Node.js", "本地Node.js版本低于24");
+                if (nodeExists) config.NodePath = localNodePath;
             }
 
             var llbotExists = !string.IsNullOrEmpty(config.LLBotPath) && File.Exists(config.LLBotPath);
@@ -1209,6 +1182,21 @@ public class HomeViewModel : ViewModelBase
             }
             _logger.LogInformation("FFmpeg可用: {Available}", ffmpegExists);
             _logger.LogInformation("FFprobe可用: {Available}", ffprobeExists);
+
+            async Task<bool> TryUseNodeAsync(string? path, string successMessage, string invalidVersionMessage)
+            {
+                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                    return false;
+
+                if (!await NodeHelper.CheckNodeVersionValidAsync(path, 24, _logger))
+                {
+                    _logger.LogWarning("{Message}: {Path}", invalidVersionMessage, path);
+                    return false;
+                }
+
+                _logger.LogInformation("{Message}: {Path}", successMessage, path);
+                return true;
+            }
 
             // 如果任何文件不存在，尝试下载
             if (!pmhqExists || !nodeExists || !llbotExists || !ffmpegExists || !ffprobeExists)
@@ -1621,10 +1609,10 @@ public class HomeViewModel : ViewModelBase
         // (QQUin setter 会顺带触发头像加载, 所以填对 uin 头像也跟着回来.)
         QQVersion = string.Empty;   // 无头无 PMHQ /health, 不显示 QQ 版本
         var loginState = _llbotIpc.CurrentLoginState;
-        if (!string.IsNullOrEmpty(loginState?.Uin))
+        if (loginState is { Uin: var loggedInUin } && AccountInfoHelper.IsValidQQUin(loggedInUin))
         {
             QQNickname = loginState.Nickname ?? string.Empty;
-            QQUin = loginState.Uin;
+            QQUin = loggedInUin;
             QQStatus = ProcessStatus.Running;
         }
         else

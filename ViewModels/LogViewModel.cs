@@ -1,5 +1,6 @@
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System;
@@ -127,7 +128,7 @@ public class LogViewModel : ViewModelBase, IDisposable
         _logSubscription = _logCollector.LogStream
             .Buffer(TimeSpan.FromMilliseconds(200))
             .Where(batch => batch.Count > 0)
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(OnLogBatchReceived);
 
         SelectedLogEntries.CollectionChanged += (_, _) =>
@@ -140,7 +141,7 @@ public class LogViewModel : ViewModelBase, IDisposable
             LogEntries.Clear();
             _logCollector.ClearLogs();
             _logger.LogInformation("日志已清空");
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         CopySelectedCommand = ReactiveCommand.CreateFromTask(async () =>
         {
@@ -162,13 +163,13 @@ public class LogViewModel : ViewModelBase, IDisposable
 
             SelectedLogEntries.Clear();
             ClearSelectionRequested?.Invoke();
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         ClearSelectionCommand = ReactiveCommand.Create(() =>
         {
             SelectedLogEntries.Clear();
             ClearSelectionRequested?.Invoke();
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         LoadRecentLogs();
     }

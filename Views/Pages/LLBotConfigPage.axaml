@@ -76,6 +76,38 @@
             <Setter Property="Padding" Value="12,9"/>
             <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource PrimarySelectionBrush}"/>
+            <Setter Property="SelectionForegroundBrush" Value="White"/>
+        </Style>
+        <Style Selector="TextBox:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="TextBox:focus">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="NumericUpDown">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundStrong}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        </Style>
+        <Style Selector="NumericUpDown:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="NumericUpDown:focus">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="NumericUpDown /template/ Border#PART_BorderElement">
+            <Setter Property="CornerRadius" Value="14"/>
+        </Style>
+        <Style Selector="NumericUpDown /template/ Border#BorderElement">
+            <Setter Property="CornerRadius" Value="14"/>
+        </Style>
+        <Style Selector="NumericUpDown /template/ TextBox">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource PrimarySelectionBrush}"/>
+            <Setter Property="SelectionForegroundBrush" Value="White"/>
         </Style>
         <Style Selector="ComboBox">
             <Setter Property="CornerRadius" Value="14"/>
@@ -383,22 +415,37 @@
                                                                                             Command="{Binding $parent[ItemsControl].((vm:OB11ConnectionViewModel)DataContext).Filter.RemoveRuleCommand}"
                                                                                             CommandParameter="{Binding}"/>
                                                                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                                                                        <ComboBox Width="140" SelectedValue="{Binding Field}" DisplayMemberBinding="{ReflectionBinding Label}"
-                                                                                                  SelectedValueBinding="{ReflectionBinding Value}"
-                                                                                                  ItemsSource="{x:Static vm:EventFilterViewModel.FieldOptions}"/>
-                                                                                        <ComboBox Width="110" SelectedValue="{Binding Operator}" DisplayMemberBinding="{ReflectionBinding Label}"
-                                                                                                  SelectedValueBinding="{ReflectionBinding Value}"
-                                                                                                  ItemsSource="{x:Static vm:EventFilterViewModel.OperatorOptions}"/>
+                                                                                        <ComboBox Width="140" SelectedItem="{Binding SelectedFieldOption}"
+                                                                                                  ItemsSource="{x:Static vm:EventFilterViewModel.FieldOptions}">
+                                                                                            <ComboBox.ItemTemplate>
+                                                                                                <DataTemplate x:DataType="vm:FieldOption">
+                                                                                                    <TextBlock Text="{Binding Label}"/>
+                                                                                                </DataTemplate>
+                                                                                            </ComboBox.ItemTemplate>
+                                                                                        </ComboBox>
+                                                                                        <ComboBox Width="110" SelectedItem="{Binding SelectedOperatorOption}"
+                                                                                                  ItemsSource="{x:Static vm:EventFilterViewModel.OperatorOptions}">
+                                                                                            <ComboBox.ItemTemplate>
+                                                                                                <DataTemplate x:DataType="vm:OperatorOption">
+                                                                                                    <TextBlock Text="{Binding Label}"/>
+                                                                                                </DataTemplate>
+                                                                                            </ComboBox.ItemTemplate>
+                                                                                        </ComboBox>
                                                                                     </StackPanel>
                                                                                 </DockPanel>
                                                                                 <!-- 值输入 - 列表操作符 -->
                                                                                 <TextBox Text="{Binding Value}" Watermark="{Binding ValuePlaceholder}"
                                                                                          IsVisible="{Binding IsListOperator}"/>
                                                                                 <!-- 值输入 - 下拉选择字段 -->
-                                                                                <ComboBox SelectedValue="{Binding Value}" DisplayMemberBinding="{ReflectionBinding Label}"
-                                                                                          SelectedValueBinding="{ReflectionBinding Value}"
+                                                                                <ComboBox SelectedItem="{Binding SelectedValueOption}"
                                                                                           ItemsSource="{Binding FieldOptions}"
-                                                                                          IsVisible="{Binding IsSelectField}" HorizontalAlignment="Stretch"/>
+                                                                                          IsVisible="{Binding IsSelectField}" HorizontalAlignment="Stretch">
+                                                                                    <ComboBox.ItemTemplate>
+                                                                                        <DataTemplate x:DataType="vm:SelectOption">
+                                                                                            <TextBlock Text="{Binding Label}"/>
+                                                                                        </DataTemplate>
+                                                                                    </ComboBox.ItemTemplate>
+                                                                                </ComboBox>
                                                                                 <!-- 值输入 - 文本/正则字段 -->
                                                                                 <TextBox Text="{Binding Value}" Watermark="{Binding ValuePlaceholder}"
                                                                                          IsVisible="{Binding IsTextField}"/>

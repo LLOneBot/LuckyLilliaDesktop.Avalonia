@@ -6,7 +6,6 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 using LuckyLilliaDesktop.Models;
@@ -31,12 +30,6 @@ public class RedReplyInstallService : IRedReplyInstallService
 
     private const string RedReplyDir = "bin/redreply";
     private const int DefaultWebPort = 1207;
-    private static readonly JsonSerializerOptions IndentedJsonOptions = new()
-    {
-        WriteIndented = true,
-        TypeInfoResolver = new DefaultJsonTypeInfoResolver()
-    };
-
     public bool IsInstalled => File.Exists(Path.Combine(RedReplyDir, GetExeFileName()));
     public string RedReplyPath => Path.GetFullPath(RedReplyDir);
 
@@ -145,9 +138,9 @@ public class RedReplyInstallService : IRedReplyInstallService
 
         RemoveStaleDefaultWsUrl(wsUrls, wsUrl);
         if (!ContainsString(wsUrls, wsUrl))
-            wsUrls.Add(wsUrl);
+            ((System.Collections.Generic.IList<JsonNode?>)wsUrls).Add(JsonValue.Create(wsUrl));
 
-        File.WriteAllText(configPath, config.ToJsonString(IndentedJsonOptions));
+        File.WriteAllText(configPath, config.ToJsonString(AppJsonContext.Default.Options));
 
         _logger.LogInformation("redreply OneBot11 正向 WS 已配置: {Url}", wsUrl);
     }
@@ -164,7 +157,7 @@ public class RedReplyInstallService : IRedReplyInstallService
         try
         {
             var json = File.ReadAllText(configPath);
-            var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            var config = JsonSerializer.Deserialize(json, AppJsonContext.Default.LLBotConfig) ?? LLBotConfig.Default;
             var changed = false;
 
             var redReplyWs = config.OB11.Connect.FirstOrDefault(c =>
@@ -613,7 +606,7 @@ public class RedReplyInstallService : IRedReplyInstallService
 
     private static void SaveLLBotConfig(string configPath, LLBotConfig config)
     {
-        File.WriteAllText(configPath, JsonSerializer.Serialize(config, IndentedJsonOptions));
+        File.WriteAllText(configPath, JsonSerializer.Serialize(config, AppJsonContext.Default.LLBotConfig));
     }
 
     private static int FindAvailablePort(int startPort)

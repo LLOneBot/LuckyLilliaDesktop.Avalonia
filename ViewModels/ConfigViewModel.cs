@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Utils;
 using LuckyLilliaDesktop.Views;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
@@ -330,25 +331,25 @@ public class ConfigViewModel : ViewModelBase
         {
             var path = await BrowseFileAsync("选择 QQ 可执行文件", ["exe"], QQPath);
             if (!string.IsNullOrEmpty(path)) QQPath = path;
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         BrowsePmhqCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var path = await BrowseFileAsync("选择 PMHQ 可执行文件", ["exe"], PmhqPath);
             if (!string.IsNullOrEmpty(path)) PmhqPath = path;
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         BrowseLLBotCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var path = await BrowseFileAsync("选择 LLBot 脚本文件", ["js"], LLBotPath);
             if (!string.IsNullOrEmpty(path)) LLBotPath = path;
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         BrowseNodeCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var path = await BrowseFileAsync("选择 Node.js 可执行文件", ["exe"], NodePath);
             if (!string.IsNullOrEmpty(path)) NodePath = path;
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         TestCommandCommand = ReactiveCommand.Create(() =>
         {
@@ -371,9 +372,9 @@ public class ConfigViewModel : ViewModelBase
             {
                 _logger.LogError(ex, "执行命令失败");
             }
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
-        TestEmailCommand = ReactiveCommand.CreateFromTask(TestEmailAsync);
+        TestEmailCommand = ReactiveCommand.CreateFromTask(TestEmailAsync, outputScheduler: AvaloniaUiScheduler.Instance);
         OpenEmailGuideCommand = ReactiveCommand.Create(() =>
         {
             try
@@ -389,7 +390,7 @@ public class ConfigViewModel : ViewModelBase
             {
                 _logger.LogError(ex, "打开邮件设置向导失败");
             }
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
         OpenWorkingDirectoryCommand = ReactiveCommand.Create(() =>
         {
             try
@@ -435,9 +436,9 @@ public class ConfigViewModel : ViewModelBase
             {
                 _logger.LogError(ex, "打开工作目录失败");
             }
-        });
-        SaveConfigCommand = ReactiveCommand.CreateFromTask(SaveConfigAsync);
-        LoadConfigCommand = ReactiveCommand.CreateFromTask(LoadConfigAsync);
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
+        SaveConfigCommand = ReactiveCommand.CreateFromTask(SaveConfigAsync, outputScheduler: AvaloniaUiScheduler.Instance);
+        LoadConfigCommand = ReactiveCommand.CreateFromTask(LoadConfigAsync, outputScheduler: AvaloniaUiScheduler.Instance);
 
         _ = LoadConfigAsync();
     }

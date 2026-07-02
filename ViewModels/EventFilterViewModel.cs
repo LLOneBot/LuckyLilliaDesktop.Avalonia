@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reactive;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using LuckyLilliaDesktop.Utils;
 using ReactiveUI;
 
 namespace LuckyLilliaDesktop.ViewModels;
@@ -41,7 +42,18 @@ public class FilterRuleViewModel : ReactiveObject
             this.RaisePropertyChanged(nameof(IsNumberField));
             this.RaisePropertyChanged(nameof(IsTextField));
             this.RaisePropertyChanged(nameof(FieldOptions));
+            this.RaisePropertyChanged(nameof(SelectedFieldOption));
+            this.RaisePropertyChanged(nameof(SelectedValueOption));
             NotifyModified();
+        }
+    }
+
+    public FieldOption? SelectedFieldOption
+    {
+        get => EventFilterViewModel.FieldOptions.FirstOrDefault(f => f.Value == Field);
+        set
+        {
+            if (value != null) Field = value.Value;
         }
     }
 
@@ -55,6 +67,7 @@ public class FilterRuleViewModel : ReactiveObject
             var wasListOp = _operator is "$in" or "$nin";
             var isListOp = value is "$in" or "$nin";
             this.RaiseAndSetIfChanged(ref _operator, value);
+            this.RaisePropertyChanged(nameof(SelectedOperatorOption));
             this.RaisePropertyChanged(nameof(IsListOperator));
             this.RaisePropertyChanged(nameof(IsNotListOperator));
             // 列表→单值：取第一项
@@ -71,7 +84,30 @@ public class FilterRuleViewModel : ReactiveObject
     public string Value
     {
         get => _value;
-        set { this.RaiseAndSetIfChanged(ref _value, value ?? ""); NotifyModified(); }
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _value, value ?? "");
+            this.RaisePropertyChanged(nameof(SelectedValueOption));
+            NotifyModified();
+        }
+    }
+
+    public OperatorOption? SelectedOperatorOption
+    {
+        get => EventFilterViewModel.OperatorOptions.FirstOrDefault(o => o.Value == Operator);
+        set
+        {
+            if (value != null) Operator = value.Value;
+        }
+    }
+
+    public SelectOption? SelectedValueOption
+    {
+        get => FieldOptions?.FirstOrDefault(o => o.Value == Value);
+        set
+        {
+            if (value != null) Value = value.Value;
+        }
     }
 
     public FieldOption? CurrentFieldDef => EventFilterViewModel.FieldOptions.FirstOrDefault(f => f.Value == Field);
@@ -229,17 +265,17 @@ public class EventFilterViewModel : ReactiveObject
 
     public EventFilterViewModel(JsonObject? filter = null)
     {
-        AddRuleCommand = ReactiveCommand.Create(AddRule);
-        RemoveRuleCommand = ReactiveCommand.Create<FilterRuleViewModel>(RemoveRule);
+        AddRuleCommand = ReactiveCommand.Create(AddRule, outputScheduler: AvaloniaUiScheduler.Instance);
+        RemoveRuleCommand = ReactiveCommand.Create<FilterRuleViewModel>(RemoveRule, outputScheduler: AvaloniaUiScheduler.Instance);
         SwitchExpandCommand = ReactiveCommand.Create(() =>
         {
             IsExpanded = !IsExpanded;
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
         SwitchToVisualCommand = ReactiveCommand.Create(() =>
         {
             if (!IsVisualUnsupported) IsJsonMode = false;
             this.RaisePropertyChanged(nameof(IsVisualMode));
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
         SwitchToJsonCommand = ReactiveCommand.Create(() =>
         {
             if (!IsJsonMode)
@@ -251,7 +287,7 @@ public class EventFilterViewModel : ReactiveObject
             }
             IsJsonMode = true;
             this.RaisePropertyChanged(nameof(IsVisualMode));
-        });
+        }, outputScheduler: AvaloniaUiScheduler.Instance);
 
         LoadFromJsonObject(filter);
     }
@@ -484,9 +520,9 @@ public class EventFilterViewModel : ReactiveObject
                 foreach (var item in items)
                 {
                     if (isNumeric && long.TryParse(item, NumberStyles.Integer, CultureInfo.InvariantCulture, out var num))
-                        arr.Add(num);
+                        ((IList<JsonNode?>)arr).Add(JsonValue.Create(num));
                     else if (!isNumeric)
-                        arr.Add(item);
+                        ((IList<JsonNode?>)arr).Add(JsonValue.Create(item));
                 }
                 filter[rule.Field] = new JsonObject { [rule.Operator] = arr };
             }

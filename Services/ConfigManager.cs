@@ -36,13 +36,7 @@ public class ConfigManager : IConfigManager
             }
 
             var json = await File.ReadAllTextAsync(ConfigPath);
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                WriteIndented = true
-            };
-
-            _cachedConfig = JsonSerializer.Deserialize<AppConfig>(json, options) ?? AppConfig.Default;
+            _cachedConfig = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppConfig) ?? AppConfig.Default;
             _rawJson = JsonNode.Parse(json)?.AsObject() ?? new JsonObject();
             _logger.LogInformation("配置加载成功");
             return _cachedConfig;
@@ -60,13 +54,7 @@ public class ConfigManager : IConfigManager
     {
         try
         {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                WriteIndented = true
-            };
-
-            var json = JsonSerializer.Serialize(config, options);
+            var json = JsonSerializer.Serialize(config, AppJsonContext.Default.AppConfig);
             await File.WriteAllTextAsync(ConfigPath, json);
 
             _cachedConfig = config;
@@ -92,7 +80,7 @@ public class ConfigManager : IConfigManager
             {
                 if (_rawJson.TryGetPropertyValue(key, out var node) && node != null)
                 {
-                    var value = node.Deserialize<T>() ?? defaultValue;
+                    var value = ConvertFromJsonNode(node, defaultValue);
                     _logger.LogDebug("读取设置: {Key}", key);
                     return value;
                 }
@@ -114,8 +102,8 @@ public class ConfigManager : IConfigManager
             lock (_lock)
             {
                 _rawJson ??= new JsonObject();
-                _rawJson[key] = JsonSerializer.SerializeToNode(value);
-                json = JsonSerializer.Serialize(_rawJson, new JsonSerializerOptions { WriteIndented = true });
+                _rawJson[key] = ConvertToJsonNode(value);
+                json = _rawJson.ToJsonString(AppJsonContext.Default.Options);
             }
             await File.WriteAllTextAsync(ConfigPath, json);
             _logger.LogInformation("设置已保存: {Key} = {Value}", key, value);
@@ -124,5 +112,39 @@ public class ConfigManager : IConfigManager
         {
             _logger.LogError(ex, "保存设置失败: {Key}", key);
         }
+    }
+
+    private static T ConvertFromJsonNode<T>(JsonNode node, T defaultValue)
+    {
+        try
+        {
+            var targetType = typeof(T);
+            if (targetType == typeof(string))
+                return (T)(object)(node.GetValue<string>() ?? string.Empty);
+            if (targetType == typeof(int))
+                return (T)(object)node.GetValue<int>();
+            if (targetType == typeof(bool))
+                return (T)(object)node.GetValue<bool>();
+            if (targetType == typeof(bool?))
+                return (T)(object?)node.GetValue<bool>()!;
+        }
+        catch
+        {
+            return defaultValue;
+        }
+
+        return defaultValue;
+    }
+
+    private static JsonNode? ConvertToJsonNode<T>(T value)
+    {
+        return value switch
+        {
+            null => null,
+            string stringValue => JsonValue.Create(stringValue),
+            int intValue => JsonValue.Create(intValue),
+            bool boolValue => JsonValue.Create(boolValue),
+            _ => throw new NotSupportedException($"不支持保存设置类型: {typeof(T).FullName}")
+        };
     }
 }

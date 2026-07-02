@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using LuckyLilliaDesktop.Utils;
 
 namespace LuckyLilliaDesktop.Controls;
 
@@ -9,7 +10,7 @@ public partial class LoadingSpinner : UserControl
     public static readonly StyledProperty<double> SpinnerSizeProperty =
         AvaloniaProperty.Register<LoadingSpinner, double>(nameof(SpinnerSize), 32);
 
-    public static readonly StyledProperty<IBrush?> SpinnerBrushProperty =
+    private static readonly StyledProperty<IBrush?> SpinnerBrushProperty =
         AvaloniaProperty.Register<LoadingSpinner, IBrush?>(nameof(SpinnerBrush));
 
     public double SpinnerSize
@@ -27,6 +28,8 @@ public partial class LoadingSpinner : UserControl
     public LoadingSpinner()
     {
         InitializeComponent();
+        if (RenderingPerformanceHelper.UseReducedMotion)
+            Styles.Clear();
         UpdateSize();
     }
 

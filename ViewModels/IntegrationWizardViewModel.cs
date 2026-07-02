@@ -103,11 +103,11 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         _configManager = configManager;
         _logger = logger;
 
-        SelectFrameworkCommand = ReactiveCommand.CreateFromTask<string>(OnSelectFrameworkAsync);
-        CancelInstallCommand = ReactiveCommand.Create(OnCancelInstall);
+        SelectFrameworkCommand = ReactiveCommand.CreateFromTask<string>(OnSelectFrameworkAsync, outputScheduler: AvaloniaUiScheduler.Instance);
+        CancelInstallCommand = ReactiveCommand.Create(OnCancelInstall, outputScheduler: AvaloniaUiScheduler.Instance);
 
         _uinSubscription = _selfInfoService.UinStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(uin =>
             {
                 HasUin = !string.IsNullOrEmpty(uin);
@@ -318,7 +318,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         if (File.Exists(configPath))
         {
             var json = await File.ReadAllTextAsync(configPath);
-            config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            config = JsonSerializer.Deserialize(json, AppJsonContext.Default.LLBotConfig) ?? LLBotConfig.Default;
         }
         else
         {
@@ -339,7 +339,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         var dir = Path.GetDirectoryName(configPath);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
-        await File.WriteAllTextAsync(configPath, JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+        await File.WriteAllTextAsync(configPath, JsonSerializer.Serialize(config, AppJsonContext.Default.LLBotConfig));
         _logger.LogInformation("已启用 Satori，端口: {Port}", port);
         return port;
     }
@@ -550,7 +550,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         try
         {
             var json = await File.ReadAllTextAsync(configPath);
-            var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            var config = JsonSerializer.Deserialize(json, AppJsonContext.Default.LLBotConfig) ?? LLBotConfig.Default;
             var changed = false;
             
             var wsUrl = string.IsNullOrEmpty(path) 
@@ -584,7 +584,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 if (changed)
                 {
                     await File.WriteAllTextAsync(configPath,
-                        JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                        JsonSerializer.Serialize(config, AppJsonContext.Default.LLBotConfig));
                 }
                 return;
             }
@@ -608,7 +608,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             }
 
             await File.WriteAllTextAsync(configPath, 
-                JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(config, AppJsonContext.Default.LLBotConfig));
             _logger.LogInformation("已添加 LLBot WebSocket 客户端配置: {Url}", wsUrl);
         }
         catch (Exception ex)
@@ -630,7 +630,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         try
         {
             var json = await File.ReadAllTextAsync(configPath);
-            var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            var config = JsonSerializer.Deserialize(json, AppJsonContext.Default.LLBotConfig) ?? LLBotConfig.Default;
             var changed = false;
 
             // 检查是否已存在 WebSocket 服务端配置到该端口（无论启用状态）
@@ -660,7 +660,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 if (changed)
                 {
                     await File.WriteAllTextAsync(configPath,
-                        JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                        JsonSerializer.Serialize(config, AppJsonContext.Default.LLBotConfig));
                 }
                 return;
             }
@@ -684,7 +684,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
             }
 
             await File.WriteAllTextAsync(configPath,
-                JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(config, AppJsonContext.Default.LLBotConfig));
             _logger.LogInformation("已添加 LLBot WebSocket 服务端配置: 端口 {Port}", wsPort);
         }
         catch (Exception ex)
@@ -828,7 +828,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
         try
         {
             var json = await File.ReadAllTextAsync(configPath);
-            var config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            var config = JsonSerializer.Deserialize(json, AppJsonContext.Default.LLBotConfig) ?? LLBotConfig.Default;
             var changed = false;
 
             // 1. 查找名为 OpenClaw 的正向 ws
@@ -849,7 +849,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 if (changed)
                 {
                     await File.WriteAllTextAsync(configPath,
-                        JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                        JsonSerializer.Serialize(config, AppJsonContext.Default.LLBotConfig));
                 }
                 _logger.LogInformation("复用已有 OpenClaw WebSocket 配置，端口: {Port}", openclawWs.Port);
                 return openclawWs.Port;
@@ -883,7 +883,7 @@ public class IntegrationWizardViewModel : ViewModelBase, IDisposable
                 config.OB11.Enable = true;
 
             await File.WriteAllTextAsync(configPath,
-                JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(config, AppJsonContext.Default.LLBotConfig));
             _logger.LogInformation("已新建 OpenClaw WebSocket 服务端配置，端口: {Port}", port);
             return port;
         }

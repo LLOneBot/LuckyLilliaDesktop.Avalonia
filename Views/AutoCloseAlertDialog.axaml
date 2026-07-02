@@ -7,11 +7,9 @@
         WindowStartupLocation="CenterOwner"
         CanResize="False"
         ShowInTaskbar="False"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
-        ExtendClientAreaTitleBarHeightHint="-1"
         SystemDecorations="None"
         TransparencyLevelHint="Transparent"
+        TransparencyBackgroundFallback="Transparent"
         Background="Transparent">
 
     <Window.Resources>
@@ -74,7 +72,6 @@
             Background="{DynamicResource CardBackground}"
             BorderBrush="{DynamicResource BorderColor}"
             BorderThickness="1"
-            BoxShadow="0 24 70 0 #2DE84D9C"
             Padding="30,26">
         <StackPanel Spacing="24">
             <TextBlock x:Name="MessageText"

@@ -6,10 +6,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Management;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -91,7 +91,7 @@ public class ProcessManager : IProcessManager, IDisposable
                 }
             };
 
-            int length = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
+            int length = Marshal.SizeOf<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>();
             IntPtr extendedInfoPtr = Marshal.AllocHGlobal(length);
             try
             {
@@ -128,8 +128,7 @@ public class ProcessManager : IProcessManager, IDisposable
         }
     }
 
-    // 用 WMI Win32_Process.Create 启动 QQ: 创建出来的进程父进程是 WmiPrvSE 而非本程序,
-    // QQ 由此脱离 Desktop (也不进 Desktop 的 Job Object), 不做父进程伪装, 单纯启动.
+    // 用 CreateProcess + CREATE_BREAKAWAY_FROM_JOB 启动 QQ, 避免 QQ 进入 Desktop 的 Job Object.
     // 不传 pid 给 PMHQ —— 随后 PMHQ 自行 find_existing_qq_pid attach.
     public async Task<bool> StartQQAsync(string qqPath)
     {
@@ -148,33 +147,40 @@ public class ProcessManager : IProcessManager, IDisposable
         try
         {
             var workingDir = Path.GetDirectoryName(qqPath) ?? Environment.CurrentDirectory;
-            var (success, pid) = await Task.Run(() =>
+            var (success, pid) = await Task.Run<(bool Success, int Pid)>(() =>
             {
-                // lambda 内重新做 windows 守卫, 让 CA1416 分析认得 (跨 lambda 不传递外层 guard)
-                if (!OperatingSystem.IsWindows()) return (false, 0);
+                var si = new STARTUPINFO { cb = Marshal.SizeOf<STARTUPINFO>() };
+                var commandLine = $"\"{qqPath}\"";
+                var created = CreateProcess(
+                    null,
+                    commandLine,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    false,
+                    CREATE_BREAKAWAY_FROM_JOB | CREATE_NEW_CONSOLE,
+                    IntPtr.Zero,
+                    workingDir,
+                    ref si,
+                    out var pi);
 
-                using var mc = new ManagementClass("Win32_Process");
-                using var inParams = mc.GetMethodParameters("Create");
-                inParams["CommandLine"] = $"\"{qqPath}\"";
-                inParams["CurrentDirectory"] = workingDir;
-
-                using var outParams = mc.InvokeMethod("Create", inParams, null);
-                var ret = Convert.ToUInt32(outParams["ReturnValue"]);
-                if (ret != 0)
+                if (!created)
                 {
-                    _logger.LogError("Win32_Process.Create 返回错误码: {Code}", ret);
+                    _logger.LogError("CreateProcess 启动 QQ 失败, error={Error}", Marshal.GetLastWin32Error());
                     return (false, 0);
                 }
-                return (true, Convert.ToInt32(outParams["ProcessId"]));
+
+                CloseHandle(pi.hThread);
+                CloseHandle(pi.hProcess);
+                return (true, pi.dwProcessId);
             });
 
             if (!success)
             {
-                _logger.LogError("通过 WMI 启动 QQ 失败");
+                _logger.LogError("启动 QQ 失败");
                 return false;
             }
 
-            _logger.LogInformation("QQ 已启动 (WMI), 启动器 PID: {Pid}", pid);
+            _logger.LogInformation("QQ 已启动: {Pid}", pid);
 
             // 等 QQ 主进程就绪后再启动 PMHQ, 否则 PMHQ find_existing_qq_pid 找不到会自己再启一个 QQ
             await WaitForQQProcessAsync();
@@ -469,20 +475,20 @@ public class ProcessManager : IProcessManager, IDisposable
 
         try
         {
-            Dictionary<string, object>? config = null;
+            JsonObject? config = null;
 
             // 读取现有配置
             if (File.Exists(configPath))
             {
                 var json = await File.ReadAllTextAsync(configPath);
-                config = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+                config = JsonNode.Parse(json)?.AsObject();
             }
 
-            config ??= new Dictionary<string, object>();
+            config ??= new JsonObject();
             config["qq_path"] = absQqPath;
 
             // 写回配置
-            var newJson = JsonSerializer.Serialize(config, _jsonOptions);
+            var newJson = config.ToJsonString(_jsonOptions);
             await File.WriteAllTextAsync(configPath, newJson);
 
             _logger.LogInformation("已更新 PMHQ 配置文件 qq_path: {QQPath}", absQqPath);
@@ -585,6 +591,7 @@ public class ProcessManager : IProcessManager, IDisposable
             if (_llbotProcess.HasExited)
             {
                 _logger.LogError("LLBot 进程立即退出，返回码: {ExitCode}", _llbotProcess.ExitCode);
+                await LogExitedProcessOutputAsync(_llbotProcess, "LLBot");
                 _llbotStatus = ProcessStatus.Error;
                 ProcessStatusChanged?.Invoke(this, _llbotStatus);
                 return false;
@@ -609,6 +616,28 @@ public class ProcessManager : IProcessManager, IDisposable
             _llbotStatus = ProcessStatus.Error;
             ProcessStatusChanged?.Invoke(this, _llbotStatus);
             return false;
+        }
+    }
+
+    private async Task LogExitedProcessOutputAsync(Process process, string processName)
+    {
+        try
+        {
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            await Task.WhenAll(stdoutTask, stderrTask);
+
+            var stdout = stdoutTask.Result.Trim();
+            var stderr = stderrTask.Result.Trim();
+
+            if (!string.IsNullOrEmpty(stdout))
+                _logger.LogError("{ProcessName} stdout: {Output}", processName, stdout);
+            if (!string.IsNullOrEmpty(stderr))
+                _logger.LogError("{ProcessName} stderr: {Error}", processName, stderr);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取 {ProcessName} 退出输出失败", processName);
         }
     }
 
@@ -1024,29 +1053,7 @@ public class ProcessManager : IProcessManager, IDisposable
 
             try
             {
-                var map = new Dictionary<int, List<int>>();
-
-                using var searcher = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId FROM Win32_Process");
-                using var results = searcher.Get();
-                foreach (ManagementObject obj in results)
-                {
-                    var pidObj = obj["ProcessId"];
-                    var ppidObj = obj["ParentProcessId"];
-                    if (pidObj == null || ppidObj == null)
-                        continue;
-
-                    var pid = Convert.ToInt32(pidObj);
-                    var ppid = Convert.ToInt32(ppidObj);
-
-                    if (!map.TryGetValue(ppid, out var list))
-                    {
-                        list = new List<int>();
-                        map[ppid] = list;
-                    }
-                    list.Add(pid);
-                }
-
-                _childrenMapCache = map;
+                _childrenMapCache = BuildProcessChildrenMapWin32();
                 _childrenMapCacheTimeUtc = nowUtc;
                 return _childrenMapCache;
             }
@@ -1056,6 +1063,45 @@ public class ProcessManager : IProcessManager, IDisposable
                 _childrenMapCacheTimeUtc = nowUtc;
                 return null;
             }
+        }
+    }
+
+    private static Dictionary<int, List<int>> BuildProcessChildrenMapWin32()
+    {
+        const uint TH32CS_SNAPPROCESS = 0x00000002;
+        var map = new Dictionary<int, List<int>>();
+        var snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot == IntPtr.Zero || snapshot == new IntPtr(-1))
+            return map;
+
+        try
+        {
+            var entry = new PROCESSENTRY32
+            {
+                dwSize = (uint)Marshal.SizeOf<PROCESSENTRY32>()
+            };
+
+            if (!Process32First(snapshot, ref entry))
+                return map;
+
+            do
+            {
+                var pid = unchecked((int)entry.th32ProcessID);
+                var ppid = unchecked((int)entry.th32ParentProcessID);
+                if (!map.TryGetValue(ppid, out var list))
+                {
+                    list = new List<int>();
+                    map[ppid] = list;
+                }
+                list.Add(pid);
+            }
+            while (Process32Next(snapshot, ref entry));
+
+            return map;
+        }
+        finally
+        {
+            CloseHandle(snapshot);
         }
     }
 
@@ -1103,6 +1149,15 @@ public class ProcessManager : IProcessManager, IDisposable
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr hObject);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool CreateProcess(
@@ -1155,6 +1210,22 @@ public class ProcessManager : IProcessManager, IDisposable
         public IntPtr Reserved2_1;
         public IntPtr UniqueProcessId;
         public IntPtr InheritedFromUniqueProcessId;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct PROCESSENTRY32
+    {
+        public uint dwSize;
+        public uint cntUsage;
+        public uint th32ProcessID;
+        public IntPtr th32DefaultHeapID;
+        public uint th32ModuleID;
+        public uint cntThreads;
+        public uint th32ParentProcessID;
+        public int pcPriClassBase;
+        public uint dwFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        public string szExeFile;
     }
 
     [StructLayout(LayoutKind.Sequential)]

@@ -374,9 +374,8 @@
         </ScrollViewer>
 
         <!-- 下载进度遮罩层 -->
-        <Border Background="#D0000000"
-                IsVisible="{Binding IsDownloading}"
-                CornerRadius="20">
+        <Border Background="#CC000000"
+                IsVisible="{Binding IsDownloading}">
             <Border Background="{DynamicResource CardBackground}"
                     BorderBrush="{DynamicResource BorderColor}"
                     BorderThickness="1"

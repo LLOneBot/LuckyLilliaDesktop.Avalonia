@@ -1,11 +1,13 @@
 using LuckyLilliaDesktop.Models;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Net.Http;
-using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -97,13 +99,19 @@ public class PmhqClient : IPmhqClient, IDisposable
         }
 
         var url = $"http://127.0.0.1:{_port.Value}";
-        var payload = new
+        var argArray = new JsonArray();
+        foreach (var arg in args ?? Array.Empty<object>())
         {
-            type = "call",
-            data = new
+            ((IList<JsonNode?>)argArray).Add(ConvertRpcArgumentToJsonNode(arg));
+        }
+
+        var payload = new JsonObject
+        {
+            ["type"] = "call",
+            ["data"] = new JsonObject
             {
-                func,
-                args = args ?? Array.Empty<object>()
+                ["func"] = func,
+                ["args"] = argArray
             }
         };
 
@@ -113,14 +121,17 @@ public class PmhqClient : IPmhqClient, IDisposable
         try
         {
             _logger.LogDebug("调用 PMHQ API: {Func}, URL: {Url}", func, url);
-            var response = await _httpClient.PostAsJsonAsync(url, payload, linkedCts.Token);
+            using var content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync(url, content, linkedCts.Token);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("PMHQ API 返回 HTTP {StatusCode}: {Func}", response.StatusCode, func);
                 return null;
             }
 
-            var json = await response.Content.ReadFromJsonAsync<JsonElement>(linkedCts.Token);
+            var responseJson = await response.Content.ReadAsStringAsync(linkedCts.Token);
+            using var document = JsonDocument.Parse(responseJson);
+            var json = document.RootElement;
 
             if (json.TryGetProperty("type", out var typeElem) && typeElem.GetString() == "call" &&
                 json.TryGetProperty("data", out var dataElem))
@@ -131,13 +142,14 @@ public class PmhqClient : IPmhqClient, IDisposable
                     if (!string.IsNullOrEmpty(dataStr))
                     {
                         _logger.LogDebug("PMHQ API 调用成功: {Func}", func);
-                        return JsonSerializer.Deserialize<JsonElement>(dataStr);
+                        using var dataDocument = JsonDocument.Parse(dataStr);
+                        return dataDocument.RootElement.Clone();
                     }
                 }
                 else if (dataElem.ValueKind == JsonValueKind.Object)
                 {
                     _logger.LogDebug("PMHQ API 调用成功: {Func}", func);
-                    return dataElem;
+                    return dataElem.Clone();
                 }
             }
 
@@ -171,6 +183,55 @@ public class PmhqClient : IPmhqClient, IDisposable
         }
     }
 
+    private static JsonNode? ConvertRpcArgumentToJsonNode(object? arg)
+    {
+        return arg switch
+        {
+            null => null,
+            JsonNode node => node.DeepClone(),
+            JsonElement element => JsonNode.Parse(element.GetRawText()),
+            string value => JsonValue.Create(value),
+            bool value => JsonValue.Create(value),
+            byte value => JsonValue.Create(value),
+            sbyte value => JsonValue.Create(value),
+            short value => JsonValue.Create(value),
+            ushort value => JsonValue.Create(value),
+            int value => JsonValue.Create(value),
+            uint value => JsonValue.Create(value),
+            long value => JsonValue.Create(value),
+            ulong value => JsonValue.Create(value),
+            float value => JsonValue.Create(value),
+            double value => JsonValue.Create(value),
+            decimal value => JsonValue.Create(value),
+            IReadOnlyDictionary<string, object?> dict => ConvertDictionaryToJsonObject(dict),
+            IDictionary<string, object?> dict => ConvertDictionaryToJsonObject(dict),
+            IEnumerable enumerable when arg is not string => ConvertEnumerableToJsonArray(enumerable),
+            _ => throw new NotSupportedException($"PMHQ RPC 参数类型不支持 AOT-safe JSON 序列化: {arg.GetType().FullName}")
+        };
+    }
+
+    private static JsonObject ConvertDictionaryToJsonObject(IEnumerable<KeyValuePair<string, object?>> values)
+    {
+        var json = new JsonObject();
+        foreach (var pair in values)
+        {
+            json[pair.Key] = ConvertRpcArgumentToJsonNode(pair.Value);
+        }
+
+        return json;
+    }
+
+    private static JsonArray ConvertEnumerableToJsonArray(IEnumerable values)
+    {
+        var json = new JsonArray();
+        foreach (var value in values)
+        {
+            ((IList<JsonNode?>)json).Add(ConvertRpcArgumentToJsonNode(value));
+        }
+
+        return json;
+    }
+
     // PMHQ 不再提供 getSelfInfo 查询 QQ 账号信息, uin/昵称改走 LLBot IPC. 直接返回 null 避免无效请求/刷日志.
     public Task<SelfInfo?> FetchSelfInfoAsync(CancellationToken ct = default)
     {
@@ -185,7 +246,9 @@ public class PmhqClient : IPmhqClient, IDisposable
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, ct);
         try
         {
-            var json = await _httpClient.GetFromJsonAsync<JsonElement>(url, linkedCts.Token);
+            var responseJson = await _httpClient.GetStringAsync(url, linkedCts.Token);
+            using var document = JsonDocument.Parse(responseJson);
+            var json = document.RootElement;
             int? pid = null;
             if (json.TryGetProperty("qq_pid", out var pidElem) && pidElem.ValueKind == JsonValueKind.Number)
                 pid = pidElem.GetInt32();

@@ -37,6 +37,11 @@
         <Setter Property="CornerRadius" Value="14"/>
     </Style>
 
+    <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource SelectedBackground}"/>
+        <Setter Property="CornerRadius" Value="14"/>
+    </Style>
+
     <!-- PathIcon 样式 -->
     <Style Selector="PathIcon">
         <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
@@ -158,6 +163,49 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="14"/>
         <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="SelectionBrush" Value="{DynamicResource PrimarySelectionBrush}"/>
+        <Setter Property="SelectionForegroundBrush" Value="White"/>
+    </Style>
+
+    <Style Selector="TextBox:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="TextBox:focus">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <!-- 数字输入框样式 -->
+    <Style Selector="NumericUpDown">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondary}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="14"/>
+        <Setter Property="Padding" Value="10,8"/>
+    </Style>
+
+    <Style Selector="NumericUpDown:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="NumericUpDown:focus">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="NumericUpDown /template/ Border#PART_BorderElement">
+        <Setter Property="CornerRadius" Value="14"/>
+    </Style>
+
+    <Style Selector="NumericUpDown /template/ Border#BorderElement">
+        <Setter Property="CornerRadius" Value="14"/>
+    </Style>
+
+    <Style Selector="NumericUpDown /template/ TextBox">
+        <Setter Property="CornerRadius" Value="14"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="SelectionBrush" Value="{DynamicResource PrimarySelectionBrush}"/>
+        <Setter Property="SelectionForegroundBrush" Value="White"/>
     </Style>
 
     <!-- 下拉框样式 -->
@@ -170,9 +218,27 @@
         <Setter Property="Padding" Value="10,8"/>
     </Style>
 
+    <Style Selector="ComboBox:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="ComboBox:focus">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
     <!-- 复选框/开关样式 -->
     <Style Selector="CheckBox">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+    </Style>
+
+    <Style Selector="CheckBox:checked /template/ Border#NormalRectangle">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="CheckBox:checked:pointerover /template/ Border#NormalRectangle">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
     </Style>
 
     <Style Selector="ToggleSwitch">
@@ -195,6 +261,26 @@
     <Style Selector="TabItem:selected">
         <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style Selector="TabItem:selected /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="TabItem:selected /template/ Border#SelectedPipe">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="TabItem:selected /template/ Rectangle#SelectedPipe">
+        <Setter Property="Fill" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="TabItem:selected /template/ Rectangle#PART_SelectedPipe">
+        <Setter Property="Fill" Value="{DynamicResource PrimaryBrush}"/>
     </Style>
 
     <Style Selector="TabItem:pointerover">

@@ -1,5 +1,6 @@
 using LuckyLilliaDesktop.Models;
 using LuckyLilliaDesktop.Services;
+using LuckyLilliaDesktop.Utils;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System;
@@ -292,32 +293,21 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
         _processManager = processManager;
         _logger = logger;
 
-        SaveConfigCommand = ReactiveCommand.CreateFromTask(SaveConfigAsync);
-        RefreshCommand = ReactiveCommand.CreateFromTask(RefreshAsync);
-        OpenWebuiCommand = ReactiveCommand.Create(OpenWebui);
-        AddConnectionCommand = ReactiveCommand.Create<string>(AddConnection);
-        RemoveConnectionCommand = ReactiveCommand.Create<OB11ConnectionViewModel>(RemoveConnection);
-        AddWebhookUrlCommand = ReactiveCommand.Create(AddWebhookUrl);
-        RemoveWebhookUrlCommand = ReactiveCommand.Create<string>(RemoveWebhookUrl);
-        OpenOb11DocsCommand = ReactiveCommand.Create(() => OpenUrl("https://www.luckylillia.com/guide/develop#onebot11-%E5%8D%8F%E8%AE%AE"));
-        OpenMilkyDocsCommand = ReactiveCommand.Create(() => OpenUrl("https://www.luckylillia.com/guide/develop#milky-%E5%8D%8F%E8%AE%AE"));
-        OpenSatoriDocsCommand = ReactiveCommand.Create(() => OpenUrl("https://www.luckylillia.com/guide/develop#satori-%E5%8D%8F%E8%AE%AE"));
+        SaveConfigCommand = ReactiveCommand.CreateFromTask(SaveConfigAsync, outputScheduler: AvaloniaUiScheduler.Instance);
+        RefreshCommand = ReactiveCommand.CreateFromTask(RefreshAsync, outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenWebuiCommand = ReactiveCommand.Create(OpenWebui, outputScheduler: AvaloniaUiScheduler.Instance);
+        AddConnectionCommand = ReactiveCommand.Create<string>(AddConnection, outputScheduler: AvaloniaUiScheduler.Instance);
+        RemoveConnectionCommand = ReactiveCommand.Create<OB11ConnectionViewModel>(RemoveConnection, outputScheduler: AvaloniaUiScheduler.Instance);
+        AddWebhookUrlCommand = ReactiveCommand.Create(AddWebhookUrl, outputScheduler: AvaloniaUiScheduler.Instance);
+        RemoveWebhookUrlCommand = ReactiveCommand.Create<string>(RemoveWebhookUrl, outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenOb11DocsCommand = ReactiveCommand.Create(() => OpenUrl("https://www.luckylillia.com/guide/develop#onebot11-%E5%8D%8F%E8%AE%AE"), outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenMilkyDocsCommand = ReactiveCommand.Create(() => OpenUrl("https://www.luckylillia.com/guide/develop#milky-%E5%8D%8F%E8%AE%AE"), outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenSatoriDocsCommand = ReactiveCommand.Create(() => OpenUrl("https://www.luckylillia.com/guide/develop#satori-%E5%8D%8F%E8%AE%AE"), outputScheduler: AvaloniaUiScheduler.Instance);
 
         _uinSubscription = _selfInfoService.UinStream
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(OnUinReceived);
 
-        _processManager.ProcessStatusChanged += OnProcessStatusChanged;
-    }
-
-    private void OnProcessStatusChanged(object? sender, ProcessStatus status)
-    {
-        var qqStatus = _processManager.GetProcessStatus("QQ");
-        if (qqStatus != ProcessStatus.Running)
-        {
-            _currentUin = null;
-            HasUin = false;
-        }
     }
 
     private async void OnUinReceived(string uin)
@@ -424,7 +414,7 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
             }
 
             var json = await File.ReadAllTextAsync(configPath);
-            _config = JsonSerializer.Deserialize<LLBotConfig>(json) ?? LLBotConfig.Default;
+            _config = JsonSerializer.Deserialize(json, AppJsonContext.Default.LLBotConfig) ?? LLBotConfig.Default;
             
             // 加载 WebUI token
             WebuiPassword = await LoadWebuiTokenAsync();
@@ -596,10 +586,7 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
                 Directory.CreateDirectory(dir);
 
             // 写入文件
-            var json = JsonSerializer.Serialize(_config, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var json = JsonSerializer.Serialize(_config, AppJsonContext.Default.LLBotConfig);
             await File.WriteAllTextAsync(configPath, json);
 
             HasUnsavedChanges = false;
@@ -680,7 +667,6 @@ public class LLBotConfigViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _uinSubscription.Dispose();
-        _processManager.ProcessStatusChanged -= OnProcessStatusChanged;
     }
 }
 

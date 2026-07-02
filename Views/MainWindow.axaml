@@ -9,10 +9,13 @@
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
         Icon="avares://LuckyLilliaDesktop/Assets/Icons/icon.ico"
-        Width="960" Height="640"
-        MinWidth="880" MinHeight="560"
-        SystemDecorations="None"
-        CanResize="True"
+         Width="960" Height="640"
+         MinWidth="880" MinHeight="560"
+         SystemDecorations="Full"
+         ExtendClientAreaChromeHints="NoChrome"
+         ExtendClientAreaTitleBarHeightHint="-1"
+         ExtendClientAreaToDecorationsHint="True"
+         CanResize="True"
         WindowStartupLocation="CenterScreen"
         UseLayoutRounding="True"
         Background="{DynamicResource MainBackground}">
@@ -90,6 +93,14 @@
             <Setter Property="Background" Value="{DynamicResource PrimaryBrushSoft}"/>
             <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
         </Style>
+        <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrushSoft}"/>
+            <Setter Property="CornerRadius" Value="18"/>
+        </Style>
+        <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrushSoft}"/>
+            <Setter Property="CornerRadius" Value="18"/>
+        </Style>
         <Style Selector="Button.vscode-titlebar-button">
             <Setter Property="Width" Value="46"/>
             <Setter Property="Height" Value="35"/>
@@ -157,6 +168,10 @@
             <Setter Property="Background" Value="{DynamicResource WindowButtonHover}"/>
             <Setter Property="Opacity" Value="1"/>
         </Style>
+        <Style Selector="Button.modern-window-button.snap-hover">
+            <Setter Property="Background" Value="{DynamicResource WindowButtonHover}"/>
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
         <Style Selector="Button.modern-window-button Path">
             <Setter Property="Stroke" Value="{DynamicResource WindowButtonStroke}"/>
             <Setter Property="StrokeThickness" Value="1.35"/>
@@ -164,6 +179,9 @@
             <Setter Property="Fill" Value="Transparent"/>
         </Style>
         <Style Selector="Button.modern-window-button:pointerover Path">
+            <Setter Property="Stroke" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="Button.modern-window-button.snap-hover Path">
             <Setter Property="Stroke" Value="{DynamicResource PrimaryBrush}"/>
         </Style>
         <Style Selector="Button.modern-close-button:pointerover">
@@ -175,10 +193,9 @@
 </Window.Styles>
 
 
-    <Panel>
-    <Border Background="{DynamicResource MainBackground}"
-            CornerRadius="0"
-            ClipToBounds="True">
+    <Grid x:Name="RootPanel"
+          Background="{DynamicResource MainBackground}"
+          ClipToBounds="True">
         <Grid RowDefinitions="54,*">
             <!-- 自定义标题栏：VS Code / Windows 风格细线窗口按钮 -->
             <Grid Grid.Row="0"
@@ -203,26 +220,15 @@
                             BorderThickness="1"
                             ClipToBounds="True"
                             BoxShadow="0 8 24 0 #18E84D9C">
-                        <Panel>
-                            <Image Width="34" Height="34"
-                                   Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
-                                   Stretch="UniformToFill"
-                                   RenderOptions.BitmapInterpolationMode="HighQuality"
-                                   IsVisible="{Binding !HomeVM.HasQQInfo}">
-                                <Image.Clip>
-                                    <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
-                                </Image.Clip>
-                            </Image>
-                            <Image Width="34" Height="34"
-                                   Source="{Binding HomeVM.AvatarBitmap}"
-                                   Stretch="UniformToFill"
-                                   RenderOptions.BitmapInterpolationMode="HighQuality"
-                                   IsVisible="{Binding HomeVM.HasQQInfo}">
-                                <Image.Clip>
-                                    <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
-                                </Image.Clip>
-                            </Image>
-                        </Panel>
+                        <Image x:Name="TitleDefaultAvatarIcon"
+                               Width="34" Height="34"
+                               RenderOptions.BitmapInterpolationMode="HighQuality"
+                               UseLayoutRounding="True"
+                               Stretch="UniformToFill">
+                            <Image.Clip>
+                                <EllipseGeometry Center="17,17" RadiusX="17" RadiusY="17"/>
+                            </Image.Clip>
+                        </Image>
                     </Border>
                     <TextBlock Text="LLBot"
                                FontSize="16"
@@ -255,7 +261,8 @@
                                 <Path Data="M 4 8 L 12 8"/>
                             </Grid>
                         </Button>
-                        <Button Classes="modern-window-button"
+                        <Button x:Name="MaximizeButton"
+                                Classes="modern-window-button"
                                 Click="MaximizeButton_Click"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
@@ -310,9 +317,9 @@
                                 <!-- 默认图标 -->
                                 <Image x:Name="DefaultAvatarIcon"
                                        Width="56" Height="56"
-                                       Source="avares://LuckyLilliaDesktop/Assets/Icons/icon.png"
-                                       Stretch="UniformToFill"
                                        RenderOptions.BitmapInterpolationMode="HighQuality"
+                                       UseLayoutRounding="True"
+                                       Stretch="UniformToFill"
                                        IsVisible="{Binding !HomeVM.HasQQInfo}">
                                     <Image.Clip>
                                         <EllipseGeometry Center="28,28" RadiusX="28" RadiusY="28"/>
@@ -426,8 +433,23 @@
                                 Width="40" Height="40"
                                 Background="Transparent"
                                 BorderThickness="0"
-                                ToolTip.Tip="切换主题">
+                                ToolTip.Tip="{Binding ThemeToggleTooltip}">
                             <Panel>
+                                <!-- 自动亮暗模式图标 (跟随系统) -->
+                                <Viewbox Width="18" Height="18"
+                                         IsVisible="{Binding IsSystemTheme}">
+                                    <Canvas Width="960" Height="960">
+                                        <Path Fill="{DynamicResource TextPrimary}">
+                                            <Path.Data>
+                                                <PathGeometry FillRule="EvenOdd"
+                                                              Figures="M480-28 346-160H160v-186L28-480l132-134v-186h186l134-132 134 132h186v186l132 134-132 134v186H614L480-28Zm0-252q83 0 141.5-58.5T680-480q0-83-58.5-141.5T480-680v400Zm0 140 100-100h140v-140l100-100-100-100v-140H580L480-820 380-720H240v140L140-480l100 100v140h140l100 100Zm0-340Z"/>
+                                            </Path.Data>
+                                            <Path.RenderTransform>
+                                                <TranslateTransform Y="960"/>
+                                            </Path.RenderTransform>
+                                        </Path>
+                                    </Canvas>
+                                </Viewbox>
                                 <!-- 月亮图标 (深色模式) -->
                                 <PathIcon Data="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"
                                           Width="18" Height="18"
@@ -453,45 +475,22 @@
                     BorderThickness="1"
                     BoxShadow="0 18 70 0 #18E84D9C">
                 <!-- 页面切换容器 -->
-                <Panel x:CompileBindings="False">
-                    <views:HomePage DataContext="{Binding HomeVM}"
-                                   IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=0}"/>
-                    <views:LogPage DataContext="{Binding LogVM}"
-                                  IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=1}"/>
-                    <views:ConfigPage DataContext="{Binding ConfigVM}"
-                                     IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=2}"/>
-                    <views:LLBotConfigPage DataContext="{Binding LLBotConfigVM}"
-                                          IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=3}"/>
-                    <views:IntegrationWizardPage DataContext="{Binding IntegrationWizardVM}"
-                                                 IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=4}"/>
-                    <views:AboutPage DataContext="{Binding AboutVM}"
-                                    IsVisible="{Binding DataContext.SelectedIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource EqualToIntConverter}, ConverterParameter=5}"/>
+                <Panel x:Name="PageHost">
+                    <views:HomePage x:Name="HomePageView"
+                                    IsVisible="True"/>
+                    <views:LogPage x:Name="LogPageView"
+                                   IsVisible="False"/>
+                    <views:ConfigPage x:Name="ConfigPageView"
+                                      IsVisible="False"/>
+                    <views:LLBotConfigPage x:Name="LLBotConfigPageView"
+                                           IsVisible="False"/>
+                    <views:IntegrationWizardPage x:Name="IntegrationWizardPageView"
+                                                  IsVisible="False"/>
+                    <views:AboutPage x:Name="AboutPageView"
+                                     IsVisible="False"/>
                 </Panel>
             </Border>
             </Grid>
         </Grid>
-    </Border>
-
-    <!-- 无边框窗口自定义 resize 边缘: 9 宫格, 边缘 6px 透明区拦截 resize, 中间留空穿透到内容 -->
-    <Grid IsHitTestVisible="True">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="6"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="6"/>
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="6"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="6"/>
-        </Grid.ColumnDefinitions>
-        <Border Grid.Row="0" Grid.Column="0" Background="Transparent" Cursor="TopLeftCorner" Tag="NorthWest" PointerPressed="ResizeBorder_PointerPressed"/>
-        <Border Grid.Row="0" Grid.Column="1" Background="Transparent" Cursor="SizeNorthSouth" Tag="North" PointerPressed="ResizeBorder_PointerPressed"/>
-        <Border Grid.Row="0" Grid.Column="2" Background="Transparent" Cursor="TopRightCorner" Tag="NorthEast" PointerPressed="ResizeBorder_PointerPressed"/>
-        <Border Grid.Row="1" Grid.Column="0" Background="Transparent" Cursor="SizeWestEast" Tag="West" PointerPressed="ResizeBorder_PointerPressed"/>
-        <Border Grid.Row="1" Grid.Column="2" Background="Transparent" Cursor="SizeWestEast" Tag="East" PointerPressed="ResizeBorder_PointerPressed"/>
-        <Border Grid.Row="2" Grid.Column="0" Background="Transparent" Cursor="BottomLeftCorner" Tag="SouthWest" PointerPressed="ResizeBorder_PointerPressed"/>
-        <Border Grid.Row="2" Grid.Column="1" Background="Transparent" Cursor="SizeNorthSouth" Tag="South" PointerPressed="ResizeBorder_PointerPressed"/>
-        <Border Grid.Row="2" Grid.Column="2" Background="Transparent" Cursor="BottomRightCorner" Tag="SouthEast" PointerPressed="ResizeBorder_PointerPressed"/>
     </Grid>
-    </Panel>
 </Window>

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 
@@ -12,23 +12,20 @@
     <AssemblyTitle>Lucky Lillia Desktop</AssemblyTitle>
     <Description>幸运莉莉娅桌面端</Description>
     <Version>3.0.0</Version>
-  </PropertyGroup>
-
-  <!-- Windows特定配置 -->
-  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">
-    <OutputType>WinExe</OutputType>
-    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <LangVersion>14</LangVersion>
   </PropertyGroup>
 
   <!-- 发布配置（仅在发布时使用） -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <SelfContained>true</SelfContained>
-    <!-- macOS 不支持 PublishSingleFile with native libraries -->
-    <PublishSingleFile Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'linux-x64'">true</PublishSingleFile>
-    <IncludeNativeLibrariesForSelfExtract Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'linux-x64'">true</IncludeNativeLibrariesForSelfExtract>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <PublishAot>true</PublishAot>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <WindowsSupportedOSPlatformVersion>5.1</WindowsSupportedOSPlatformVersion>
   </PropertyGroup>
-
+  
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
@@ -39,28 +36,28 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.2.2" />
-    <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.3.0" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.2.2" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.2" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.2" />
-    <PackageReference Include="Avalonia.ReactiveUI" Version="11.2.2" />
-
-    <PackageReference Include="ReactiveUI" Version="20.1.1" />
+    <PackageReference Include="Avalonia" Version="11.3.14" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.4.1" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.14" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.14" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.14" />
+    <PackageReference Include="ReactiveUI" Version="23.2.28" />
     <PackageReference Include="ReactiveUI.Fody" Version="19.5.41" />
+    <PackageReference Include="StaticLink.Avalonia" Version="2.88.9-7151.10" />
+    <PackageReference Include="StaticLink.Avalonia.Native" Version="11.3.14.1" />
 
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
 
-    <PackageReference Include="Serilog" Version="4.0.0" />
+    <PackageReference Include="Serilog" Version="4.3.1" />
 
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
-    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
-    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
-
-    <PackageReference Include="System.Reactive" Version="6.0.1" />
-    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
-    <PackageReference Include="System.Management" Version="8.0.0" />
-    <PackageReference Include="MailKit" Version="4.16.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="System.Reactive" Version="6.1.0" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.9" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
+    <PackageReference Include="VC-LTL" Version="5.3.1" />
+    <PackageReference Include="YY-Thunks" Version="1.2.1" />
   </ItemGroup>
 </Project>

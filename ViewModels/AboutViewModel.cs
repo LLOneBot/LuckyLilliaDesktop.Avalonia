@@ -225,21 +225,21 @@ public class AboutViewModel : ViewModelBase
             : "1.0.0";
 
         // 检查更新/立即更新命令
-        CheckOrUpdateCommand = ReactiveCommand.CreateFromTask(CheckOrUpdateAsync);
+        CheckOrUpdateCommand = ReactiveCommand.CreateFromTask(CheckOrUpdateAsync, outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 打开链接命令
-        OpenAppReleaseCommand = ReactiveCommand.Create(() => OpenUrl(AppReleaseUrl));
-        OpenPmhqReleaseCommand = ReactiveCommand.Create(() => OpenUrl(PmhqReleaseUrl));
-        OpenLLBotReleaseCommand = ReactiveCommand.Create(() => OpenUrl(LLBotReleaseUrl));
-        OpenDocsCommand = ReactiveCommand.Create(() => OpenUrl("https://luckylillia.com"));
-        OpenQQGroupCommand = ReactiveCommand.Create(() => OpenUrl(QQGroupUrl));
-        OpenAppGitHubCommand = ReactiveCommand.Create(() => OpenUrl(AppGitHubUrl));
-        OpenPmhqGitHubCommand = ReactiveCommand.Create(() => OpenUrl(PmhqGitHubUrl));
-        OpenLLBotGitHubCommand = ReactiveCommand.Create(() => OpenUrl(LLBotGitHubUrl));
+        OpenAppReleaseCommand = ReactiveCommand.Create(() => OpenUrl(AppReleaseUrl), outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenPmhqReleaseCommand = ReactiveCommand.Create(() => OpenUrl(PmhqReleaseUrl), outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenLLBotReleaseCommand = ReactiveCommand.Create(() => OpenUrl(LLBotReleaseUrl), outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenDocsCommand = ReactiveCommand.Create(() => OpenUrl("https://luckylillia.com"), outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenQQGroupCommand = ReactiveCommand.Create(() => OpenUrl(QQGroupUrl), outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenAppGitHubCommand = ReactiveCommand.Create(() => OpenUrl(AppGitHubUrl), outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenPmhqGitHubCommand = ReactiveCommand.Create(() => OpenUrl(PmhqGitHubUrl), outputScheduler: AvaloniaUiScheduler.Instance);
+        OpenLLBotGitHubCommand = ReactiveCommand.Create(() => OpenUrl(LLBotGitHubUrl), outputScheduler: AvaloniaUiScheduler.Instance);
 
         // 订阅共享更新状态
         _updateStateService.StateChanged
-            .ObserveOn(RxApp.MainThreadScheduler)
+            .ObserveOnUiThread()
             .Subscribe(OnUpdateStateChanged);
 
         // 初始化版本检测

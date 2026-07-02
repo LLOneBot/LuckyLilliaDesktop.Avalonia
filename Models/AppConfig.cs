@@ -61,7 +61,7 @@ public class AppConfig
 
     // 窗口设置
     [JsonPropertyName("theme_mode")]
-    public string ThemeMode { get; set; } = "dark";
+    public string ThemeMode { get; set; } = "system";
 
     [JsonPropertyName("window_width")]
     public int WindowWidth { get; set; } = 1200;

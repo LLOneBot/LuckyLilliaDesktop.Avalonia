@@ -619,27 +619,21 @@ public class PythonHelper : IPythonHelper
 
         var outputTask = Task.Run(async () =>
         {
-            while (!process.StandardOutput.EndOfStream)
+            string? line;
+            while ((line = await process.StandardOutput.ReadLineAsync(ct)) != null)
             {
-                var line = await process.StandardOutput.ReadLineAsync(ct);
-                if (line != null)
-                {
-                    onOutput?.Invoke(line);
-                    _logger.LogDebug("{Output}", line);
-                }
+                onOutput?.Invoke(line);
+                _logger.LogDebug("{Output}", line);
             }
         }, ct);
 
         var errorTask = Task.Run(async () =>
         {
-            while (!process.StandardError.EndOfStream)
+            string? line;
+            while ((line = await process.StandardError.ReadLineAsync(ct)) != null)
             {
-                var line = await process.StandardError.ReadLineAsync(ct);
-                if (line != null)
-                {
-                    onOutput?.Invoke(line);
-                    _logger.LogWarning("{Error}", line);
-                }
+                onOutput?.Invoke(line);
+                _logger.LogWarning("{Error}", line);
             }
         }, ct);
 

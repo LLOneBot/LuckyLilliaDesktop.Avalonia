@@ -12,6 +12,7 @@
         ShowInTaskbar="False"
         SystemDecorations="None"
         TransparencyLevelHint="Transparent"
+        TransparencyBackgroundFallback="Transparent"
         Background="Transparent">
 
     <Window.Resources>
@@ -40,6 +41,12 @@
                     <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#3B2434"/>
                     <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#8D6E82"/>
                     <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#F3C4DE"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#E84D9C"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#D83E8D"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#D83E8D"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#C93482"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#C93482"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="MainBackground" Color="#141018"/>
@@ -64,10 +71,27 @@
                     <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#FFF1F8"/>
                     <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#D8B8CA"/>
                     <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#553648"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#F472B6"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#EC5FAA"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#EC5FAA"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#DB4C99"/>
+                    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#DB4C99"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
     </Window.Resources>
+
+    <Window.Styles>
+        <Style Selector="CheckBox:checked /template/ Border#NormalRectangle">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="CheckBox:checked:pointerover /template/ Border#NormalRectangle">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        </Style>
+    </Window.Styles>
 
 
     <Border Padding="30"

@@ -443,7 +443,7 @@ public class OpenClawInstallService : IOpenClawInstallService
             if (configFiles.Length == 0) return 3001;
 
             var json = File.ReadAllText(configFiles[0]);
-            var config = JsonSerializer.Deserialize<LLBotConfig>(json);
+            var config = JsonSerializer.Deserialize(json, AppJsonContext.Default.LLBotConfig);
             if (config == null) return 3001;
 
             // 1. 查找名为 OpenClaw 的正向 ws
@@ -745,9 +745,9 @@ public class OpenClawInstallService : IOpenClawInstallService
 
         var outputTask = Task.Run(async () =>
         {
-            while (!process.StandardOutput.EndOfStream)
+            string? line;
+            while ((line = await process.StandardOutput.ReadLineAsync(ct)) != null)
             {
-                var line = await process.StandardOutput.ReadLineAsync(ct);
                 if (!string.IsNullOrEmpty(line))
                 {
                     _logger.LogDebug("{Output}", line);
@@ -758,9 +758,9 @@ public class OpenClawInstallService : IOpenClawInstallService
 
         var errorTask = Task.Run(async () =>
         {
-            while (!process.StandardError.EndOfStream)
+            string? line;
+            while ((line = await process.StandardError.ReadLineAsync(ct)) != null)
             {
-                var line = await process.StandardError.ReadLineAsync(ct);
                 if (!string.IsNullOrEmpty(line))
                     _logger.LogWarning("{Error}", line);
             }
