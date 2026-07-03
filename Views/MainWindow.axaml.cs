@@ -733,7 +733,9 @@ public partial class MainWindow : Window
 
     private async Task<string?> ShowAuthTokenDialogAsync()
     {
-        var dialog = new AuthTokenDialog();
+        var app = Application.Current as App;
+        var validator = app?.Services?.GetService(typeof(IAuthTokenValidator)) as IAuthTokenValidator;
+        var dialog = new AuthTokenDialog(validator);
         return await dialog.ShowDialog<string?>(this);
     }
 

@@ -29,6 +29,7 @@ public class HomeViewModel : ViewModelBase
     private readonly ISelfInfoService _selfInfoService;
     private readonly IConfigManager _configManager;
     private readonly IPmhqClient _pmhqClient;
+    private readonly IAuthTokenValidator _authTokenValidator;
     private readonly ILLBotIpcClient _llbotIpc;
     private readonly ILogCollector _logCollector;
     private readonly IDownloadService _downloadService;
@@ -415,6 +416,7 @@ public class HomeViewModel : ViewModelBase
         ISelfInfoService selfInfoService,
         IConfigManager configManager,
         IPmhqClient pmhqClient,
+        IAuthTokenValidator authTokenValidator,
         ILLBotIpcClient llbotIpc,
         ILogCollector logCollector,
         IDownloadService downloadService,
@@ -428,6 +430,7 @@ public class HomeViewModel : ViewModelBase
         _selfInfoService = selfInfoService;
         _configManager = configManager;
         _pmhqClient = pmhqClient;
+        _authTokenValidator = authTokenValidator;
         _llbotIpc = llbotIpc;
         _logCollector = logCollector;
         _downloadService = downloadService;
@@ -1757,9 +1760,26 @@ public class HomeViewModel : ViewModelBase
             ? (await File.ReadAllTextAsync(authTokenPath)).Trim()
             : "";
 
+        // 已有 token: 启动前走服务端校验。
+        // - Valid: 直接用
+        // - Invalid (401/403, token 明确失效/被吊销): 落到下面弹框重输
+        // - Inconclusive (网络/超时/5xx, 无法判定): 宽松沿用旧 token (弹框也连不上, 无意义)
         if (!string.IsNullOrEmpty(existingToken))
         {
-            return existingToken;
+            _logger.LogInformation("校验现有 Auth Token...");
+            var result = await _authTokenValidator.ValidateAsync(existingToken);
+            if (result.Status == AuthTokenValidationStatus.Valid)
+            {
+                _logger.LogInformation("现有 Auth Token 校验通过");
+                return existingToken;
+            }
+            if (result.Status == AuthTokenValidationStatus.Inconclusive)
+            {
+                _logger.LogWarning("Auth Token 服务端校验无法判定 ({Msg}), 沿用现有 token 继续", result.Message);
+                return existingToken;
+            }
+            // Invalid: 现有 token 已失效, 弹框让用户重新输入
+            _logger.LogWarning("现有 Auth Token 校验失败 ({Msg}), 需要重新输入", result.Message);
         }
 
         if (ShowAuthTokenDialog == null)
