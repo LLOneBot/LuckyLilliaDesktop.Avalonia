@@ -118,8 +118,13 @@ Serilog with console + file sinks. Log files are per-session (`logs/yyyyMMdd_HHm
 
 Tags matching `v*` trigger the GitHub Actions workflow (`.github/workflows/release.yml`):
 - Windows: `dotnet publish -c Release -r win-x64` → single-file exe → zip + npm package
-- macOS: `build-macos-app.sh` → `.app` bundle → tar.gz + npm package
-- Both publish to GitHub Releases (draft) and npm registry with provenance
+- macOS: `build-macos-app.sh` → `.app` bundle → tar.gz + npm package — **temporarily disabled** (job commented out in the workflow; re-enable instructions are in its comment header)
+- Both publish to GitHub Releases (**draft** — must be published manually on the Releases page) and npm registry with provenance
+
+npm publish gotchas:
+- The npm steps require the `NPM_TOKEN` repo secret (`HAS_NPM_TOKEN` gate). If it is missing, they are **silently skipped** — the run still shows success. If a release run succeeded but the version never appeared on npm, check this first.
+- Manual `workflow_dispatch` runs never publish npm or create a release (`event_name == 'push'` gate; `ref_name` would be `main`, not the tag). Only a `v*` tag push publishes.
+- To re-publish a version whose npm steps were skipped: delete the remote tag and push it again (`git push origin :refs/tags/vX.Y.Z && git push origin vX.Y.Z`) — same commit is fine, the re-push re-fires the workflow.
 
 ## Testing
 
