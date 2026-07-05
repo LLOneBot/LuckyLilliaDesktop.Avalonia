@@ -256,7 +256,13 @@
                                   Foreground="{DynamicResource TextPrimary}"/>
                         <CheckBox Content="无头模式（不依赖 QQ 本体，纯协议实现）"
                                   IsChecked="{Binding Headless}"
+                                  IsEnabled="{Binding !IsHeadlessForced}"
                                   Foreground="{DynamicResource TextPrimary}"/>
+                        <TextBlock Text="macOS 仅支持无头模式，无法关闭"
+                                   IsVisible="{Binding IsHeadlessForced}"
+                                   FontSize="12"
+                                   Margin="24,-8,0,0"
+                                   Foreground="{DynamicResource TextSecondary}"/>
                         <CheckBox Content="调试模式（显示 QQ 控制台和详细日志）"
                                   IsChecked="{Binding Debug}"
                                   Foreground="{DynamicResource TextPrimary}"/>

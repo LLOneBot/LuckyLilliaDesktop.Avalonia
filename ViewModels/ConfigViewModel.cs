@@ -117,6 +117,9 @@ public class ConfigViewModel : ViewModelBase
         set { this.RaiseAndSetIfChanged(ref _headless, value); CheckUnsavedChanges(); }
     }
 
+    // macOS 恒为无头模式 (见 AppConfig.Headless), 配置页禁用该开关并给出说明.
+    public bool IsHeadlessForced => PlatformHelper.IsMacOS;
+
     public bool Debug
     {
         get => _debug;
