@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
 using System.IO.Pipes;
+using System.Net.Sockets;
 using System.Reactive.Subjects;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -27,12 +28,14 @@ public sealed record LoginStateInfo(string State, string? QrcodePngBase64, strin
 }
 
 /// <summary>
-/// LLBot IPC 客户端 (仅 Windows). LLBot 是 server, Desktop 是 client.
+/// LLBot IPC 客户端 (跨平台). LLBot 是 server, Desktop 是 client.
 ///
 /// 流程:
-///   1. Desktop 生成管道名 luckylillia-llbot-{pid}-{guid}, 通过 env LL_IPC_PIPE 传给 LLBot.
-///   2. LLBot 用 net.createServer().listen('\\\\.\\pipe\\' + name) 监听.
-///   3. Desktop 启 LLBot 后调用 StartAsync(pipeName): 重连循环 + 长连接内轮询 get_login_state.
+///   1. Desktop 生成连接标识, 通过 env LL_IPC_PIPE 传给 LLBot:
+///        - Windows: 管道名 luckylillia-llbot-{pid}-{guid} (不含 \\.\pipe\ 前缀)
+///        - macOS/Linux: Unix Domain Socket 绝对路径 $TMPDIR/luckylillia-llbot-{pid}-{guid}.sock
+///   2. LLBot 用 net.createServer().listen(path) 监听 (Node.js 会按传入路径自动选管道 / UDS).
+///   3. Desktop 启 LLBot 后调用 StartAsync(): 重连循环 + 长连接内轮询 get_login_state.
 ///
 /// 协议: JSON Lines, UTF-8, '\n' 分隔.
 ///   Desktop -&gt; LLBot: {"type":"request","id":"1","method":"get_login_state"}
@@ -43,7 +46,7 @@ public sealed record LoginStateInfo(string State, string? QrcodePngBase64, strin
 /// </summary>
 public interface ILLBotIpcClient
 {
-    /// <summary>已经协商好的管道名, 没启动时为 null.</summary>
+    /// <summary>已经协商好的连接标识 (Windows: 管道名; Unix: socket 路径), 没启动时为 null.</summary>
     string? PipeName { get; }
     /// <summary>self_info 流 (uin, nickname). 登录成功后推送, 兼容 HomeViewModel 现有订阅.</summary>
     IObservable<(string Uin, string Nickname)> SelfInfoStream { get; }
@@ -56,7 +59,7 @@ public interface ILLBotIpcClient
     /// <summary>最近一次拿到的登录状态, 没有则 null. 供新订阅者立即读取当前值.</summary>
     LoginStateInfo? CurrentLoginState { get; }
 
-    /// <summary>生成一个管道名, 同时开始连接循环. 返回 pipe 名供调用方塞到 LLBot 的环境变量里.</summary>
+    /// <summary>生成一个连接标识, 同时开始连接循环. 返回值供调用方塞到 LLBot 的 env LL_IPC_PIPE.</summary>
     Task<string> StartAsync(CancellationToken ct = default);
     /// <summary>停止连接 + 轮询.</summary>
     Task StopAsync();
@@ -99,9 +102,9 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
 
     public Task<string> StartAsync(CancellationToken ct = default)
     {
-        if (!PlatformHelper.IsWindows)
+        if (!PlatformHelper.IsWindows && !PlatformHelper.IsMacOS && !PlatformHelper.IsLinux)
         {
-            throw new PlatformNotSupportedException("LLBotIpcClient 仅支持 Windows");
+            throw new PlatformNotSupportedException("LLBotIpcClient 仅支持 Windows / macOS / Linux");
         }
 
         if (_pipeName != null)
@@ -109,11 +112,18 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
             return Task.FromResult(_pipeName);
         }
 
-        _pipeName = $"luckylillia-llbot-{Environment.ProcessId}-{Guid.NewGuid():N}";
+        // Windows: 短名, LLBot 侧拼 \\.\pipe\; Unix: 直接给绝对路径的 socket 文件.
+        // 用 /tmp 而不是 Path.GetTempPath(): macOS 上 TMPDIR 是 /var/folders/xx/yy/T/ (66 字符),
+        // 加文件名超过 sockaddr_un.sun_path 104 字节上限. /tmp -> /private/tmp 是符号链接, 但内核
+        // bind/connect 时保存原始字符串不 resolve, 所以短路径可用. guid 缩到 8 位省字符.
+        var shortGuid = Guid.NewGuid().ToString("N").Substring(0, 8);
+        var id = $"luckylillia-llbot-{Environment.ProcessId}-{shortGuid}";
+        _pipeName = PlatformHelper.IsWindows ? id : $"/tmp/{id}.sock";
+
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
         _runTask = Task.Run(() => RunAsync(_pipeName, token), token);
-        _logger.LogInformation("LLBot IPC 客户端已启动, 等待连接管道: {Pipe}", _pipeName);
+        _logger.LogInformation("LLBot IPC 客户端已启动, 等待连接: {Pipe}", _pipeName);
         return Task.FromResult(_pipeName);
     }
 
@@ -150,23 +160,39 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
     {
         while (!ct.IsCancellationRequested)
         {
-            NamedPipeClientStream? client = null;
+            Stream? stream = null;
+            Socket? socket = null;
             try
             {
-                client = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
                 using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 connectCts.CancelAfter(ConnectTimeoutMs);
-                await client.ConnectAsync(connectCts.Token);
+
+                if (PlatformHelper.IsWindows)
+                {
+                    var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+                    await pipe.ConnectAsync(connectCts.Token);
+                    stream = pipe;
+                }
+                else
+                {
+                    // Unix Domain Socket. LLBot 侧 fs.existsSync(socket) 才会 listen, 所以
+                    // socket 文件在 LLBot 起来前不存在, ConnectAsync 会抛 SocketException, 走安静重试.
+                    socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+                    await socket.ConnectAsync(new UnixDomainSocketEndPoint(pipeName), connectCts.Token);
+                    stream = new NetworkStream(socket, ownsSocket: true);
+                    socket = null; // NetworkStream 接管所有权, dispose stream 会关 socket
+                }
 
                 _connected = true;
                 _logger.LogInformation("LLBot IPC 已连接");
 
-                await PollLoopAsync(client, ct);
+                await PollLoopAsync(stream, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
             catch (TimeoutException) { /* connect 超时, 安静重试 */ }
             catch (OperationCanceledException) { /* connect 超时 (CancellationToken 路径), 安静重试 */ }
             catch (IOException) { /* LLBot 还没 listen / 断开, 安静重试 */ }
+            catch (SocketException) { /* UDS: 文件不存在 / 拒绝连接, 安静重试 */ }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "LLBot IPC 连接异常, 1 秒后重试");
@@ -174,10 +200,11 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
             finally
             {
                 _connected = false;
-                if (client != null)
+                if (stream != null)
                 {
-                    try { await client.DisposeAsync(); } catch { }
+                    try { await stream.DisposeAsync(); } catch { }
                 }
+                socket?.Dispose();
             }
 
             if (ct.IsCancellationRequested) break;
@@ -186,12 +213,14 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
         }
     }
 
-    private async Task PollLoopAsync(NamedPipeClientStream pipe, CancellationToken ct)
+    private async Task PollLoopAsync(Stream stream, CancellationToken ct)
     {
-        var writer = new StreamWriter(pipe, new System.Text.UTF8Encoding(false)) { NewLine = "\n", AutoFlush = false };
-        var reader = new StreamReader(pipe, new System.Text.UTF8Encoding(false));
+        var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false)) { NewLine = "\n", AutoFlush = false };
+        var reader = new StreamReader(stream, new System.Text.UTF8Encoding(false));
 
-        while (!ct.IsCancellationRequested && pipe.IsConnected)
+        // 循环退出靠异常 (IOException / SocketException / EOF 触发的 IOException) — 让 RunAsync 重连.
+        // NamedPipeClientStream.IsConnected 在 Stream 基类上没有等价, UDS 侧断开只能靠读写抛错感知.
+        while (!ct.IsCancellationRequested)
         {
             var info = await RequestLoginStateOnceAsync(writer, reader, ct);
             if (info != null)
@@ -229,7 +258,11 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
             while (!token.IsCancellationRequested)
             {
                 var line = await reader.ReadLineAsync(token);
-                if (line == null) return null;
+                if (line == null)
+                {
+                    // EOF: 对端关闭, 走 RunAsync 重连
+                    throw new IOException("LLBot IPC 连接已关闭 (EOF)");
+                }
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
                 var parsed = TryParseResponse(line, id, out var data);
@@ -239,8 +272,12 @@ public sealed class LLBotIpcClient : ILLBotIpcClient, IDisposable
             }
             return null;
         }
-        catch (OperationCanceledException) { return null; }
-        catch (IOException) { return null; }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // 请求超时 (RequestTimeoutMs) — 保持连接, 下轮再试
+            return null;
+        }
+        // OperationCanceledException (外层 ct 触发) 和 IOException/SocketException 交给 RunAsync 处理
     }
 
     private enum ParseResult { NotMatched, MatchedSuccess, MatchedError }

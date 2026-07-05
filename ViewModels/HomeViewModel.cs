@@ -1546,19 +1546,16 @@ public class HomeViewModel : ViewModelBase
 
         _logger.LogInformation("准备启动 LLBot (无头模式)...");
 
-        // 启动 LLBot 的本地函数: uin 非空走快速登录 (--qq=uin), null 走扫码; 同时拉起 IPC 管道
+        // 启动 LLBot 的本地函数: uin 非空走快速登录 (--qq=uin), null 走扫码; 同时拉起 IPC (Windows 命名管道 / Unix UDS)
         async Task<bool> StartLLBotWithUinAsync(string? uin)
         {
             string? pipe = null;
-            if (Utils.PlatformHelper.IsWindows)
-            {
-                try { pipe = await _llbotIpc.StartAsync(); }
-                catch (Exception ex) { _logger.LogWarning(ex, "启动 LLBot IPC 客户端失败"); }
-            }
+            try { pipe = await _llbotIpc.StartAsync(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "启动 LLBot IPC 客户端失败"); }
             return await _processManager.StartLLBotAsync(config.NodePath, config.LLBotPath, pipe, uin);
         }
 
-        if (Utils.PlatformHelper.IsWindows && ShowHeadlessLoginDialog != null && string.IsNullOrEmpty(config.AutoLoginQQ))
+        if (ShowHeadlessLoginDialog != null && string.IsNullOrEmpty(config.AutoLoginQQ))
         {
             // 未配自动登录号: 弹登录框 (快速登录账号列表 + 扫码), 框内管理启动 LLBot 并等待登录结果
             var accounts = ScanSessionAccounts(config.LLBotPath);
@@ -1576,7 +1573,7 @@ public class HomeViewModel : ViewModelBase
         }
         else
         {
-            // 配了自动登录号 -> 直接快速登录 (--qq=该号); 非 Windows -> 直接启动 (无 IPC/登录框)
+            // 配了自动登录号 -> 直接快速登录 (--qq=该号); 或调用方没注入登录框 (视为直接启动)
             var autoUin = string.IsNullOrEmpty(config.AutoLoginQQ) ? null : config.AutoLoginQQ;
             if (!string.IsNullOrEmpty(autoUin))
                 _logger.LogInformation("配置了自动登录号, 直接快速登录: {Uin}", autoUin);

@@ -1,17 +1,27 @@
 # LLBot IPC 协议 (Desktop &lt;-&gt; LLBot)
 
 headless 模式下 Desktop 不启动 PMHQ, LLBot 走直连协议 (direct protocol) 自己连 QQ. Desktop 通过一条
-Windows 命名管道向 LLBot 轮询**登录状态**: 登录中拿二维码 + 扫码进度, 登录后拿 uin / nickname.
+本机 IPC 通道向 LLBot 轮询**登录状态**: 登录中拿二维码 + 扫码进度, 登录后拿 uin / nickname.
+
+传输:
+- **Windows**: 命名管道 (`\\.\pipe\...`).
+- **macOS / Linux**: Unix Domain Socket (`/tmp/luckylillia-llbot-{pid}-{guid8}.sock`). 不用 `$TMPDIR` 是因为 macOS 上 `$TMPDIR` = `/var/folders/xx/yy/T/` (66 字符), 加文件名会超过 `sockaddr_un.sun_path` 104 字节上限.
 
 **LLBot 是 server, Desktop 是 client.** Desktop 周期性轮询 LLBot.
-**仅 Windows**, 由 `Services/LLBotIpcClient.cs` 实现.
+由 `Services/LLBotIpcClient.cs` 实现, 单份代码覆盖两种传输.
 
 ## 握手
 
-1. Desktop 启动 LLBot 之前生成管道名 `luckylillia-llbot-{desktop_pid}-{guid}` (不含 `\\.\pipe\` 前缀).
-2. 通过环境变量 `LL_IPC_PIPE` 把名字塞给 LLBot 子进程.
-3. LLBot 在自己启动早期 `net.createServer().listen('\\\\.\\pipe\\' + name)`.
-4. Desktop 的 `LLBotIpcClient.RunAsync` 在 LLBot 启动后开始 `ConnectAsync` 重连循环 (1.5s 超时, 失败后 1s 重试), 直到 LLBot listen 上.
+1. Desktop 启动 LLBot 之前生成一个标识:
+   - Windows: 短名 `luckylillia-llbot-{desktop_pid}-{guid}` (不含 `\\.\pipe\` 前缀).
+   - macOS/Linux: 绝对路径 `$TMPDIR/luckylillia-llbot-{desktop_pid}-{guid}.sock`.
+2. 通过环境变量 `LL_IPC_PIPE` 把标识塞给 LLBot 子进程.
+3. LLBot 在自己启动早期 `net.createServer().listen(...)`:
+   - Windows 拼 `\\\\.\\pipe\\` + 名字.
+   - Unix 直接把路径当 UDS listen; listen 前 `fs.unlinkSync` 清残留.
+4. Desktop 的 `LLBotIpcClient.RunAsync` 在 LLBot 启动后开始重连循环 (1.5s connect 超时, 失败后 1s 重试),
+   直到 LLBot listen 上. Windows 用 `NamedPipeClientStream`, Unix 用 `Socket(AddressFamily.Unix)` +
+   `UnixDomainSocketEndPoint` + `NetworkStream`.
 5. 连上后 Desktop 进入轮询循环, 每隔一段时间发一次 `get_login_state` 请求.
 
 ## 帧格式
@@ -79,15 +89,16 @@ JSON Lines:
 
 `state=logged_in` 时 Desktop 把 uin/nickname 喂给 `SelfInfoStream` (兼容现有 UI 订阅); 其余状态推给 `LoginStateStream` (二维码对话框消费).
 
-## LLBot 端接入 (Node.js 18+, Windows)
+## LLBot 端接入 (Node.js 18+)
 
 ```js
 // llbot-ipc.js
 const net = require('node:net');
+const fs = require('node:fs');
 
 const pipeName = process.env.LL_IPC_PIPE;
-if (!pipeName || process.platform !== 'win32') {
-  // 不是从 Desktop 起的, 或非 Windows: 跳过 IPC
+if (!pipeName) {
+  // 不是从 Desktop 起的: 跳过 IPC
   module.exports = { setLoginState: () => {} };
   return;
 }
@@ -124,8 +135,21 @@ function handleLine(socket, line) {
   if (!socket.destroyed) socket.write(JSON.stringify(response) + '\n');
 }
 
-server.listen(`\\\\.\\pipe\\${pipeName}`, () => {
-  console.log(`[LL_IPC] listening on \\\\.\\pipe\\${pipeName}`);
+// Windows: 短名 -> 拼 \\.\pipe\; Unix: LL_IPC_PIPE 已经是 socket 绝对路径, 直接 listen (清残留).
+let listenPath;
+if (process.platform === 'win32') {
+  listenPath = `\\\\.\\pipe\\${pipeName}`;
+} else {
+  listenPath = pipeName;
+  try { fs.unlinkSync(listenPath); } catch { /* 不存在 = 正常 */ }
+  const cleanup = () => { try { fs.unlinkSync(listenPath); } catch {} };
+  process.once('exit', cleanup);
+  process.once('SIGINT', () => { cleanup(); process.exit(0); });
+  process.once('SIGTERM', () => { cleanup(); process.exit(0); });
+}
+
+server.listen(listenPath, () => {
+  console.log(`[LL_IPC] listening on ${listenPath}`);
 });
 
 module.exports = {
@@ -160,9 +184,10 @@ ipc.setLoginState({ state: 'logged_in', uin: String(uin), nickname: nick, qrcode
 
 - LLBot 应尽早 `listen`; Desktop 1.5s connect 超时 + 1s 重试退避, LLBot 启动慢点也能等到.
 - Desktop 启动 LLBot 后, `HomeViewModel.StartHeadlessServicesAsync` 调 `WaitFirstLoginStateAsync` 等首个非 `initializing` 状态 (最多 15s). 若 15s 内拿不到 (LLBot 没实现 `get_login_state`), Desktop 记 warning 并跳过登录界面直接进运行态 — 即旧版 LLBot 仍能启动, 只是没有二维码界面.
-- Desktop 重启 / 切有头无头时管道名会变, LLBot 仍监听旧名字 — 重启 LLBot 即可.
-- 非 Windows: Desktop 不启动 IPC, 不注入 `LL_IPC_PIPE`, LLBot 跳过. headless 在非 Windows 没有扫码界面, 需看 LLBot 日志/终端登录.
-- 命名管道 ACL 走当前用户; 管道名带 Desktop 的 pid + guid, 同机多开不冲突.
+- Desktop 重启 / 切有头无头时连接标识会变, LLBot 仍监听旧名字 — 重启 LLBot 即可.
+- 命名管道 ACL 走当前用户; UDS 文件模式默认 `0755` (owner-only 写), 权限也是当前用户. 连接标识带 Desktop 的 pid + guid, 同机多开不冲突.
+- UDS 文件生命周期: LLBot listen 前 `fs.unlinkSync` 清残留, 进程正常退出 / SIGINT / SIGTERM 时再 `unlink` 一次 (SIGKILL / crash 后残留文件会由下一次 listen 前的 unlink 清掉).
+- Linux 上 UDS 走文件系统, 与 Windows/macOS 行为一致; 不用 abstract socket (`@`-开头) 是为了让 macOS 兼容.
 
 ## 改动入口
 
