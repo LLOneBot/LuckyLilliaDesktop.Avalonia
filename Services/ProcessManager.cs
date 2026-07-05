@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -128,6 +129,12 @@ public class ProcessManager : IProcessManager, IDisposable
         }
     }
 
+    // 日志脱敏: PMHQ 命令行含 --auth-token / --api-token 等凭证, 直接打印会落进
+    // 落盘日志 (logs/*.log) 和 UI 日志页, 造成凭证泄露。仅脱敏日志展示, 不影响实际传参。
+    private static readonly Regex SecretArgRegex = new(@"(--(?:auth|api)-token=)\S+");
+
+    private static string MaskSecrets(string command) => SecretArgRegex.Replace(command, "$1***");
+
     // QQ 由 PMHQ 启动: qqPath 写入 pmhq_config.json 的 qq_path (见 UpdatePmhqConfigAsync),
     // PMHQ find_existing_qq_pid 找不到已运行的 QQ 时按 qq_path 自行拉起 (Desktop 不再单独启动 QQ).
     // authToken 作为 --auth-token 传给 PMHQ (PMHQ 必填, 缺则启动即退).
@@ -217,7 +224,7 @@ public class ProcessManager : IProcessManager, IDisposable
                 };
 
                 var fullCommand = $"{absPmhqPath} {argsString}";
-                _logger.LogInformation("启动 PMHQ 完整命令: {Command}", fullCommand);
+                _logger.LogInformation("启动 PMHQ 完整命令: {Command}", MaskSecrets(fullCommand));
                 _logger.LogInformation("工作目录: {WorkingDir}", workingDir);
             }
             else
@@ -246,7 +253,7 @@ public class ProcessManager : IProcessManager, IDisposable
                     };
 
                     var fullCommand = $"{absPmhqPath} {argsString}";
-                    _logger.LogInformation("启动 PMHQ 完整命令 (调试模式): {Command}", fullCommand);
+                    _logger.LogInformation("启动 PMHQ 完整命令 (调试模式): {Command}", MaskSecrets(fullCommand));
                     _logger.LogInformation("工作目录: {WorkingDir}", workingDir);
                 }
                 else
@@ -279,7 +286,7 @@ public class ProcessManager : IProcessManager, IDisposable
                     }
 
                     var fullCommand = $"{pmhqPath} {string.Join(" ", startInfo.ArgumentList)}";
-                    _logger.LogInformation("启动 PMHQ 完整命令: {Command}", fullCommand);
+                    _logger.LogInformation("启动 PMHQ 完整命令: {Command}", MaskSecrets(fullCommand));
                     _logger.LogInformation("工作目录: {WorkingDir}", workingDir);
                 }
             }
