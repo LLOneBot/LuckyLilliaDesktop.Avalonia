@@ -12,6 +12,13 @@ class Program
     {
         try
         {
+            // Windows AppCompat 可能给本 exe 打上 __COMPAT_LAYER (如 DetectorsAppHealth),
+            // 该变量会被子进程继承。QQ 一旦继承, apphelp 的 GetProcAddress 挂钩
+            // (SE_GetProcAddressForCaller) 会在 PMHQ 手动注入的 pmhq.dll (未在 PEB 登记,
+            // 无模块名) 调用 GetProcAddress 时对 NULL 模块名执行 _wcsicmp, 读空指针 ->
+            // QQ 崩溃 (0xC0000005)。启动即清除, 让 PMHQ/QQ/LLBot 继承干净的环境。
+            Environment.SetEnvironmentVariable("__COMPAT_LAYER", null);
+
             // 开机自启时工作目录为 System32，需要切换到 exe 所在目录
             var exeDir = AppContext.BaseDirectory;
             if (!string.IsNullOrEmpty(exeDir))
