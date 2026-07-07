@@ -478,7 +478,6 @@ public class ProcessManager : IProcessManager, IDisposable
             var userArgs = new List<string>();
             if (PmhqPort.HasValue)
             {
-                startInfo.Environment["QQ_USE_PMHQ"] = "1";
                 userArgs.Add($"--pmhq-port={PmhqPort.Value}");
             }
             if (!string.IsNullOrEmpty(loginUin))
@@ -565,7 +564,7 @@ public class ProcessManager : IProcessManager, IDisposable
     public async Task StopPmhqAsync()
     {
         // PMHQ 端口随其生命周期, 停止即失效. 必须清空, 否则下次无头模式 StartLLBotAsync
-        // 会看到残留的 PmhqPort 而误给 LLBot 设 QQ_USE_PMHQ + --pmhq-port,
+        // 会看到残留的 PmhqPort 而误给 LLBot 传 --pmhq-port,
         // 让 LLBot 去连根本没启动的 PMHQ, 卡在 initializing (直连登录流程不会执行).
         // 放在 early-return 之前, 兜住"PMHQ 启动失败但 PmhqPort 已赋值"的残留.
         PmhqPort = null;

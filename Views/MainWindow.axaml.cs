@@ -701,17 +701,31 @@ public partial class MainWindow : Window
         });
     }
 
+    // Avalonia 拒绝给 non-visible owner 挂模态子窗口 ("Cannot show window with non-visible owner").
+    // 启动即最小化到托盘 + auto_start_bot 的组合下, 主窗口已 Hide() 但启动流程仍会弹 Auth Token / 登录对话框,
+    // 若不先恢复主窗口就会抛异常. 恢复出来也是必要行为 — 否则用户看不到弹窗输入.
+    private void EnsureVisibleForDialog()
+    {
+        if (IsVisible && WindowState != WindowState.Minimized) return;
+        if (!IsVisible) Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        SetBackgroundMode(false);
+    }
+
     private async Task ShowAlertDialogAsync(string title, string message)
     {
+        EnsureVisibleForDialog();
         var dialog = new AlertDialog(message);
         await dialog.ShowDialog<object?>(this);
     }
 
     private async Task ShowLoadingDialogAsync(string message, Func<Task> action)
     {
+        EnsureVisibleForDialog();
         var dialog = new LoadingDialog(message);
         var dialogTask = dialog.ShowDialog<object?>(this);
-        
+
         try
         {
             await action();
@@ -720,12 +734,13 @@ public partial class MainWindow : Window
         {
             dialog.Close();
         }
-        
+
         await dialogTask;
     }
 
     private async Task<bool> ShowConfirmDialogAsync(string title, string message)
     {
+        EnsureVisibleForDialog();
         var dialog = new ConfirmDialog(message);
         var result = await dialog.ShowDialog<bool?>(this);
         return result == true;
@@ -733,6 +748,7 @@ public partial class MainWindow : Window
 
     private async Task<string?> ShowAuthTokenDialogAsync()
     {
+        EnsureVisibleForDialog();
         var app = Application.Current as App;
         var validator = app?.Services?.GetService(typeof(IAuthTokenValidator)) as IAuthTokenValidator;
         var dialog = new AuthTokenDialog(validator);
@@ -741,6 +757,7 @@ public partial class MainWindow : Window
 
     private async Task<string?> ShowQRLoginDialogAsync()
     {
+        EnsureVisibleForDialog();
         var app = Application.Current as App;
         if (app?.Services?.GetService(typeof(ILLBotIpcClient)) is not ILLBotIpcClient ipc)
         {
@@ -752,6 +769,7 @@ public partial class MainWindow : Window
 
     private async Task<string?> ShowHeadlessLoginDialogAsync(List<LoginAccount> accounts, Func<string?, Task<bool>> onStart)
     {
+        EnsureVisibleForDialog();
         var app = Application.Current as App;
         if (app?.Services?.GetService(typeof(ILLBotIpcClient)) is not ILLBotIpcClient ipc)
         {
@@ -804,6 +822,7 @@ public partial class MainWindow : Window
 
     private async Task<int> ShowChoiceDialogAsync(string title, string message, string option1, string option2)
     {
+        EnsureVisibleForDialog();
         var dialog = new ChoiceDialog(title, message, option1, option2);
         var result = await dialog.ShowDialog<int?>(this);
         return result ?? -1;

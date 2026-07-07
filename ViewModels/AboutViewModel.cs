@@ -312,13 +312,60 @@ public class AboutViewModel : ViewModelBase
 
     /// <summary>
     /// 检测 PMHQ 版本
+    /// 优先执行 `pmhq --version`; 失败或无输出时退回读取同目录 package.json
     /// </summary>
     private string? DetectPmhqVersion(string pmhqPath)
     {
+        if (string.IsNullOrEmpty(pmhqPath) || !File.Exists(pmhqPath)) return null;
+
+        var pmhqDir = Path.GetDirectoryName(pmhqPath);
+
+        // 1) 尝试运行 pmhq --version
         try
         {
-            // 尝试从 package.json 读取版本
-            var pmhqDir = Path.GetDirectoryName(pmhqPath);
+            var psi = new ProcessStartInfo
+            {
+                FileName = pmhqPath,
+                Arguments = "--version",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                WorkingDirectory = pmhqDir ?? Environment.CurrentDirectory
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc != null)
+            {
+                var stdout = proc.StandardOutput.ReadToEnd();
+                var stderr = proc.StandardError.ReadToEnd();
+                if (!proc.WaitForExit(5000))
+                {
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    _logger.LogWarning("`pmhq --version` 超时, 回退到 package.json");
+                }
+                else
+                {
+                    // 部分程序把版本打到 stderr; 两个都尝试
+                    var output = !string.IsNullOrWhiteSpace(stdout) ? stdout : stderr;
+                    var version = ExtractVersion(output);
+                    if (!string.IsNullOrEmpty(version))
+                    {
+                        return version;
+                    }
+                    _logger.LogWarning("`pmhq --version` 未解析到版本号 (exit={Exit}, output={Output}), 回退到 package.json",
+                        proc.ExitCode, output?.Trim());
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "运行 `pmhq --version` 失败, 回退到 package.json");
+        }
+
+        // 2) 退回 package.json
+        try
+        {
             if (string.IsNullOrEmpty(pmhqDir)) return null;
 
             var packageJsonPath = Path.Combine(pmhqDir, "package.json");
@@ -334,9 +381,21 @@ public class AboutViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "检测 PMHQ 版本失败");
+            _logger.LogWarning(ex, "从 package.json 检测 PMHQ 版本失败");
         }
         return null;
+    }
+
+    /// <summary>
+    /// 从 `--version` 命令输出里提取版本号
+    /// 兼容 "1.2.3" / "v1.2.3" / "PMHQ v1.2.3 (build ...)" 等常见格式
+    /// </summary>
+    private static string? ExtractVersion(string? output)
+    {
+        if (string.IsNullOrWhiteSpace(output)) return null;
+        var match = System.Text.RegularExpressions.Regex.Match(
+            output, @"\d+\.\d+\.\d+(?:[-.+][0-9A-Za-z.-]+)?");
+        return match.Success ? match.Value : output.Trim();
     }
 
     /// <summary>

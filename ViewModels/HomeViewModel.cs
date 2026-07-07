@@ -1555,11 +1555,13 @@ public class HomeViewModel : ViewModelBase
             return await _processManager.StartLLBotAsync(config.NodePath, config.LLBotPath, pipe, uin);
         }
 
-        if (ShowHeadlessLoginDialog != null && string.IsNullOrEmpty(config.AutoLoginQQ))
+        if (ShowHeadlessLoginDialog != null && !HasLocalSession(config.LLBotPath, config.AutoLoginQQ))
         {
-            // 未配自动登录号: 弹登录框 (快速登录账号列表 + 扫码), 框内管理启动 LLBot 并等待登录结果
+            // 场景: 未配自动登录号, 或配了但本地找不到对应 session -> 弹框 (账号列表 + 扫码)。
+            // 若不弹框就直接 --qq=<uin>, LLBot 会因缺 session 自动转扫码, 但控制面板没开框, 用户看不到二维码。
             var accounts = ScanSessionAccounts(config.LLBotPath);
-            _logger.LogInformation("无头登录: 扫描到 {Count} 个本地账号", accounts.Count);
+            _logger.LogInformation("无头登录: 扫描到 {Count} 个本地账号 (AutoLoginQQ='{AutoUin}' 未找到 session 或未配置)",
+                accounts.Count, config.AutoLoginQQ);
             var loggedUin = await ShowHeadlessLoginDialog(accounts, StartLLBotWithUinAsync);
             if (string.IsNullOrEmpty(loggedUin))
             {
@@ -1573,10 +1575,10 @@ public class HomeViewModel : ViewModelBase
         }
         else
         {
-            // 配了自动登录号 -> 直接快速登录 (--qq=该号); 或调用方没注入登录框 (视为直接启动)
+            // 配了自动登录号且本地有对应 session -> 直接快速登录 (--qq=该号); 或调用方没注入登录框 (视为直接启动)
             var autoUin = string.IsNullOrEmpty(config.AutoLoginQQ) ? null : config.AutoLoginQQ;
             if (!string.IsNullOrEmpty(autoUin))
-                _logger.LogInformation("配置了自动登录号, 直接快速登录: {Uin}", autoUin);
+                _logger.LogInformation("配置了自动登录号且本地存在 session, 直接快速登录: {Uin}", autoUin);
             if (!await StartLLBotWithUinAsync(autoUin))
             {
                 ErrorMessage = "LLBot 启动失败，请检查日志";
@@ -1619,6 +1621,17 @@ public class HomeViewModel : ViewModelBase
 
         await ExecuteStartupCommandAsync(config);
         await StartAutoFrameworksAsync(config);
+    }
+
+    // 判断 config.AutoLoginQQ 是否有对应的本地 session 文件 -> 决定能否直接快速登录 (不弹框).
+    // AutoLoginQQ 为空时返回 false (表示无自动登录号, 走弹框流程).
+    private static bool HasLocalSession(string? llbotPath, string? uin)
+    {
+        if (string.IsNullOrWhiteSpace(uin)) return false;
+        var llbotDir = Path.GetDirectoryName(llbotPath);
+        if (string.IsNullOrEmpty(llbotDir)) return false;
+        var sessionFile = Path.Combine(llbotDir, "data", $"qq-session-{uin}.json");
+        return File.Exists(sessionFile);
     }
 
     // 扫描 LLBot data 目录下的 qq-session-{uin}.json, 提取 uin (文件名) + nick (文件内容), 供快速登录列表
