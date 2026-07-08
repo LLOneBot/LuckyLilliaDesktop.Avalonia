@@ -573,7 +573,7 @@ public class HomeViewModel : ViewModelBase
         try
         {
             var config = await _configManager.LoadConfigAsync();
-            var llbotVer = DetectLLBotVersion(config.LLBotPath) ?? "";
+            var llbotVer = Utils.VersionDetector.DetectLLBotVersion(config.LLBotPath, _logger) ?? "";
             var nodeVer = await Utils.NodeHelper.GetNodeVersionAsync(config.NodePath, _logger);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -724,8 +724,8 @@ public class HomeViewModel : ViewModelBase
             var config = await _configManager.LoadConfigAsync();
             var appVersion = GetAppVersion();
             // 无头模式不启动 PMHQ, 不检测它的版本/更新
-            var pmhqVersion = config.Headless ? null : DetectPmhqVersion(config.PmhqPath);
-            var llbotVersion = DetectLLBotVersion(config.LLBotPath);
+            var pmhqVersion = config.Headless ? null : Utils.VersionDetector.DetectPmhqVersion(config.PmhqPath, _logger);
+            var llbotVersion = Utils.VersionDetector.DetectLLBotVersion(config.LLBotPath, _logger);
 
             var updateNames = new System.Collections.Generic.List<string>();
             var state = new UpdateState { IsChecked = true };
@@ -800,52 +800,6 @@ public class HomeViewModel : ViewModelBase
             : "1.0.0";
     }
 
-    private string? DetectPmhqVersion(string? pmhqPath)
-    {
-        if (string.IsNullOrEmpty(pmhqPath)) return null;
-        try
-        {
-            var pmhqDir = Path.GetDirectoryName(pmhqPath);
-            if (string.IsNullOrEmpty(pmhqDir)) return null;
-
-            var packageJsonPath = Path.Combine(pmhqDir, "package.json");
-            if (File.Exists(packageJsonPath))
-            {
-                var json = File.ReadAllText(packageJsonPath);
-                using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("version", out var versionElement))
-                {
-                    return versionElement.GetString();
-                }
-            }
-        }
-        catch { }
-        return null;
-    }
-
-    private string? DetectLLBotVersion(string? llbotPath)
-    {
-        if (string.IsNullOrEmpty(llbotPath)) return null;
-        try
-        {
-            var llbotDir = Path.GetDirectoryName(llbotPath);
-            if (string.IsNullOrEmpty(llbotDir)) return null;
-
-            var packageJsonPath = Path.Combine(llbotDir, "package.json");
-            if (File.Exists(packageJsonPath))
-            {
-                var json = File.ReadAllText(packageJsonPath);
-                using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("version", out var versionElement))
-                {
-                    return versionElement.GetString();
-                }
-            }
-        }
-        catch { }
-        return null;
-    }
-
     // 启动门槛: PMHQ / LLBot 主版本必须 >= 8.
     private const int MinMajorVersion = 8;
 
@@ -858,10 +812,10 @@ public class HomeViewModel : ViewModelBase
     }
 
     // LLBot (两种模式) + PMHQ (仅有头) 主版本必须 >= 8. 通过返回 null, 否则返回展示给用户的错误消息.
-    // 读不到版本也拦 (正常发布都带 package.json, 读不到说明安装异常 -> 让用户重装/更新).
+    // 读不到版本也拦 (安装异常 -> 让用户重装/更新). PMHQ 以 `pmhq --version` 为主, 见 Utils.VersionDetector.
     private string? CheckVersionRequirement(AppConfig config)
     {
-        var llbotVer = DetectLLBotVersion(config.LLBotPath);
+        var llbotVer = Utils.VersionDetector.DetectLLBotVersion(config.LLBotPath, _logger);
         var llbotMajor = ParseMajorVersion(llbotVer);
         if (llbotMajor == null)
             return $"无法确认 LLBot 版本, 请更新到 {MinMajorVersion}.0 或以上后再启动";
@@ -870,7 +824,7 @@ public class HomeViewModel : ViewModelBase
 
         if (!config.Headless)
         {
-            var pmhqVer = DetectPmhqVersion(config.PmhqPath);
+            var pmhqVer = Utils.VersionDetector.DetectPmhqVersion(config.PmhqPath, _logger);
             var pmhqMajor = ParseMajorVersion(pmhqVer);
             if (pmhqMajor == null)
                 return $"无法确认 PMHQ 版本, 请更新到 {MinMajorVersion}.0 或以上后再启动";
@@ -1594,7 +1548,7 @@ public class HomeViewModel : ViewModelBase
         _logger.LogInformation("LLBot 启动成功");
 
         // 启动后重新读 LLBot / Node 版本 (首次可能刚下载完)
-        LLBotVersion = DetectLLBotVersion(config.LLBotPath) ?? LLBotVersion;
+        LLBotVersion = Utils.VersionDetector.DetectLLBotVersion(config.LLBotPath, _logger) ?? LLBotVersion;
         var nodeVerOnStart = await Utils.NodeHelper.GetNodeVersionAsync(config.NodePath, _logger);
         if (nodeVerOnStart.HasValue) NodeVersion = $"v{nodeVerOnStart.Value}";
         IsServicesRunning = true;
