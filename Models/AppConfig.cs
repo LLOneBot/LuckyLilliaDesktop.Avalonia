@@ -56,6 +56,10 @@ public class AppConfig
     [JsonPropertyName("auto_start_frameworks")]
     public List<string> AutoStartFrameworks { get; set; } = new();
 
+    // HTTP 代理: 非空时以 HTTP_PROXY/HTTPS_PROXY 环境变量传给 PMHQ 和 LLBot
+    [JsonPropertyName("http_proxy")]
+    public string HttpProxy { get; set; } = string.Empty;
+
     // 日志设置
     [JsonPropertyName("log_save_enabled")]
     public bool LogSaveEnabled { get; set; } = true;

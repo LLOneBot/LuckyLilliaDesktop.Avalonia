@@ -135,10 +135,75 @@ public class ProcessManager : IProcessManager, IDisposable
 
     private static string MaskSecrets(string command) => SecretArgRegex.Replace(command, "$1***");
 
+    // 代理 URL 可能带认证信息 (http://user:pass@host:port), 日志里隐去凭证部分
+    private static readonly Regex ProxyCredentialRegex = new(@"://[^@/\s]+@");
+
+    private static string MaskProxyCredentials(string proxy) => ProxyCredentialRegex.Replace(proxy, "://***@");
+
+    private static readonly string[] ProxyEnvNames = { "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy" };
+
+    // UseShellExecute = true 时临时改当前进程环境变量, 需要串行化避免并发启动互相污染
+    private static readonly object _proxyEnvLock = new();
+
+    /// <summary>
+    /// 启动进程, 非空代理以 HTTP_PROXY/HTTPS_PROXY 环境变量传入。
+    /// 大小写各设一遍: Windows 环境变量不区分大小写 (等于只写一个), Unix 上部分程序只认小写。
+    /// </summary>
+    private Process? StartProcessWithProxy(ProcessStartInfo startInfo, string? httpProxy)
+    {
+        var proxy = string.IsNullOrWhiteSpace(httpProxy) ? null : httpProxy.Trim();
+        if (proxy == null)
+        {
+            return Process.Start(startInfo);
+        }
+
+        _logger.LogInformation("已设置 HTTP 代理环境变量: {Proxy}", MaskProxyCredentials(proxy));
+
+        if (!startInfo.UseShellExecute)
+        {
+            foreach (var name in ProxyEnvNames)
+            {
+                startInfo.Environment[name] = proxy;
+            }
+            return Process.Start(startInfo);
+        }
+
+        // UseShellExecute = true (macOS bash / Windows 调试模式 cmd) 不允许改 startInfo.Environment,
+        // 改为临时设置当前进程环境变量让子进程继承, 启动后立即还原.
+        //
+        // Windows 环境变量大小写不敏感, HTTP_PROXY / http_proxy 是同一个变量. 保存 / 还原
+        // 必须先"整体读旧值", 再"整体写代理"; 还原按倒序 -- 最后一次写回的是最早保存的原值,
+        // 即物理变量原始状态. 若把 Get + Set 交错做, i=0 写 HTTP_PROXY=proxy 后, i=2 读到的
+        // http_proxy 就是 proxy 而非原值, finally 里再按同序 Set 回去, 就把变量永久污染成 proxy.
+        lock (_proxyEnvLock)
+        {
+            var saved = new string?[ProxyEnvNames.Length];
+            for (int i = 0; i < ProxyEnvNames.Length; i++)
+            {
+                saved[i] = Environment.GetEnvironmentVariable(ProxyEnvNames[i]);
+            }
+            for (int i = 0; i < ProxyEnvNames.Length; i++)
+            {
+                Environment.SetEnvironmentVariable(ProxyEnvNames[i], proxy);
+            }
+            try
+            {
+                return Process.Start(startInfo);
+            }
+            finally
+            {
+                for (int i = ProxyEnvNames.Length - 1; i >= 0; i--)
+                {
+                    Environment.SetEnvironmentVariable(ProxyEnvNames[i], saved[i]);
+                }
+            }
+        }
+    }
+
     // QQ 由 PMHQ 启动: qqPath 写入 pmhq_config.json 的 qq_path (见 UpdatePmhqConfigAsync),
     // PMHQ find_existing_qq_pid 找不到已运行的 QQ 时按 qq_path 自行拉起 (Desktop 不再单独启动 QQ).
     // authToken 作为 --auth-token 传给 PMHQ (PMHQ 必填, 缺则启动即退).
-    public async Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, string autoLoginQQ, string authToken, bool debug = false)
+    public async Task<bool> StartPmhqAsync(string pmhqPath, string qqPath, string autoLoginQQ, string authToken, bool debug = false, string? httpProxy = null)
     {
         try
         {
@@ -291,7 +356,7 @@ public class ProcessManager : IProcessManager, IDisposable
                 }
             }
 
-            _pmhqProcess = Process.Start(startInfo);
+            _pmhqProcess = StartProcessWithProxy(startInfo, httpProxy);
 
             if (_pmhqProcess == null)
             {
@@ -420,7 +485,7 @@ public class ProcessManager : IProcessManager, IDisposable
         }
     }
 
-    public async Task<bool> StartLLBotAsync(string nodePath, string scriptPath, string? ipcPipeName = null, string? loginUin = null)
+    public async Task<bool> StartLLBotAsync(string nodePath, string scriptPath, string? ipcPipeName = null, string? loginUin = null, string? httpProxy = null)
     {
         try
         {
@@ -494,7 +559,7 @@ public class ProcessManager : IProcessManager, IDisposable
             _logger.LogInformation("启动 LLBot 完整命令: {Command}", fullCommand);
             _logger.LogInformation("工作目录: {WorkingDir}", workingDir);
 
-            _llbotProcess = Process.Start(startInfo);
+            _llbotProcess = StartProcessWithProxy(startInfo, httpProxy);
 
             if (_llbotProcess == null)
             {

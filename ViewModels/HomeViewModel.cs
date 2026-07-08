@@ -1357,7 +1357,8 @@ public class HomeViewModel : ViewModelBase
                 config.QQPath,
                 config.AutoLoginQQ,
                 authToken,
-                config.Debug);
+                config.Debug,
+                config.HttpProxy);
 
             if (pmhqSuccess)
             {
@@ -1375,7 +1376,8 @@ public class HomeViewModel : ViewModelBase
                 var llbotSuccess = await _processManager.StartLLBotAsync(
                     config.NodePath,
                     config.LLBotPath,
-                    llbotIpcPipe);
+                    llbotIpcPipe,
+                    httpProxy: config.HttpProxy);
 
                 if (llbotSuccess)
                 {
@@ -1552,7 +1554,7 @@ public class HomeViewModel : ViewModelBase
             string? pipe = null;
             try { pipe = await _llbotIpc.StartAsync(); }
             catch (Exception ex) { _logger.LogWarning(ex, "启动 LLBot IPC 客户端失败"); }
-            return await _processManager.StartLLBotAsync(config.NodePath, config.LLBotPath, pipe, uin);
+            return await _processManager.StartLLBotAsync(config.NodePath, config.LLBotPath, pipe, uin, config.HttpProxy);
         }
 
         if (ShowHeadlessLoginDialog != null && !HasLocalSession(config.LLBotPath, config.AutoLoginQQ))

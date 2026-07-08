@@ -56,6 +56,7 @@ public class ConfigViewModel : ViewModelBase
             StartupEnabled != _savedStartupEnabled ||
             StartupCommandEnabled != _savedConfig.StartupCommandEnabled ||
             StartupCommand != _savedConfig.StartupCommand ||
+            HttpProxy != _savedConfig.HttpProxy ||
             LogSaveEnabled != _savedConfig.LogSaveEnabled ||
             LogRetentionHours != _savedConfig.LogRetentionSeconds / 3600 ||
             emailChanged;
@@ -197,6 +198,14 @@ public class ConfigViewModel : ViewModelBase
     {
         get => _startupCommand;
         set { this.RaiseAndSetIfChanged(ref _startupCommand, value); CheckUnsavedChanges(); }
+    }
+
+    private string _httpProxy = string.Empty;
+
+    public string HttpProxy
+    {
+        get => _httpProxy;
+        set { this.RaiseAndSetIfChanged(ref _httpProxy, value); CheckUnsavedChanges(); }
     }
 
     private bool _logSaveEnabled = true;
@@ -549,6 +558,7 @@ public class ConfigViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(StartupEnabled));
             StartupCommandEnabled = config.StartupCommandEnabled;
             StartupCommand = config.StartupCommand;
+            HttpProxy = config.HttpProxy;
 
             LogSaveEnabled = config.LogSaveEnabled;
             LogRetentionHours = config.LogRetentionSeconds / 3600;
@@ -576,6 +586,7 @@ public class ConfigViewModel : ViewModelBase
                 MinimizeToTrayOnStart = MinimizeToTrayOnStart,
                 StartupCommandEnabled = StartupCommandEnabled,
                 StartupCommand = StartupCommand,
+                HttpProxy = HttpProxy,
                 LogSaveEnabled = LogSaveEnabled,
                 LogRetentionSeconds = LogRetentionHours * 3600
             };
@@ -625,6 +636,7 @@ public class ConfigViewModel : ViewModelBase
                 MinimizeToTrayOnStart = MinimizeToTrayOnStart,
                 StartupCommandEnabled = StartupCommandEnabled,
                 StartupCommand = StartupCommand,
+                HttpProxy = HttpProxy,
                 LogSaveEnabled = LogSaveEnabled,
                 LogRetentionSeconds = LogRetentionHours * 3600
             };

@@ -295,6 +295,37 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 网络代理区域 -->
+                <DockPanel>
+                    <PathIcon DockPanel.Dock="Left"
+                              Data="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56C8.81 5.55 8.35 6.75 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.65-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"
+                              Width="24" Height="24"
+                              Foreground="{DynamicResource PrimaryBrush}"
+                              Margin="0,0,10,0"/>
+                    <TextBlock Text="网络代理"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               VerticalAlignment="Center"/>
+                </DockPanel>
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="20"
+                        Padding="24"
+                    BoxShadow="0 18 48 0 #18E84D9C">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="HTTP 代理" Foreground="{DynamicResource TextSecondary}"/>
+                        <TextBox Text="{Binding HttpProxy}"
+                                 Watermark="例如: http://127.0.0.1:7890，留空则不使用"
+                                 Width="300"
+                                 HorizontalAlignment="Left"/>
+                        <TextBlock Text="以 HTTP_PROXY / HTTPS_PROXY 环境变量传给 PMHQ 和 LLBot，下次启动服务时生效"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- 邮件通知区域 -->
                 <DockPanel>
                     <PathIcon DockPanel.Dock="Left"
