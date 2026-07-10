@@ -26,7 +26,8 @@ public class ZhenxunInstallService : IZhenxunInstallService
 
     private const string ZhenxunDir = "bin/zhenxun";
 
-    public bool IsInstalled => File.Exists(Path.Combine(ZhenxunDir, "bot.py"));
+    // 检测 pyproject.toml 存在来代表源码拉取成功
+    public bool IsInstalled => File.Exists(Path.Combine(ZhenxunDir, "pyproject.toml"));
     public string ZhenxunPath => Path.GetFullPath(ZhenxunDir);
 
     public ZhenxunInstallService(ILogger<ZhenxunInstallService> logger, IGitHubHelper gitHubHelper, IPythonHelper pythonHelper)
@@ -89,11 +90,10 @@ public class ZhenxunInstallService : IZhenxunInstallService
             await SafeDeleteDirectoryAsync(tempExtractDir);
             _logger.LogInformation("真寻Bot源码解压完成");
 
-            // Step 4: 使用 uv 安装依赖
-            Report(progress, 4, totalSteps, "安装依赖", "正在使用 uv 安装依赖...");
+            // Step 4: 使用 uv sync 安装依赖
+            Report(progress, 4, totalSteps, "安装依赖", "正在使用 uv sync 同步环境依赖...");
             var zhenxunPath = Path.GetFullPath(ZhenxunDir);
             
-            // zhenxun_bot 使用 pyproject.toml，用 uv sync 安装
             var pyprojectFile = Path.Combine(zhenxunPath, "pyproject.toml");
             if (!await _pythonHelper.UvInstallRequirementsAsync(zhenxunPath, pyprojectFile,
                 line => Report(progress, 4, totalSteps, "安装依赖", line), ct))
@@ -128,37 +128,36 @@ public class ZhenxunInstallService : IZhenxunInstallService
 
             if (string.IsNullOrEmpty(uvExe) || !File.Exists(uvExe))
             {
-                _logger.LogError("uv 未正确安装，已搜索 bin/uv、Scripts、PythonDir 均未找到");
+                _logger.LogError("uv 未正确安装，无法启动");
                 return;
             }
 
-            _logger.LogInformation("准备启动真寻Bot，工作目录: {Path}", zhenxunPath);
-            _logger.LogInformation("使用 uv: {Path}", uvExe);
+            _logger.LogInformation("准备启动真寻Bot CLI，工作目录: {Path}", zhenxunPath);
+
+            // 使用 uv run 调度 zhenxun cli
+            const string targetCommand = "zx run"; 
 
             if (PlatformHelper.IsWindows)
             {
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = $"/k \"\"{uvExe}\" tool run poetry run python bot.py & pause\"",
+                    Arguments = $"/k \"\"{uvExe}\" run {targetCommand} & pause\"",
                     WorkingDirectory = zhenxunPath,
                     UseShellExecute = true
                 });
             }
             else
             {
-                // macOS: 使用 osascript 在 Terminal 中执行命令
                 if (PlatformHelper.IsMacOS)
                 {
                     var escapedPath = zhenxunPath.Replace("\"", "\\\"");
                     var escapedUv = uvExe.Replace("\"", "\\\"");
 
-                    // 构建完整的命令 - 使用 poetry run 来运行
-                    var fullCommand = $"cd '{escapedPath}' && '{escapedUv}' tool run poetry run python bot.py";
+                    var fullCommand = $"cd '{escapedPath}' && '{escapedUv}' run {targetCommand}";
                     _logger.LogInformation("Terminal 执行命令: {Command}", fullCommand);
 
                     var script = $"tell application \\\"Terminal\\\" to do script \\\"{fullCommand}\\\"";
-                    _logger.LogInformation("AppleScript: {Script}", script);
 
                     var psi = new ProcessStartInfo
                     {
@@ -174,15 +173,6 @@ public class ZhenxunInstallService : IZhenxunInstallService
                     if (proc != null)
                     {
                         proc.WaitForExit();
-                        var output = proc.StandardOutput.ReadToEnd();
-                        var error = proc.StandardError.ReadToEnd();
-
-                        if (!string.IsNullOrEmpty(output))
-                            _logger.LogInformation("osascript 输出: {Output}", output);
-                        if (!string.IsNullOrEmpty(error))
-                            _logger.LogWarning("osascript 错误: {Error}", error);
-
-                        _logger.LogInformation("osascript 退出码: {ExitCode}", proc.ExitCode);
                     }
                 }
                 else
@@ -191,13 +181,13 @@ public class ZhenxunInstallService : IZhenxunInstallService
                     Process.Start(new ProcessStartInfo
                     {
                         FileName = "xterm",
-                        Arguments = $"-e \"{uvExe} tool run poetry run python bot.py && read -p 'Press enter to exit...'\"",
+                        Arguments = $"-e \"{uvExe} run {targetCommand} && read -p 'Press enter to exit...'\"",
                         WorkingDirectory = zhenxunPath,
                         UseShellExecute = true
                     });
                 }
             }
-            _logger.LogInformation("真寻Bot启动命令已执行");
+            _logger.LogInformation("真寻Bot CLI 启动命令已执行");
         }
         catch (Exception ex)
         {
@@ -207,39 +197,10 @@ public class ZhenxunInstallService : IZhenxunInstallService
 
     public async Task ConfigureEnvAsync(string superUser, int port = 8080)
     {
-        var envDevPath = Path.Combine(ZhenxunDir, ".env.dev");
-        
-        var envContent = $"""
-ENVIRONMENT=dev
-
-SUPERUSERS=["{superUser}"]
-
-COMMAND_START=[""]
-
-SESSION_RUNNING_EXPRESSION="别急呀,小真寻要宕机了!QAQ"
-
-NICKNAME=["真寻", "小真寻", "绪山真寻", "小寻子"]
-
-SESSION_EXPIRE_TIMEOUT=00:00:30
-
-ALCONNA_USE_COMMAND_START=True
-
-IMAGE_TO_BYTES=True
-
-SELF_NICKNAME="小真寻"
-
-DB_URL="sqlite:data/db/zhenxun.db"
-
-CACHE_MODE=NONE
-
-DRIVER=~fastapi+~httpx+~websockets
-
-HOST=127.0.0.1
-PORT={port}
-""";
-
-        await File.WriteAllTextAsync(envDevPath, envContent);
-        _logger.LogInformation("已生成 .env.dev 配置文件，端口: {Port}", port);
+        // 新版真寻在没有 .env.dev 时会自动创建包含全部必备字段的标准配置模板，并引导去 WebUI
+        // 故此方法留空，避免写入不全/旧格式的文件干扰真寻自身的配置初始化机制
+        _logger.LogInformation("将由真寻自带 WebUI 管理配置，跳过桌面端强制写入。");
+        await Task.CompletedTask;
     }
 
     private static void Report(IProgress<InstallProgress>? progress, int step, int totalSteps,
