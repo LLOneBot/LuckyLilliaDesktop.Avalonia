@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using LuckyLilliaDesktop.Utils;
@@ -151,13 +152,17 @@ public class ZhenxunInstallService : IZhenxunInstallService
             {
                 if (PlatformHelper.IsMacOS)
                 {
-                    var escapedPath = zhenxunPath.Replace("\"", "\\\"");
-                    var escapedUv = uvExe.Replace("\"", "\\\"");
+                    // 1. 安全转义 Shell 路径与可执行文件路径
+                    var escapedPath = EscapeForPosixShell(zhenxunPath);
+                    var escapedUv = EscapeForPosixShell(uvExe);
 
-                    var fullCommand = $"cd '{escapedPath}' && '{escapedUv}' run {targetCommand}";
-                    _logger.LogInformation("Terminal 执行命令: {Command}", fullCommand);
+                    // 2. 拼接出安全的拼接指令
+                    var fullCommand = $"cd {escapedPath} && {escapedUv} run {targetCommand}";
+                    _logger.LogInformation("Terminal 拟执行命令: {Command}", fullCommand);
 
-                    var script = $"tell application \\\"Terminal\\\" to do script \\\"{fullCommand}\\\"";
+                    // 3. 针对 AppleScript 内部的双引号进行转义
+                    var escapedAppleScriptCmd = fullCommand.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                    var script = $"tell application \"Terminal\" to do script \"{escapedAppleScriptCmd}\"";
 
                     var psi = new ProcessStartInfo
                     {
@@ -177,11 +182,12 @@ public class ZhenxunInstallService : IZhenxunInstallService
                 }
                 else
                 {
-                    // Linux
+                    // Linux 下同样做安全 Shell 转义
+                    var escapedUv = EscapeForPosixShell(uvExe);
                     Process.Start(new ProcessStartInfo
                     {
                         FileName = "xterm",
-                        Arguments = $"-e \"{uvExe} run {targetCommand} && read -p 'Press enter to exit...'\"",
+                        Arguments = $"-e \"{escapedUv} run {targetCommand} && read -p 'Press enter to exit...'\"",
                         WorkingDirectory = zhenxunPath,
                         UseShellExecute = true
                     });
@@ -201,6 +207,18 @@ public class ZhenxunInstallService : IZhenxunInstallService
         // 故此方法留空，避免写入不全/旧格式的文件干扰真寻自身的配置初始化机制
         _logger.LogInformation("将由真寻自带 WebUI 管理配置，跳过桌面端强制写入。");
         await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 将路径或参数转义为符合 POSIX 规范的单引号安全格式，防止 Shell 注入漏洞与路径特殊字符解析失败。
+    /// 例如：/path/to/lillia's bot -> '/path/to/lillia'\''s bot'
+    /// </summary>
+    private static string EscapeForPosixShell(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return "''";
+        
+        // 将原文本中的所有单引号 ' 替换为 '\'' 并在首尾追加单引号包裹
+        return "'" + path.Replace("'", "'\\''") + "'";
     }
 
     private static void Report(IProgress<InstallProgress>? progress, int step, int totalSteps,
@@ -245,7 +263,6 @@ public class ZhenxunInstallService : IZhenxunInstallService
     {
         if (!Directory.Exists(path)) return;
 
-        // 先清除只读属性
         foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
         {
             try
@@ -255,7 +272,6 @@ public class ZhenxunInstallService : IZhenxunInstallService
             catch { }
         }
 
-        // 重试删除
         for (int i = 0; i < 3; i++)
         {
             try
