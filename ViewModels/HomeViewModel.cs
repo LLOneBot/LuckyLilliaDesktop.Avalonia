@@ -724,7 +724,7 @@ public class HomeViewModel : ViewModelBase
             var config = await _configManager.LoadConfigAsync();
             var appVersion = GetAppVersion();
             // 无头模式不启动 PMHQ, 不检测它的版本/更新
-            var pmhqVersion = config.Headless ? null : Utils.VersionDetector.DetectPmhqVersion(config.PmhqPath, _logger);
+            var pmhqVersion = config.Headless ? null : await Utils.VersionDetector.DetectPmhqVersionAsync(config.PmhqPath, _logger);
             var llbotVersion = Utils.VersionDetector.DetectLLBotVersion(config.LLBotPath, _logger);
 
             var updateNames = new System.Collections.Generic.List<string>();
@@ -813,7 +813,7 @@ public class HomeViewModel : ViewModelBase
 
     // LLBot (两种模式) + PMHQ (仅有头) 主版本必须 >= 8. 通过返回 null, 否则返回展示给用户的错误消息.
     // 读不到版本也拦 (安装异常 -> 让用户重装/更新). PMHQ 以 `pmhq --version` 为主, 见 Utils.VersionDetector.
-    private string? CheckVersionRequirement(AppConfig config)
+    private async Task<string?> CheckVersionRequirementAsync(AppConfig config)
     {
         var llbotVer = Utils.VersionDetector.DetectLLBotVersion(config.LLBotPath, _logger);
         var llbotMajor = ParseMajorVersion(llbotVer);
@@ -824,7 +824,7 @@ public class HomeViewModel : ViewModelBase
 
         if (!config.Headless)
         {
-            var pmhqVer = Utils.VersionDetector.DetectPmhqVersion(config.PmhqPath, _logger);
+            var pmhqVer = await Utils.VersionDetector.DetectPmhqVersionAsync(config.PmhqPath, _logger);
             var pmhqMajor = ParseMajorVersion(pmhqVer);
             if (pmhqMajor == null)
                 return $"无法确认 PMHQ 版本, 请更新到 {MinMajorVersion}.0 或以上后再启动";
@@ -1287,7 +1287,7 @@ public class HomeViewModel : ViewModelBase
             }
 
             // 版本门槛: 有头模式查 PMHQ + LLBot 主版本, 任一 < 8 (或读不到) 拦截并要求更新
-            var versionError = CheckVersionRequirement(config);
+            var versionError = await CheckVersionRequirementAsync(config);
             if (versionError != null)
             {
                 ErrorMessage = versionError;
@@ -1487,7 +1487,7 @@ public class HomeViewModel : ViewModelBase
         }
 
         // 版本门槛: 无头模式只启动 LLBot, 查 LLBot 主版本 (< 8 或读不到则拦截要求更新)
-        var versionError = CheckVersionRequirement(config);
+        var versionError = await CheckVersionRequirementAsync(config);
         if (versionError != null)
         {
             ErrorMessage = versionError;

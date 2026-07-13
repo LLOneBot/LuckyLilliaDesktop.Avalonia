@@ -282,7 +282,7 @@ public class AboutViewModel : ViewModelBase
             var pmhqPath = config.PmhqPath;
             if (!string.IsNullOrEmpty(pmhqPath))
             {
-                var pmhqVersion = VersionDetector.DetectPmhqVersion(pmhqPath, _logger);
+                var pmhqVersion = await VersionDetector.DetectPmhqVersionAsync(pmhqPath, _logger);
                 PmhqVersion = pmhqVersion ?? "未知";
             }
             else
