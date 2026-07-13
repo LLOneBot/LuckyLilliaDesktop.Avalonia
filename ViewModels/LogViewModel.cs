@@ -20,14 +20,14 @@ public class LogEntryViewModel : ViewModelBase
     {
         get
         {
+            var timestamp = LogEntry.Timestamp.ToString("MM-dd HH:mm:ss");
             string text;
             if (LogEntry.ProcessName == "LLBot")
             {
-                text = LogEntry.Message;
+                text = $"{timestamp} {LogEntry.Message}";
             }
             else
             {
-                var timestamp = LogEntry.Timestamp.ToString("HH:mm:ss");
                 text = $"{timestamp} [{LogEntry.ProcessName}] {LogEntry.Message}";
             }
             return SanitizeText(text, preserveAnsi: true);
