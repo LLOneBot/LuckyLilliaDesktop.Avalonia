@@ -11,7 +11,7 @@
     <Product>Lucky Lillia Desktop</Product>
     <AssemblyTitle>Lucky Lillia Desktop</AssemblyTitle>
     <Description>幸运莉莉娅桌面端</Description>
-    <Version>3.0.5</Version>
+    <Version>3.0.6</Version>
     <LangVersion>14</LangVersion>
   </PropertyGroup>
 
