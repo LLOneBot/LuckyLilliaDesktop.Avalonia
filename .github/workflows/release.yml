@@ -54,7 +54,7 @@ jobs:
         if: github.event_name == 'push' && env.HAS_NPM_TOKEN == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Update npm
@@ -130,7 +130,7 @@ jobs:
         if: github.event_name == 'push' && env.HAS_NPM_TOKEN == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Update npm
