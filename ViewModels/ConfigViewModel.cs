@@ -623,23 +623,24 @@ public class ConfigViewModel : ViewModelBase
             IsSaving = true;
             _logger.LogInformation("开始保存配置...");
 
-            var config = new AppConfig
-            {
-                QQPath = QQPath,
-                PmhqPath = PmhqPath,
-                LLBotPath = LLBotPath,
-                NodePath = NodePath,
-                AutoLoginQQ = AutoLoginQQ,
-                AutoStartBot = AutoStartBot,
-                Headless = Headless,
-                Debug = Debug,
-                MinimizeToTrayOnStart = MinimizeToTrayOnStart,
-                StartupCommandEnabled = StartupCommandEnabled,
-                StartupCommand = StartupCommand,
-                HttpProxy = HttpProxy,
-                LogSaveEnabled = LogSaveEnabled,
-                LogRetentionSeconds = LogRetentionHours * 3600
-            };
+            // 先读现有配置再改, 只覆盖本页拥有的字段.
+            // 否则 AutoStartFrameworks (框架跟随启动) / CloseToTray (关闭行为) 等
+            // 由其他 VM 维护、本页不涉及的字段会被默认值覆盖丢失.
+            var config = await _configManager.LoadConfigAsync();
+            config.QQPath = QQPath;
+            config.PmhqPath = PmhqPath;
+            config.LLBotPath = LLBotPath;
+            config.NodePath = NodePath;
+            config.AutoLoginQQ = AutoLoginQQ;
+            config.AutoStartBot = AutoStartBot;
+            config.Headless = Headless;
+            config.Debug = Debug;
+            config.MinimizeToTrayOnStart = MinimizeToTrayOnStart;
+            config.StartupCommandEnabled = StartupCommandEnabled;
+            config.StartupCommand = StartupCommand;
+            config.HttpProxy = HttpProxy;
+            config.LogSaveEnabled = LogSaveEnabled;
+            config.LogRetentionSeconds = LogRetentionHours * 3600;
 
             var success = await _configManager.SaveConfigAsync(config);
 
