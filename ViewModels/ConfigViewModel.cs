@@ -53,6 +53,7 @@ public class ConfigViewModel : ViewModelBase
             Headless != _savedConfig.Headless ||
             Debug != _savedConfig.Debug ||
             MinimizeToTrayOnStart != _savedConfig.MinimizeToTrayOnStart ||
+            CloseToTray != _savedConfig.CloseToTray ||
             StartupEnabled != _savedStartupEnabled ||
             StartupCommandEnabled != _savedConfig.StartupCommandEnabled ||
             StartupCommand != _savedConfig.StartupCommand ||
@@ -96,6 +97,7 @@ public class ConfigViewModel : ViewModelBase
     private bool _headless;
     private bool _debug;
     private bool _minimizeToTrayOnStart;
+    private bool? _closeToTray;
     private bool _startupEnabled;
     private bool _startupCommandEnabled;
     private string _startupCommand = string.Empty;
@@ -131,6 +133,31 @@ public class ConfigViewModel : ViewModelBase
     {
         get => _minimizeToTrayOnStart;
         set { this.RaiseAndSetIfChanged(ref _minimizeToTrayOnStart, value); CheckUnsavedChanges(); }
+    }
+
+    // 关闭主窗口时的行为. 三态: null=每次询问, true=收进托盘, false=直接退出.
+    // 与 MainWindow.OnWindowClosing 读取的 close_to_tray 一致.
+    public bool? CloseToTray
+    {
+        get => _closeToTray;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _closeToTray, value);
+            this.RaisePropertyChanged(nameof(CloseToTrayIndex));
+            CheckUnsavedChanges();
+        }
+    }
+
+    // ComboBox 绑定: 0=每次询问(null), 1=收进托盘(true), 2=直接退出(false)
+    public int CloseToTrayIndex
+    {
+        get => _closeToTray switch { true => 1, false => 2, null => 0 };
+        set
+        {
+            var newValue = value switch { 1 => (bool?)true, 2 => (bool?)false, _ => null };
+            if (_closeToTray != newValue)
+                CloseToTray = newValue;
+        }
     }
 
     public bool StartupEnabled
@@ -553,6 +580,7 @@ public class ConfigViewModel : ViewModelBase
             Headless = config.Headless;
             Debug = config.Debug;
             MinimizeToTrayOnStart = config.MinimizeToTrayOnStart;
+            CloseToTray = config.CloseToTray;
             // 在后台线程执行注册表操作
             _startupEnabled = await Task.Run(() => Utils.StartupManager.IsStartupEnabled());
             this.RaisePropertyChanged(nameof(StartupEnabled));
@@ -584,6 +612,7 @@ public class ConfigViewModel : ViewModelBase
                 Headless = Headless,
                 Debug = Debug,
                 MinimizeToTrayOnStart = MinimizeToTrayOnStart,
+                CloseToTray = CloseToTray,
                 StartupCommandEnabled = StartupCommandEnabled,
                 StartupCommand = StartupCommand,
                 HttpProxy = HttpProxy,
@@ -636,6 +665,7 @@ public class ConfigViewModel : ViewModelBase
             config.Headless = Headless;
             config.Debug = Debug;
             config.MinimizeToTrayOnStart = MinimizeToTrayOnStart;
+            config.CloseToTray = CloseToTray;
             config.StartupCommandEnabled = StartupCommandEnabled;
             config.StartupCommand = StartupCommand;
             config.HttpProxy = HttpProxy;

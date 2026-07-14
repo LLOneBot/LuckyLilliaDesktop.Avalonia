@@ -111,6 +111,7 @@ Serilog with console + file sinks. Log files are per-session (`logs/yyyyMMdd_HHm
 
 | Doc | When to read |
 |-----|--------------|
+| [doc/config-persistence.md](doc/config-persistence.md) | 任何写 `app_settings.json` 的代码（`ConfigViewModel` / `IntegrationWizardViewModel` 等）：整体存回必须 read-modify-write，别覆盖其他 VM 维护的字段；`close_to_tray` 三态语义。 |
 | [doc/job-object.md](doc/job-object.md) | Touching Windows Job Object subprocess cleanup in `ProcessManager`. |
 | [doc/koishi.md](doc/koishi.md) | Working on `KoishiInstallService` / Koishi auto-install flow. |
 | [doc/llbot-ipc.md](doc/llbot-ipc.md) | Anything touching the LLBot IPC (named pipe on Windows / Unix Domain Socket on macOS+Linux): message schema, env var, `ILLBotIpcClient` surface, LLBot Node.js side glue. |

@@ -295,6 +295,37 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 窗口行为区域 -->
+                <DockPanel>
+                    <PathIcon DockPanel.Dock="Left"
+                              Data="M4 4h16v4H4V4zm0 6h10v10H4V10zm12 0h4v10h-4V10z"
+                              Width="24" Height="24"
+                              Foreground="{DynamicResource PrimaryBrush}"
+                              Margin="0,0,10,0"/>
+                    <TextBlock Text="窗口行为"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               VerticalAlignment="Center"/>
+                </DockPanel>
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="20"
+                        Padding="24"
+                    BoxShadow="0 18 48 0 #18E84D9C">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="点击关闭按钮时" Foreground="{DynamicResource TextSecondary}"/>
+                        <ComboBox SelectedIndex="{Binding CloseToTrayIndex}"
+                                  Width="250"
+                                  HorizontalAlignment="Left">
+                            <ComboBoxItem Content="每次询问"/>
+                            <ComboBoxItem Content="收进托盘"/>
+                            <ComboBoxItem Content="直接退出"/>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
                 <!-- 网络代理区域 -->
                 <DockPanel>
                     <PathIcon DockPanel.Dock="Left"
