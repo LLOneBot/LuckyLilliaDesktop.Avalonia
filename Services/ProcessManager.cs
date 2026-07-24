@@ -536,6 +536,7 @@ public class ProcessManager : IProcessManager, IDisposable
 
             // 添加 Node.js 参数
             startInfo.ArgumentList.Add("--enable-source-maps");
+            startInfo.ArgumentList.Add("--disable-warning=ExperimentalWarning");
             startInfo.ArgumentList.Add(scriptFileName);
 
             // 传给 LLBot 脚本的参数 (都放在 -- 之后)
