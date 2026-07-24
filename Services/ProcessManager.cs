@@ -539,7 +539,7 @@ public class ProcessManager : IProcessManager, IDisposable
             startInfo.ArgumentList.Add(scriptFileName);
 
             // 传给 LLBot 脚本的参数 (都放在 -- 之后)
-            // PmhqPort 有值 = 非 headless, 启用 PMHQ 模式; loginUin 有值 = headless 快速登录指定 QQ 号
+            // PmhqPort 有值 = 非 headless, 启用 PMHQ 模式; loginUin 有值 = 快速登录指定 QQ 号
             var userArgs = new List<string>();
             if (PmhqPort.HasValue)
             {

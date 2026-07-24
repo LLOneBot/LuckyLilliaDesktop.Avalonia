@@ -1331,6 +1331,7 @@ public class HomeViewModel : ViewModelBase
                     config.NodePath,
                     config.LLBotPath,
                     llbotIpcPipe,
+                    loginUin: config.AutoLoginQQ,
                     httpProxy: config.HttpProxy);
 
                 if (llbotSuccess)
