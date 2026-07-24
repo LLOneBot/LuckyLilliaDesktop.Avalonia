@@ -30,6 +30,7 @@ public class HomeViewModel : ViewModelBase
     private readonly IConfigManager _configManager;
     private readonly IPmhqClient _pmhqClient;
     private readonly IAuthTokenValidator _authTokenValidator;
+    private readonly ISystemTimeChecker _systemTimeChecker;
     private readonly ILLBotIpcClient _llbotIpc;
     private readonly ILogCollector _logCollector;
     private readonly IDownloadService _downloadService;
@@ -417,6 +418,7 @@ public class HomeViewModel : ViewModelBase
         IConfigManager configManager,
         IPmhqClient pmhqClient,
         IAuthTokenValidator authTokenValidator,
+        ISystemTimeChecker systemTimeChecker,
         ILLBotIpcClient llbotIpc,
         ILogCollector logCollector,
         IDownloadService downloadService,
@@ -431,6 +433,7 @@ public class HomeViewModel : ViewModelBase
         _configManager = configManager;
         _pmhqClient = pmhqClient;
         _authTokenValidator = authTokenValidator;
+        _systemTimeChecker = systemTimeChecker;
         _llbotIpc = llbotIpc;
         _logCollector = logCollector;
         _downloadService = downloadService;
@@ -879,6 +882,42 @@ public class HomeViewModel : ViewModelBase
         }
     }
 
+    private async Task<bool> CheckSystemTimeAsync(string? httpProxy)
+    {
+        _logger.LogInformation("正在校验本机系统时间...");
+        var result = await _systemTimeChecker.CheckAsync(httpProxy);
+        if (result.Status != SystemTimeCheckStatus.Inaccurate)
+        {
+            return true;
+        }
+
+        var direction = result.Offset > TimeSpan.Zero ? "慢" : "快";
+        var difference = FormatTimeDifference(result.Offset);
+        ErrorMessage = $"本机系统时间不准确，比网络时间{direction}约 {difference}。请同步系统时间后重试。";
+        _logger.LogWarning("阻止启动: {Message}", ErrorMessage);
+
+        if (ShowAlertDialog != null)
+        {
+            await ShowAlertDialog(
+                "系统时间不准确",
+                $"{ErrorMessage}\n\n请在系统设置中开启自动设置时间，并执行立即同步。");
+        }
+
+        return false;
+    }
+
+    private static string FormatTimeDifference(TimeSpan offset)
+    {
+        var difference = offset.Duration();
+        if (difference.TotalDays >= 1)
+            return $"{difference.TotalDays:0.#} 天";
+        if (difference.TotalHours >= 1)
+            return $"{difference.TotalHours:0.#} 小时";
+        if (difference.TotalMinutes >= 1)
+            return $"{difference.TotalMinutes:0.#} 分钟";
+        return $"{difference.TotalSeconds:0} 秒";
+    }
+
     private async Task GlobalStartStopAsync()
     {
         if (IsServicesRunning || BotStatus == ProcessStatus.Running)
@@ -912,6 +951,12 @@ public class HomeViewModel : ViewModelBase
 
             var config = await _configManager.LoadConfigAsync();
             IsHeadless = config.Headless;
+
+            if (!await CheckSystemTimeAsync(config.HttpProxy))
+            {
+                BotStatus = ProcessStatus.Stopped;
+                return;
+            }
 
             // 无头模式: 不启动 PMHQ / QQ, 直接启动 LLBot (LLBot 内部自行连 QQ)
             if (config.Headless)

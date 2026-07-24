@@ -74,7 +74,7 @@ public static class Constants
     /// </summary>
     public static string QQDownloadUrl => PlatformHelper.IsMacOS
         ? "https://github.com/LLOneBot/exe/releases/download/0.0.0/QQ-macos.tar.xz"
-        : "https://dldir1v6.qq.com/qqfile/qq/QQNT/c50d6326/QQ9.9.22.40768_x64.exe";
+        : "https://qqdl.gtimg.cn/qqfile/QQNT/9.9.33/beta/8cf72bb8/QQ9.9.33.51552_x64.exe";
 
     /// <summary>
     /// 超时设置

@@ -89,6 +89,7 @@ public partial class App : Application
         services.AddSingleton<ISelfInfoService, SelfInfoService>();
         services.AddSingleton<IPmhqClient, PmhqClient>();
         services.AddSingleton<IAuthTokenValidator, AuthTokenValidator>();
+        services.AddSingleton<ISystemTimeChecker, SystemTimeChecker>();
         services.AddSingleton<ILLBotIpcClient, LLBotIpcClient>();
         services.AddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<IUpdateChecker, UpdateChecker>();
