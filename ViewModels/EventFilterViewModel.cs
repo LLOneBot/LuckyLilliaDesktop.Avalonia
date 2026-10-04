@@ -36,16 +36,43 @@ public class FilterRuleViewModel : ReactiveObject
         set
         {
             if (_field == value) return;
-            this.RaiseAndSetIfChanged(ref _field, value);
+            var previousValue = _value;
+            _field = value;
+            // 换字段后旧值往往对新字段无意义: select 字段的值下拉里找不到旧值只会显示空, 但 Value 还留着,
+            // 于是写出 {"message_type":"message"} 这种永远匹配不上的条件
+            if (!IsValueCompatibleWithField()) _value = "";
+            this.RaisePropertyChanged(nameof(Field));
             this.RaisePropertyChanged(nameof(CurrentFieldDef));
             this.RaisePropertyChanged(nameof(IsSelectField));
             this.RaisePropertyChanged(nameof(IsNumberField));
             this.RaisePropertyChanged(nameof(IsTextField));
             this.RaisePropertyChanged(nameof(FieldOptions));
+            this.RaisePropertyChanged(nameof(ValuePlaceholder));
             this.RaisePropertyChanged(nameof(SelectedFieldOption));
+            if (_value != previousValue) this.RaisePropertyChanged(nameof(Value));
             this.RaisePropertyChanged(nameof(SelectedValueOption));
             NotifyModified();
         }
+    }
+
+    // 换字段后已有值是否还配得上新字段的类型
+    private bool IsValueCompatibleWithField()
+    {
+        if (_value.Length == 0) return true;
+        var def = CurrentFieldDef;
+        if (def == null) return true;
+
+        var items = IsListOperator
+            ? _value.Split(',', '，').Select(v => v.Trim()).Where(v => v.Length > 0).ToArray()
+            : new[] { _value };
+        if (items.Length == 0) return true;
+
+        return def.Type switch
+        {
+            "select" => def.Options != null && items.All(i => def.Options.Any(o => o.Value == i)),
+            "number" => items.All(i => long.TryParse(i, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)),
+            _ => true, // text 字段接受任意值
+        };
     }
 
     public FieldOption? SelectedFieldOption
@@ -70,6 +97,7 @@ public class FilterRuleViewModel : ReactiveObject
             this.RaisePropertyChanged(nameof(SelectedOperatorOption));
             this.RaisePropertyChanged(nameof(IsListOperator));
             this.RaisePropertyChanged(nameof(IsNotListOperator));
+            this.RaisePropertyChanged(nameof(ValuePlaceholder));
             // 列表→单值：取第一项
             if (wasListOp && !isListOp)
             {
@@ -227,6 +255,20 @@ public class EventFilterViewModel : ReactiveObject
 
     public bool HasJsonError => !string.IsNullOrEmpty(JsonError);
 
+    private string _ruleConflictWarning = "";
+    public string RuleConflictWarning
+    {
+        get => _ruleConflictWarning;
+        private set
+        {
+            if (_ruleConflictWarning == value) return;
+            this.RaiseAndSetIfChanged(ref _ruleConflictWarning, value);
+            this.RaisePropertyChanged(nameof(HasRuleConflict));
+        }
+    }
+
+    public bool HasRuleConflict => !string.IsNullOrEmpty(_ruleConflictWarning);
+
     private bool _isExpanded = true;
     public bool IsExpanded
     {
@@ -372,6 +414,7 @@ public class EventFilterViewModel : ReactiveObject
     {
         if (_isSyncing) return;
         SyncRulesToJson();
+        RaiseFilterChanged();
         PropertyModified?.Invoke();
     }
 
@@ -396,6 +439,10 @@ public class EventFilterViewModel : ReactiveObject
     private void OnJsonTextChanged(string text)
     {
         if (_isSyncing) return;
+        // 可视化模式下 JsonText 只是 SyncRulesToJson 的产物: JSON 编辑框虽然隐藏, 绑定仍然活跃并会把
+        // 推过来的值回写进这个 setter。此时若重建 Rules, 就会把同字段规则合并后的 JSON 灌回规则列表,
+        // 表现为"改一条规则, 其他规则跟着变"
+        if (!IsJsonMode) return;
         _isSyncing = true;
         try
         {
@@ -455,6 +502,33 @@ public class EventFilterViewModel : ReactiveObject
         this.RaisePropertyChanged(nameof(RuleCount));
         this.RaisePropertyChanged(nameof(HasFilter));
         this.RaisePropertyChanged(nameof(HasMultipleRules));
+        UpdateRuleConflicts();
+    }
+
+    /// <summary>
+    /// 同字段同操作符在 MongoDB 查询语法里没法出现两次, RulesToFilter 只能保留最后一条。
+    /// 与其静默丢弃, 不如把被吞掉的条件点出来。
+    /// </summary>
+    private void UpdateRuleConflicts()
+    {
+        var duplicated = Rules
+            .Where(r => !string.IsNullOrEmpty(r.Field))
+            .GroupBy(r => (r.Field, r.Operator))
+            .Where(g => g.Count() > 1)
+            .Select(g => DescribeCondition(g.Key.Field, g.Key.Operator))
+            .ToList();
+
+        RuleConflictWarning = duplicated.Count == 0
+            ? ""
+            : $"以下条件重复了，只有最后一条会生效：{string.Join("、", duplicated)}。" +
+              "同一字段要匹配多个值，请把操作符改成「在列表中」并用逗号分隔。";
+    }
+
+    private static string DescribeCondition(string field, string op)
+    {
+        var fieldLabel = FieldOptions.FirstOrDefault(f => f.Value == field)?.Label ?? field;
+        var opLabel = OperatorOptions.FirstOrDefault(o => o.Value == op)?.Label ?? op;
+        return $"{fieldLabel} {opLabel}";
     }
 
     #region Parse / Convert (port of WebUI logic)
@@ -470,93 +544,113 @@ public class EventFilterViewModel : ReactiveObject
 
             if (value is JsonObject condObj)
             {
-                if (condObj.Count != 1) return null;
-                var (op, val) = condObj.First();
-                if (!op.StartsWith('$')) return null;
+                if (condObj.Count == 0) return null;
 
-                string valStr;
-                if (val is JsonArray arr)
-                    valStr = string.Join(", ", arr.Select(v => v?.ToString() ?? ""));
-                else
-                    valStr = val?.ToString() ?? "";
-
-                rules.Add(new FilterRuleViewModel(_nextRuleId++, field, op, valStr));
+                // 一个字段可以带多个操作符 (RulesToFilter 合并同字段规则的产物), 展开成多条规则
+                foreach (var (op, val) in condObj)
+                {
+                    if (!IsVisualizableOperator(op)) return null;
+                    rules.Add(new FilterRuleViewModel(_nextRuleId++, field, op, StringifyValue(val)));
+                }
             }
             else
             {
                 // 简单等于
-                string valStr;
-                if (value is JsonArray arr)
-                    valStr = string.Join(", ", arr.Select(v => v?.ToString() ?? ""));
-                else
-                    valStr = value.ToString();
-
-                rules.Add(new FilterRuleViewModel(_nextRuleId++, field, "$eq", valStr));
+                rules.Add(new FilterRuleViewModel(_nextRuleId++, field, "$eq", StringifyValue(value)));
             }
         }
         return rules;
     }
 
+    private static bool IsVisualizableOperator(string op)
+        => OperatorOptions.Any(o => o.Value == op);
+
+    private static string StringifyValue(JsonNode? node) => node switch
+    {
+        null => "",
+        JsonArray arr => string.Join(", ", arr.Select(v => v?.ToString() ?? "")),
+        _ => node.ToString(),
+    };
+
     private static JsonObject? RulesToFilter(IEnumerable<FilterRuleViewModel> rules)
     {
-        var ruleList = rules.ToList();
-        if (ruleList.Count == 0) return null;
+        // 同字段的多条规则必须合并进同一个条件对象: 直接 filter[field] = ... 会让后一条静默覆盖前一条,
+        // 而新增规则的默认字段都是 post_type, 很容易撞上
+        var conds = new Dictionary<string, List<(string Op, JsonNode? Value)>>();
+        var fieldOrder = new List<string>();
 
-        var filter = new JsonObject();
-        foreach (var rule in ruleList)
+        foreach (var rule in rules)
         {
             if (string.IsNullOrEmpty(rule.Field)) continue;
-            var fieldDef = FieldOptions.FirstOrDefault(f => f.Value == rule.Field);
-            var isNumeric = fieldDef?.Type == "number";
+            if (!TryBuildCondValue(rule, out var condValue)) continue;
 
-            if (rule.Operator is "$in" or "$nin")
+            if (!conds.TryGetValue(rule.Field, out var list))
             {
-                var items = rule.Value.Split(',', '，')
-                    .Select(v => v.Trim())
-                    .Where(v => v.Length > 0)
-                    .ToList();
+                list = new List<(string, JsonNode?)>();
+                conds[rule.Field] = list;
+                fieldOrder.Add(rule.Field);
+            }
 
-                var arr = new JsonArray();
-                foreach (var item in items)
-                {
-                    if (isNumeric && long.TryParse(item, NumberStyles.Integer, CultureInfo.InvariantCulture, out var num))
-                        ((IList<JsonNode?>)arr).Add(JsonValue.Create(num));
-                    else if (!isNumeric)
-                        ((IList<JsonNode?>)arr).Add(JsonValue.Create(item));
-                }
-                filter[rule.Field] = new JsonObject { [rule.Operator] = arr };
-            }
-            else if (rule.Operator == "$eq")
-            {
-                if (isNumeric)
-                {
-                    if (string.IsNullOrWhiteSpace(rule.Value)) continue;
-                    if (long.TryParse(rule.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var num))
-                        filter[rule.Field] = num;
-                }
-                else
-                {
-                    filter[rule.Field] = rule.Value;
-                }
-            }
-            else // $ne, $regex, $gt, $lt
-            {
-                JsonNode? parsedValue;
-                if (isNumeric)
-                {
-                    if (string.IsNullOrWhiteSpace(rule.Value)) continue;
-                    if (!long.TryParse(rule.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var num)) continue;
-                    parsedValue = num;
-                }
-                else
-                {
-                    parsedValue = rule.Value;
-                }
-                filter[rule.Field] = new JsonObject { [rule.Operator] = parsedValue };
-            }
+            // 同字段同操作符在 MongoDB 语法里无法表达两次, 保留最后一条
+            list.RemoveAll(c => c.Op == rule.Operator);
+            list.Add((rule.Operator, condValue));
+        }
+
+        var filter = new JsonObject();
+        foreach (var field in fieldOrder)
+        {
+            var list = conds[field];
+            if (list.Count == 0) continue;
+
+            // 单条 $eq 写成裸值, 与 LLBot / WebUI 既有的配置格式保持一致
+            if (list.Count == 1 && list[0].Op == "$eq")
+                filter[field] = list[0].Value;
+            else
+                filter[field] = new JsonObject(list.Select(c => new KeyValuePair<string, JsonNode?>(c.Op, c.Value)));
         }
 
         return filter.Count > 0 ? filter : null;
+    }
+
+    private static bool TryBuildCondValue(FilterRuleViewModel rule, out JsonNode? value)
+    {
+        value = null;
+
+        // 值还没填 (新建的规则, 或换字段时清掉的旧值) 就整条跳过: 写出 {"message_type":""} 或
+        // {"group_id":{"$in":[]}} 这种条件永远匹配不上, 等于悄悄把整个连接的事件全过滤掉
+        if (string.IsNullOrWhiteSpace(rule.Value)) return false;
+
+        var isNumeric = FieldOptions.FirstOrDefault(f => f.Value == rule.Field)?.Type == "number";
+
+        if (rule.Operator is "$in" or "$nin")
+        {
+            var arr = new JsonArray();
+            foreach (var item in rule.Value.Split(',', '，').Select(v => v.Trim()).Where(v => v.Length > 0))
+            {
+                if (isNumeric)
+                {
+                    if (long.TryParse(item, NumberStyles.Integer, CultureInfo.InvariantCulture, out var num))
+                        ((IList<JsonNode?>)arr).Add(JsonValue.Create(num));
+                }
+                else
+                {
+                    ((IList<JsonNode?>)arr).Add(JsonValue.Create(item));
+                }
+            }
+            if (arr.Count == 0) return false;
+            value = arr;
+            return true;
+        }
+
+        if (isNumeric)
+        {
+            if (!long.TryParse(rule.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n)) return false;
+            value = n;
+            return true;
+        }
+
+        value = rule.Value;
+        return true;
     }
 
     #endregion

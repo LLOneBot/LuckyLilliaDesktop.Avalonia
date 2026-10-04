@@ -458,6 +458,11 @@
                                                                 </ItemsControl.ItemTemplate>
                                                             </ItemsControl>
 
+                                                            <!-- 同字段同操作符重复时只有最后一条能写进 filter, 明确提示而不是静默丢弃 -->
+                                                            <TextBlock Text="{Binding Filter.RuleConflictWarning}"
+                                                                       FontSize="11" Foreground="#D97706" TextWrapping="Wrap"
+                                                                       IsVisible="{Binding Filter.HasRuleConflict}"/>
+
                                                             <Button Command="{Binding Filter.AddRuleCommand}" Padding="8,4"
                                                                     HorizontalAlignment="Left" Background="Transparent" BorderThickness="0">
                                                                 <StackPanel Orientation="Horizontal" Spacing="4">
