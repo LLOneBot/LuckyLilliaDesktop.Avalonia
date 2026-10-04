@@ -136,18 +136,16 @@ class Program
     // 归一化后的目标进程名 (品牌名)。
     private const string BrandExeName = "LuckyLillia.exe";
 
-    // 命中这些启动名时才改名重启。故意不含开发期的 LuckyLilliaDesktop.exe,
-    // 以免 dotnet build 的产物被改名; 需要别的来源名在这里加即可。
-    private static readonly string[] NormalizeFromNames =
-    {
-        "llbot.exe",
-        "lucky-lillia-desktop.exe",
-    };
+    // 命中即改名重启: 文件名(忽略大小写)包含任一关键字, 或完整等于某个分发名。
+    // 关键字用 Contains, 覆盖 llbot.exe / LLBot.exe / llbot-x64.exe 等一切带 llbot 的名字。
+    // 目标名 LuckyLillia.exe 与开发名 LuckyLilliaDesktop.exe 都不含 llbot, 不会被改 (也防重启死循环)。
+    private static readonly string[] NormalizeNameKeywords = { "llbot" };
+    private static readonly string[] NormalizeExactNames = { "lucky-lillia-desktop.exe" };
 
     /// <summary>
     /// Windows 下把进程名统一成 <see cref="BrandExeName"/>: 运行中的 exe 允许 rename (不允许
     /// delete), 同卷改名是元数据操作、不中断当前执行; 改完以新名字重启、原进程退出, 任务管理器/
-    /// 自启项即显示品牌名。仅在当前名命中 <see cref="NormalizeFromNames"/> 时动作 (该判断同时是
+    /// 自启项即显示品牌名。仅在当前名命中关键字或分发名时动作 (该判断同时是
     /// 防重启死循环的闸), 任何一步失败都静默回退、按原名正常启动。
     /// </summary>
     private static void MaybeNormalizeProcessName(string[] args)
@@ -168,8 +166,10 @@ class Program
             return;
         }
 
-        if (!NormalizeFromNames.Contains(curName, StringComparer.OrdinalIgnoreCase))
-            return;
+        var matched =
+            NormalizeNameKeywords.Any(k => curName.Contains(k, StringComparison.OrdinalIgnoreCase))
+            || NormalizeExactNames.Contains(curName, StringComparer.OrdinalIgnoreCase);
+        if (!matched) return;
 
         var targetPath = System.IO.Path.Combine(dir, BrandExeName);
 
