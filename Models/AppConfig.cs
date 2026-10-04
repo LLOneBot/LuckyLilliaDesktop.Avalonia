@@ -31,7 +31,8 @@ public class AppConfig
 
     // macOS 仅支持无头模式: PMHQ 注入 QQ、Windows Job Object、命名管道 IPC、扫码登录对话框
     // 都是 Windows 专有机制, 非无头路径在 macOS 无法工作, 故 macOS 上恒为无头, 不受配置值影响.
-    private bool _headless = true;
+    // Windows/Linux 默认有头 (PMHQ 注入 QQ 的模式); macOS 的 getter 恒 true 覆盖此默认值.
+    private bool _headless = false;
 
     [JsonPropertyName("headless")]
     public bool Headless
