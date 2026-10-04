@@ -111,6 +111,9 @@ class Program
                 }
             }
 
+            // 工作目录已定, 现在才能读 app_settings.json 里的 dev
+            DevMode.Initialize();
+
             try
             {
                 Console.OutputEncoding = Encoding.UTF8;

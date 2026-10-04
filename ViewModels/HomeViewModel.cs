@@ -1775,8 +1775,15 @@ public class HomeViewModel : ViewModelBase
         // - Valid: 直接用
         // - Invalid (401/403, token 明确失效/被吊销): 落到下面弹框重输
         // - Inconclusive (网络/超时/5xx, 无法判定): 宽松沿用旧 token (弹框也连不上, 无意义)
+        // dev 模式 (app_settings.json 的 dev): 整段跳过, 直接沿用文件里的 token (弹框那条路同样不校验)。
         if (!string.IsNullOrEmpty(existingToken))
         {
+            if (DevMode.IsEnabled)
+            {
+                _logger.LogWarning("[DEV] 跳过 Auth Token 联网校验, 直接使用现有 token");
+                return existingToken;
+            }
+
             _logger.LogInformation("校验现有 Auth Token...");
             var result = await _authTokenValidator.ValidateAsync(existingToken);
             if (result.Status == AuthTokenValidationStatus.Valid)

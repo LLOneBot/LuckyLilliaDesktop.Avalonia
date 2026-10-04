@@ -571,6 +571,10 @@ public class ProcessManager : IProcessManager, IDisposable
                 userArgs.Add("--cdn");
                 userArgs.Add("china");
             }
+            if (DevMode.IsEnabled)
+            {
+                userArgs.Add(DevMode.Argument);
+            }
             if (userArgs.Count > 0)
             {
                 startInfo.ArgumentList.Add("--");

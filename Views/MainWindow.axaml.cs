@@ -750,7 +750,10 @@ public partial class MainWindow : Window
     {
         EnsureVisibleForDialog();
         var app = Application.Current as App;
-        var validator = app?.Services?.GetService(typeof(IAuthTokenValidator)) as IAuthTokenValidator;
+        // dev 模式: 不取 validator, AuthTokenDialog 收到 null 时的既有行为就是直接放行
+        var validator = DevMode.IsEnabled
+            ? null
+            : app?.Services?.GetService(typeof(IAuthTokenValidator)) as IAuthTokenValidator;
         var serverRegion = _configManager != null
             ? (await _configManager.LoadConfigAsync()).ServerRegion
             : null;

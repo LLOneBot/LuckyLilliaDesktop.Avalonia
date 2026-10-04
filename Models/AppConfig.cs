@@ -54,6 +54,10 @@ public class AppConfig
     [JsonPropertyName("debug")]
     public bool Debug { get; set; } = false;
 
+    // 开发模式, 没有命令行开关, 见 DevMode
+    [JsonPropertyName("dev")]
+    public bool Dev { get; set; } = false;
+
     [JsonPropertyName("minimize_to_tray_on_start")]
     public bool MinimizeToTrayOnStart { get; set; } = false;
 

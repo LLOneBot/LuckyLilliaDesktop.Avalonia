@@ -39,6 +39,11 @@ public partial class App : Application
             }
         });
         
+        if (DevMode.IsEnabled)
+        {
+            Log.Warning("[DEV] 开发模式已开启 (app_settings.json 的 dev): 启动时不校验 Auth Token, 并向 LLBot 透传 --dev");
+        }
+
         Log.Information("应用初始化完成");
     }
 
