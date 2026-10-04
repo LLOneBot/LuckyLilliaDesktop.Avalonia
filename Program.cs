@@ -14,6 +14,10 @@ class Program
     {
         try
         {
+            // 统一进程名为品牌名 LuckyLillia.exe: 若以某些分发名启动, 改名后以新名字重启。
+            // 命中才改、改成固定品牌名, 非随机、非伪装系统进程; 任何失败都按原名继续, 不阻断启动。
+            MaybeNormalizeProcessName(args);
+
             args = ApplyStartupDelay(args);
 
             // Windows AppCompat 可能给本 exe 打上 __COMPAT_LAYER (如 DetectorsAppHealth),
@@ -123,6 +127,82 @@ class Program
         {
             System.IO.File.WriteAllText("crash.log", $"{DateTime.Now}: {ex}");
             throw;
+        }
+    }
+
+    // 归一化后的目标进程名 (品牌名)。
+    private const string BrandExeName = "LuckyLillia.exe";
+
+    // 命中这些启动名时才改名重启。故意不含开发期的 LuckyLilliaDesktop.exe,
+    // 以免 dotnet build 的产物被改名; 需要别的来源名在这里加即可。
+    private static readonly string[] NormalizeFromNames =
+    {
+        "llbot.exe",
+        "lucky-lillia-desktop.exe",
+    };
+
+    /// <summary>
+    /// Windows 下把进程名统一成 <see cref="BrandExeName"/>: 运行中的 exe 允许 rename (不允许
+    /// delete), 同卷改名是元数据操作、不中断当前执行; 改完以新名字重启、原进程退出, 任务管理器/
+    /// 自启项即显示品牌名。仅在当前名命中 <see cref="NormalizeFromNames"/> 时动作 (该判断同时是
+    /// 防重启死循环的闸), 任何一步失败都静默回退、按原名正常启动。
+    /// </summary>
+    private static void MaybeNormalizeProcessName(string[] args)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        string exePath, dir, curName;
+        try
+        {
+            exePath = Environment.ProcessPath ?? string.Empty;
+            if (string.IsNullOrEmpty(exePath)) return;
+            dir = System.IO.Path.GetDirectoryName(exePath) ?? string.Empty;
+            curName = System.IO.Path.GetFileName(exePath);
+            if (string.IsNullOrEmpty(dir)) return;
+        }
+        catch
+        {
+            return;
+        }
+
+        if (!NormalizeFromNames.Contains(curName, StringComparer.OrdinalIgnoreCase))
+            return;
+
+        var targetPath = System.IO.Path.Combine(dir, BrandExeName);
+
+        try
+        {
+            // 目标已存在 (上次改名残留): 未被占用则删; 被占用 (多半另一实例在跑) 则放弃改名。
+            if (System.IO.File.Exists(targetPath))
+            {
+                try { System.IO.File.Delete(targetPath); }
+                catch { return; }
+            }
+
+            System.IO.File.Move(exePath, targetPath);
+        }
+        catch
+        {
+            // 无写权限 (如装在 Program Files 且非管理员) 等: 不改名, 原名继续。
+            return;
+        }
+
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = targetPath,
+                UseShellExecute = false,
+                WorkingDirectory = dir,
+            };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+
+            System.Diagnostics.Process.Start(psi);
+            Environment.Exit(0);
+        }
+        catch
+        {
+            // 重启失败: 文件已是品牌名, 下次启动即生效; 本次仍以当前进程正常启动, 不阻断。
         }
     }
 

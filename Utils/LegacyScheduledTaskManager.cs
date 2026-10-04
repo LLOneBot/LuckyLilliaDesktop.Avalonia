@@ -22,7 +22,7 @@ internal static class LegacyScheduledTaskManager
     private const int MaxDiagnosticLength = 1_500;
 
     private static readonly string[] KnownExecutableNames =
-        ["LuckyLilliaDesktop.exe", "lucky-lillia-desktop.exe"];
+        ["LuckyLilliaDesktop.exe", "lucky-lillia-desktop.exe", "LuckyLillia.exe"];
 
     [SupportedOSPlatform("windows")]
     public static LegacyScheduledTaskInspection Inspect(string currentExecutablePath)

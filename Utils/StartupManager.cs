@@ -16,7 +16,7 @@ public static class StartupManager
     private const string StartupValueName = "LuckyLilliaDesktop";
     private const int MaxStartupCommandLength = 260;
     private static readonly string[] KnownExecutableNames =
-        ["LuckyLilliaDesktop.exe", "lucky-lillia-desktop.exe"];
+        ["LuckyLilliaDesktop.exe", "lucky-lillia-desktop.exe", "LuckyLillia.exe"];
     private static readonly object SyncRoot = new();
 
     internal const string StartupDelayArgument = "--startup-delay=5";
