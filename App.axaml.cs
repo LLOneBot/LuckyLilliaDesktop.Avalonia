@@ -189,7 +189,7 @@ public partial class App : Application
         var trayIcons = TrayIcon.GetIcons(this);
         if (!string.IsNullOrEmpty(nickname) && !string.IsNullOrEmpty(uin))
         {
-            _trayShowMenuItem.Header = $"LLBot - {nickname}({uin})";
+            _trayShowMenuItem.Header = $"{nickname}({uin})";
             if (trayIcons?.Count > 0)
             {
                 trayIcons[0].ToolTipText = $"{nickname}({uin})";
@@ -201,7 +201,7 @@ public partial class App : Application
             _trayShowMenuItem.Header = "显示主窗口";
             if (trayIcons?.Count > 0)
             {
-                trayIcons[0].ToolTipText = "LLBot";
+                trayIcons[0].ToolTipText = Constants.AppDisplayName;
             }
         }
     }

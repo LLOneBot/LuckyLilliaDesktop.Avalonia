@@ -239,7 +239,6 @@ public class HomeViewModel : ViewModelBase
             if (oldValue == value) return;
             
             this.RaiseAndSetIfChanged(ref _qqUin, value);
-            UpdateTitle();
             this.RaisePropertyChanged(nameof(HasQQInfo));
 
             if (!string.IsNullOrEmpty(value))
@@ -260,7 +259,6 @@ public class HomeViewModel : ViewModelBase
             if (_qqNickname == value) return;
             
             this.RaiseAndSetIfChanged(ref _qqNickname, value);
-            UpdateTitle();
             this.RaisePropertyChanged(nameof(HasQQInfo));
             UpdateTrayMenu();
         }
@@ -835,11 +833,6 @@ public class HomeViewModel : ViewModelBase
                 return $"PMHQ 版本过低 (当前 {pmhqVer}), 需要 {MinMajorVersion}.0 或以上, 请更新后再启动";
         }
         return null;
-    }
-
-    private void UpdateTitle()
-    {
-        // 标题固定为"控制面板"，不随登录状态改变
     }
 
     private void UpdateButtonState()

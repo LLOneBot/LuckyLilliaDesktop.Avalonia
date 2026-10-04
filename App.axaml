@@ -130,7 +130,7 @@
     <TrayIcon.Icons>
         <TrayIcons>
             <TrayIcon Icon="avares://LuckyLilliaDesktop/Assets/Icons/icon.ico"
-                      ToolTipText="LLBot" 
+                      ToolTipText="Lucky Lillia" 
                       Clicked="TrayIcon_Clicked">
                 <TrayIcon.Menu>
                     <NativeMenu>

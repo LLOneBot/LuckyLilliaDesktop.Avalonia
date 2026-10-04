@@ -6,6 +6,11 @@ namespace LuckyLilliaDesktop.Utils;
 public static class Constants
 {
     /// <summary>
+    /// 应用显示名称（窗口标题 / 托盘）
+    /// </summary>
+    public const string AppDisplayName = "Lucky Lillia";
+
+    /// <summary>
     /// NPM 包名映射
     /// </summary>
     public static class NpmPackages

@@ -230,9 +230,12 @@
                             </Image.Clip>
                         </Image>
                     </Border>
-                    <TextBlock Text="LLBot"
+                    <TextBlock Text="{Binding Title}"
                                FontSize="16"
                                FontWeight="Bold"
+                               MaxWidth="260"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding Title}"
                                Foreground="{DynamicResource TextPrimary}"
                                VerticalAlignment="Center"/>
                 </StackPanel>

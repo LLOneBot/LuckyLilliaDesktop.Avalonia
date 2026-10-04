@@ -23,7 +23,7 @@ public class MainWindowViewModel : ViewModelBase
     private readonly IResourceMonitor _resourceMonitor;
 
     private int _selectedIndex;
-    private string _title = "LLBot";
+    private string _title = Constants.AppDisplayName;
     private string _themeMode = "system";
     private bool _isMonitoringPaused;
 
@@ -100,15 +100,15 @@ public class MainWindowViewModel : ViewModelBase
         // 加载保存的主题设置（异步初始化）
         _ = LoadThemeSettingsAsync();
 
-        // 监听 QQ 信息变化更新标题
+        // 监听 QQ 信息变化更新标题：未登录显示应用名，登录后显示昵称和 QQ 号
         Observable.FromEventPattern<PropertyChangedEventHandler, PropertyChangedEventArgs>(
                 handler => homeViewModel.PropertyChanged += handler,
                 handler => homeViewModel.PropertyChanged -= handler)
             .Where(args => args.EventArgs.PropertyName is nameof(HomeViewModel.QQUin) or nameof(HomeViewModel.QQNickname))
             .Select(_ => (homeViewModel.QQUin, homeViewModel.QQNickname))
             .StartWith((homeViewModel.QQUin, homeViewModel.QQNickname))
-            .Where(info => !string.IsNullOrEmpty(info.QQUin))
-            .Select(info => $"LLBot - {info.QQNickname}({info.QQUin})")
+            .Select(info => FormatTitle(info.QQUin, info.QQNickname))
+            .DistinctUntilChanged()
             .ObserveOnUiThread()
             .Subscribe(newTitle => Title = newTitle);
 
@@ -128,6 +128,15 @@ public class MainWindowViewModel : ViewModelBase
         aboutViewModel.RestartServicesCallback = async () => await HomeVM.StartServicesAsync();
 
         _logger.LogInformation("MainWindowViewModel 已初始化");
+    }
+
+    /// <summary>
+    /// uin 比 nickname 先到（见 ISelfInfoService / LLBot IPC），所以 nickname 还没来时先只显示 uin
+    /// </summary>
+    private static string FormatTitle(string? uin, string? nickname)
+    {
+        if (string.IsNullOrEmpty(uin)) return Constants.AppDisplayName;
+        return string.IsNullOrEmpty(nickname) ? uin : $"{nickname}({uin})";
     }
 
     private async Task LoadThemeSettingsAsync()
